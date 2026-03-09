@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 
 login_page.png
+
+# Custom AI Assistant Workflows
+.agents/
