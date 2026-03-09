@@ -44,6 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+<<<<<<< HEAD
 login_page.png
 
 # Custom AI Assistant Workflows
@@ -51,3 +52,7 @@ login_page.png
 
 .agents/workflows/remove_image_background.md
 
+=======
+# Custom AI Assistant Workflows
+.agents/
+>>>>>>> d181b57 (WSPIN-12   fix: resolve branch mix-up and restore stable files)

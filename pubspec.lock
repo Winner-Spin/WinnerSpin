@@ -360,7 +360,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.7"
-<<<<<<< Updated upstream
   typed_data:
     dependency: transitive
     description:
@@ -369,8 +368,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-=======
->>>>>>> Stashed changes
   vector_math:
     dependency: transitive
     description:

@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-<<<<<<< Updated upstream
-import 'package:google_fonts/google_fonts.dart';
-import 'viewmodels/login_viewmodel.dart'; // Import the ViewModel
-=======
 import 'viewmodels/login_viewmodel.dart';
->>>>>>> Stashed changes
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,12 +9,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Instantiate the ViewModel
   final LoginViewModel _viewModel = LoginViewModel();
 
   @override
   void dispose() {
-    // Dispose the ViewModel to free resources
     _viewModel.dispose();
     super.dispose();
   }
@@ -44,10 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Action Button: Music (Placed at the home icon's position - rightmost)
+              // Music Button
               Positioned(
-                top: screenH * 0.125, // Height just above the logo in the reference
-                right: screenW * 0.07, // Position of the rightmost Home icon in the 3-button group
+                top: screenH * 0.125,
+                right: screenW * 0.07,
                 child: AnimatedImageButton(
                   imagePath: 'lib/images/login_screen/music_button.png',
                   width: 46,
@@ -59,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Email Input Field
               Positioned(
-                top: screenH * 0.48, // approximate position of email field
+                top: screenH * 0.48,
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
@@ -74,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Password Input Field
               Positioned(
-                top: screenH * 0.58, // lower position for password field
+                top: screenH * 0.58,
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
@@ -114,11 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     imagePath: 'lib/images/login_screen/signup_button_final.png',
                     width: 250,
                     onTap: () {
-<<<<<<< Updated upstream
-                      _viewModel.navigateToSignUp();
-=======
                       _viewModel.navigateToSignUp(context);
->>>>>>> Stashed changes
                     },
                   ),
                 ),
@@ -154,8 +143,14 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: GoogleFonts.baloo2(
-                textStyle: const TextStyle(
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(
                   color: Colors.white70,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -166,23 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       blurRadius: 2,
                     ),
                   ],
-                ),
-              ),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: GoogleFonts.baloo2(
-                  textStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black45,
-                        offset: Offset(0, 1),
-                        blurRadius: 2,
-                      ),
-                    ],
-                  ),
                 ),
                 border: InputBorder.none,
                 isDense: true,
@@ -195,10 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-
-
-} // End of _LoginScreenState
+}
 
 /// Custom Image Button with Scale Animation
 class AnimatedImageButton extends StatefulWidget {
@@ -227,8 +202,8 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100), // Press speed
-      reverseDuration: const Duration(milliseconds: 100), // Release speed
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 100),
     );
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.90).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
@@ -260,7 +235,7 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
         },
         child: Image.asset(
           widget.imagePath,
-          width: widget.width, // Set scale width via parameter
+          width: widget.width,
           fit: BoxFit.contain,
         ),
       ),
