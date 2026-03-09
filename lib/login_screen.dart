@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart';
+import 'viewmodels/login_viewmodel.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,13 +9,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final LoginViewModel _viewModel = LoginViewModel();
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -39,27 +37,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Action Button: Music (Placed at the home icon's position - rightmost)
+              // Music Button
               Positioned(
-                top: screenH * 0.125, // Height just above the logo in the reference
-                right: screenW * 0.07, // Position of the rightmost Home icon in the 3-button group
+                top: screenH * 0.125,
+                right: screenW * 0.07,
                 child: AnimatedImageButton(
                   imagePath: 'lib/images/login_screen/music_button.png',
-                  width: 46, // Current visual proportion
+                  width: 46,
                   onTap: () {
-                    // TODO: Toggle music
+                    _viewModel.toggleMusic();
                   },
                 ),
               ),
 
               // Email Input Field
               Positioned(
-                top: screenH * 0.48, // approximate position of email field
+                top: screenH * 0.48,
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
                   context: context,
-                  controller: _emailController,
+                  controller: _viewModel.emailController,
                   icon: Icons.email,
                   hint: 'Email',
                   backgroundImage:
@@ -69,12 +67,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Password Input Field
               Positioned(
-                top: screenH * 0.58, // lower position for password field
+                top: screenH * 0.58,
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
                   context: context,
-                  controller: _passwordController,
+                  controller: _viewModel.passwordController,
                   icon: Icons.lock,
                   hint: 'Password',
                   obscureText: true,
@@ -85,66 +83,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Login Button
               Positioned(
-                top: screenH * 0.70, // lower position
+                top: screenH * 0.70,
                 left: screenW * 0.25,
                 right: screenW * 0.25,
                 child: Center(
                   child: AnimatedImageButton(
                     imagePath: 'lib/images/login_screen/login_button_final.png',
-                    width: 180, // Orijinal buton boyutuna geri çekildi
+                    width: 180,
                     onTap: () {
-                      // TODO: Handle login
+                      _viewModel.login();
                     },
                   ),
                 ),
               ),
 
+              // Sign Up Button
               Positioned(
-                bottom: screenH * 0.12,
-                left: screenW * 0.15,
-                right: screenW * 0.15,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterScreen(),
-                      ),
-                    );
-                  },
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.pinkAccent, width: 2),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Don\'t have an account? ',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            'Sign up!',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                bottom: screenH * 0.165,
+                left: screenW * 0.10,
+                right: screenW * 0.10,
+                child: Center(
+                  child: AnimatedImageButton(
+                    imagePath: 'lib/images/login_screen/signup_button_final.png',
+                    width: 250,
+                    onTap: () {
+                      _viewModel.navigateToSignUp(context);
+                    },
                   ),
                 ),
               ),
@@ -209,10 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-
-
-} // End of _LoginScreenState
+}
 
 /// Custom Image Button with Scale Animation
 class AnimatedImageButton extends StatefulWidget {
@@ -241,8 +202,8 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100), // Press speed
-      reverseDuration: const Duration(milliseconds: 100), // Release speed
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 100),
     );
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.90).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
@@ -274,7 +235,7 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
         },
         child: Image.asset(
           widget.imagePath,
-          width: widget.width, // Set scale width via parameter
+          width: widget.width,
           fit: BoxFit.contain,
         ),
       ),
