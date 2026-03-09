@@ -21,10 +21,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final double screenH = constraints.maxHeight;
-          final double screenW = constraints.maxWidth;
+      body: AnimatedBuilder(
+        animation: _viewModel,
+        builder: (context, child) {
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final double screenH = constraints.maxHeight;
+              final double screenW = constraints.maxWidth;
 
           return Stack(
             children: [
@@ -44,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: AnimatedImageButton(
                   imagePath: 'lib/images/login_screen/music_button.png',
                   width: 46,
+                  isStrikeThrough: _viewModel.isMusicMuted,
                   onTap: () {
                     _viewModel.toggleMusic();
                   },
@@ -115,8 +119,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           );
         },
-      ),
-    );
+      ); // LayoutBuilder
+     },
+    ), // AnimatedBuilder
+   ); // Scaffold
   }
 
   Widget _buildCustomTextField({
@@ -180,12 +186,14 @@ class AnimatedImageButton extends StatefulWidget {
   final VoidCallback onTap;
   final String imagePath;
   final double width;
+  final bool isStrikeThrough;
 
   const AnimatedImageButton({
     super.key,
     required this.onTap,
     required this.imagePath,
     required this.width,
+    this.isStrikeThrough = false,
   });
 
   @override
@@ -233,10 +241,27 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
             child: child,
           );
         },
-        child: Image.asset(
-          widget.imagePath,
-          width: widget.width,
-          fit: BoxFit.contain,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Image.asset(
+              widget.imagePath,
+              width: widget.width,
+              fit: BoxFit.contain,
+            ),
+            if (widget.isStrikeThrough)
+              Transform.rotate(
+                angle: -0.785, // -45 degrees
+                child: Container(
+                  width: widget.width * 0.8,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

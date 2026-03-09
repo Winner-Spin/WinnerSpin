@@ -8,6 +8,9 @@ class LoginViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  bool _isMusicMuted = false;
+  bool get isMusicMuted => _isMusicMuted;
+
   void login() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
       return;
@@ -31,8 +34,9 @@ class LoginViewModel extends ChangeNotifier {
   }
 
   void toggleMusic() {
-    // TODO: Implement music toggle logic
-    print("Toggling Music");
+    _isMusicMuted = !_isMusicMuted;
+    print("Toggling Music. Muted: $_isMusicMuted");
+    notifyListeners();
   }
 
   void _setLoading(bool value) {
