@@ -65,6 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _emailController,
                   icon: Icons.email,
                   hint: 'Email',
+                  backgroundImage:
+                      'lib/images/login_screen/email_button1_cropped.png',
                 ),
               ),
 
@@ -79,6 +81,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Icons.lock,
                   hint: 'Password',
                   obscureText: true,
+                  backgroundImage:
+                      'lib/images/login_screen/password_button_cropped.png',
                 ),
               ),
 
@@ -101,24 +105,21 @@ class _LoginScreenState extends State<LoginScreen> {
     required TextEditingController controller,
     required IconData icon,
     required String hint,
+    required String backgroundImage,
     bool obscureText = false,
   }) {
     return Container(
-      height: 60, // Görselin oranlarına daha uygun olabilir
-      padding: const EdgeInsets.only(bottom: 8.0), // Çözüm: Yazıları yukarı kaydırmak için alttan itiyoruz.
-      decoration: const BoxDecoration(
+      height: 60,
+      padding: const EdgeInsets.only(bottom: 8.0),
+      decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage('lib/images/login_screen/email_button1_cropped.png'),
-          fit: BoxFit.fill, // Kutuyu görselle tamamen doldur
+          image: AssetImage(backgroundImage),
+          fit: BoxFit.fill,
         ),
       ),
       child: Row(
         children: [
-          // İkon kısmı (görselin kendi ikonu varsa bunu kaldırabiliriz, 
-          // ama şu an için koruyup biraz padding veriyorum)
-          const SizedBox(width: 24),
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(width: 16),
+          const SizedBox(width: 64),
           Expanded(
             child: TextField(
               controller: controller,
@@ -235,7 +236,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Positioned(
               top: 35,
               right: 18,
-              child: _buildStar(6.5, Colors.yellowAccent.withValues(alpha: 0.9)),
+              child: _buildStar(
+                6.5,
+                Colors.yellowAccent.withValues(alpha: 0.9),
+              ),
             ), // Big star
             Positioned(
               top: 20,
@@ -370,12 +374,16 @@ class _LoginScreenState extends State<LoginScreen> {
               size: 26,
               shadows: [
                 Shadow(
-                  color: Colors.black.withValues(alpha: 0.5), // Gölge belirginleştirildi
+                  color: Colors.black.withValues(
+                    alpha: 0.5,
+                  ), // Gölge belirginleştirildi
                   offset: const Offset(0, 2), // Gölge konumu değiştirildi
                   blurRadius: 4, // Bulanıklık artırıldı
                 ),
                 Shadow(
-                  color: Colors.black.withValues(alpha: 0.3), // Ek aydınlık için ikinci gölge
+                  color: Colors.black.withValues(
+                    alpha: 0.3,
+                  ), // Ek aydınlık için ikinci gölge
                   offset: const Offset(0, -1),
                   blurRadius: 2,
                 ),
