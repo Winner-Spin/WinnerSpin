@@ -48,3 +48,6 @@ login_page.png
 
 # Custom AI Assistant Workflows
 .agents/
+
+.agents/workflows/remove_image_background.md
+

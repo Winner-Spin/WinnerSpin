@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+<<<<<<< Updated upstream
 import 'package:google_fonts/google_fonts.dart';
 import 'viewmodels/login_viewmodel.dart'; // Import the ViewModel
+=======
+import 'viewmodels/login_viewmodel.dart';
+>>>>>>> Stashed changes
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -110,7 +114,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     imagePath: 'lib/images/login_screen/signup_button_final.png',
                     width: 250,
                     onTap: () {
+<<<<<<< Updated upstream
                       _viewModel.navigateToSignUp();
+=======
+                      _viewModel.navigateToSignUp(context);
+>>>>>>> Stashed changes
                     },
                   ),
                 ),

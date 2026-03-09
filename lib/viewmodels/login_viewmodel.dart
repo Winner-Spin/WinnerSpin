@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../register_screen.dart';
 
 class LoginViewModel extends ChangeNotifier {
   final TextEditingController emailController = TextEditingController();
@@ -22,9 +23,11 @@ class LoginViewModel extends ChangeNotifier {
     _setLoading(false);
   }
 
-  void navigateToSignUp() {
-    // TODO: Implement navigation logic
-    print("Navigating to Sign Up Screen");
+  void navigateToSignUp(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RegisterScreen()),
+    );
   }
 
   void toggleMusic() {

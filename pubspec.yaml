@@ -58,8 +58,15 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+<<<<<<< Updated upstream
   assets:
     - lib/images/login_screen/
+=======
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - lib/images/login_screen/
+    - lib/images/register_screen/
+>>>>>>> Stashed changes
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
