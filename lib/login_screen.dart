@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'viewmodels/login_viewmodel.dart'; // Import the ViewModel
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -8,13 +10,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  // Instantiate the ViewModel
+  final LoginViewModel _viewModel = LoginViewModel();
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    // Dispose the ViewModel to free resources
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -44,9 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 right: screenW * 0.07, // Position of the rightmost Home icon in the 3-button group
                 child: AnimatedImageButton(
                   imagePath: 'lib/images/login_screen/music_button.png',
-                  width: 46, // Current visual proportion
+                  width: 46,
                   onTap: () {
-                    // TODO: Toggle music
+                    _viewModel.toggleMusic();
                   },
                 ),
               ),
@@ -58,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
                   context: context,
-                  controller: _emailController,
+                  controller: _viewModel.emailController,
                   icon: Icons.email,
                   hint: 'Email',
                   backgroundImage:
@@ -73,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 right: screenW * 0.15,
                 child: _buildCustomTextField(
                   context: context,
-                  controller: _passwordController,
+                  controller: _viewModel.passwordController,
                   icon: Icons.lock,
                   hint: 'Password',
                   obscureText: true,
@@ -84,15 +86,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Login Button
               Positioned(
-                top: screenH * 0.70, // lower position
+                top: screenH * 0.70,
                 left: screenW * 0.25,
                 right: screenW * 0.25,
                 child: Center(
                   child: AnimatedImageButton(
                     imagePath: 'lib/images/login_screen/login_button_final.png',
-                    width: 180, // Orijinal buton boyutuna geri çekildi
+                    width: 180,
                     onTap: () {
-                      // TODO: Handle login
+                      _viewModel.login();
+                    },
+                  ),
+                ),
+              ),
+
+              // Sign Up Button
+              Positioned(
+                bottom: screenH * 0.165,
+                left: screenW * 0.10,
+                right: screenW * 0.10,
+                child: Center(
+                  child: AnimatedImageButton(
+                    imagePath: 'lib/images/login_screen/signup_button_final.png',
+                    width: 250,
+                    onTap: () {
+                      _viewModel.navigateToSignUp();
                     },
                   ),
                 ),
@@ -128,14 +146,8 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: const TextStyle(
+              style: GoogleFonts.baloo2(
+                textStyle: const TextStyle(
                   color: Colors.white70,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -146,6 +158,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       blurRadius: 2,
                     ),
                   ],
+                ),
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: GoogleFonts.baloo2(
+                  textStyle: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black45,
+                        offset: Offset(0, 1),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
                 ),
                 border: InputBorder.none,
                 isDense: true,
