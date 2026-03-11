@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'music_manager.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -27,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1A0533),
       resizeToAvoidBottomInset: false,
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -47,10 +49,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 top: screenH * 0.07,
                 right: screenW * 0.07,
                 child: AnimatedImageButton(
-                  imagePath: 'lib/images/register_screen/music_button.png',
+                  imagePath: MusicManager.instance.isPlaying
+                      ? 'lib/images/register_screen/music_button.png'
+                      : 'lib/images/register_screen/musıc.png',
                   width: 46,
-                  onTap: () {
-                    // TODO: Toggle music
+                  onTap: () async {
+                    await MusicManager.instance.toggleMusic();
+                    setState(() {});
                   },
                 ),
               ),
@@ -250,4 +255,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-

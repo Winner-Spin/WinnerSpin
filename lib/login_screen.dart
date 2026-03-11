@@ -10,6 +10,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final LoginViewModel _viewModel = LoginViewModel();
+  bool _isMusicOn = true;
 
   @override
   void dispose() {
@@ -42,10 +43,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 top: screenH * 0.125,
                 right: screenW * 0.07,
                 child: AnimatedImageButton(
-                  imagePath: 'lib/images/login_screen/music_button.png',
+                  imagePath: _isMusicOn
+                      ? 'lib/images/login_screen/music_button.png'
+                      : 'lib/images/register_screen/musıc.png',
                   width: 46,
                   onTap: () {
-                    _viewModel.toggleMusic();
+                    setState(() {
+                      _isMusicOn = !_isMusicOn;
+                    });
                   },
                 ),
               ),
