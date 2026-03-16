@@ -12,6 +12,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final LoginViewModel _viewModel = LoginViewModel();
 
   @override
+  void initState() {
+    super.initState();
+    _viewModel.initMusic();
+  }
+
+  @override
   void dispose() {
     _viewModel.dispose();
     super.dispose();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../register_screen.dart';
 
 class LoginViewModel extends ChangeNotifier {
@@ -10,6 +11,16 @@ class LoginViewModel extends ChangeNotifier {
 
   bool _isMusicMuted = false;
   bool get isMusicMuted => _isMusicMuted;
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  void initMusic() async {
+    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    // Use AssetSource for local assets from the `assets` folder
+    await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
+    _isMusicMuted = false;
+    notifyListeners();
+  }
 
   void login() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
@@ -35,6 +46,11 @@ class LoginViewModel extends ChangeNotifier {
 
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
+    if (_isMusicMuted) {
+      _audioPlayer.pause();
+    } else {
+      _audioPlayer.resume();
+    }
     print("Toggling Music. Muted: $_isMusicMuted");
     notifyListeners();
   }
@@ -48,6 +64,7 @@ class LoginViewModel extends ChangeNotifier {
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 }
