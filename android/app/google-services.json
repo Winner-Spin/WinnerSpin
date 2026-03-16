@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "865362136741",
+    "project_id": "winnerspin-fc03f",
+    "storage_bucket": "winnerspin-fc03f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:865362136741:android:05ae064acce56d6d03474c",
+        "android_client_info": {
+          "package_name": "com.example.winner_spin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHFzmUvbJMlIxrZNf0tJG7817FCjMurbA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
