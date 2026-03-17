@@ -19,7 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _viewModel.dispose();
+    // We no longer dispose the view model because it is a singleton
+    // and audio needs to be kept alive.
     super.dispose();
   }
 

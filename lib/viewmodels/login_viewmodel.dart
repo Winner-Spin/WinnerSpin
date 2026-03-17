@@ -3,6 +3,11 @@ import 'package:audioplayers/audioplayers.dart';
 import '../register_screen.dart';
 
 class LoginViewModel extends ChangeNotifier {
+  // Singleton pattern
+  static final LoginViewModel _instance = LoginViewModel._internal();
+  factory LoginViewModel() => _instance;
+  LoginViewModel._internal();
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -12,9 +17,14 @@ class LoginViewModel extends ChangeNotifier {
   bool _isMusicMuted = false;
   bool get isMusicMuted => _isMusicMuted;
 
+  bool _isMusicInitialized = false;
+
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   void initMusic() async {
+    if (_isMusicInitialized) return;
+    _isMusicInitialized = true;
+    
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
     // Use AssetSource for local assets from the `assets` folder
     await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
@@ -37,11 +47,21 @@ class LoginViewModel extends ChangeNotifier {
     _setLoading(false);
   }
 
-  void navigateToSignUp(BuildContext context) {
-    Navigator.push(
+  void navigateToSignUp(BuildContext context) async {
+    // Pause music before navigating
+    if (!_isMusicMuted) {
+      await _audioPlayer.pause();
+    }
+
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RegisterScreen()),
     );
+
+    // Resume music when returning (if it wasn't muted)
+    if (!_isMusicMuted) {
+      await _audioPlayer.resume();
+    }
   }
 
   void toggleMusic() {
@@ -60,6 +80,9 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // We no longer dispose the audio player since it's a singleton
+  // and needs to survive across screen re-visits.
+  /*
   @override
   void dispose() {
     emailController.dispose();
@@ -67,4 +90,5 @@ class LoginViewModel extends ChangeNotifier {
     _audioPlayer.dispose();
     super.dispose();
   }
+  */
 }
