@@ -31,6 +31,9 @@ class _LoginScreenState extends State<LoginScreen> {
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
+          // Show error snackbar when errorMessage changes
+          _showErrorIfNeeded(context);
+
           return LayoutBuilder(
             builder: (context, constraints) {
               final double screenH = constraints.maxHeight;
@@ -92,19 +95,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Login Button
+              // Login Button (or loading spinner)
               Positioned(
                 top: screenH * 0.70,
                 left: screenW * 0.25,
                 right: screenW * 0.25,
                 child: Center(
-                  child: AnimatedImageButton(
-                    imagePath: 'lib/images/login_screen/login_button_final.png',
-                    width: 180,
-                    onTap: () {
-                      _viewModel.login();
-                    },
-                  ),
+                  child: _viewModel.isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : AnimatedImageButton(
+                          imagePath:
+                              'lib/images/login_screen/login_button_final.png',
+                          width: 180,
+                          onTap: () {
+                            _viewModel.login(context);
+                          },
+                        ),
                 ),
               ),
 
@@ -115,7 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 right: screenW * 0.10,
                 child: Center(
                   child: AnimatedImageButton(
-                    imagePath: 'lib/images/login_screen/signup_button_final.png',
+                    imagePath:
+                        'lib/images/login_screen/signup_button_final.png',
                     width: 250,
                     onTap: () {
                       _viewModel.navigateToSignUp(context);
@@ -131,6 +140,29 @@ class _LoginScreenState extends State<LoginScreen> {
     ), // AnimatedBuilder
    ); // Scaffold
   }
+
+  // ─── ERROR HANDLING ──────────────────────────────────────────
+
+  String? _lastShownError;
+
+  void _showErrorIfNeeded(BuildContext context) {
+    final error = _viewModel.errorMessage;
+    if (error != null && error != _lastShownError) {
+      _lastShownError = error;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  // ─── HELPERS ─────────────────────────────────────────────────
 
   Widget _buildCustomTextField({
     required BuildContext context,
