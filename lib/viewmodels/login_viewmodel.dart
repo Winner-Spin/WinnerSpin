@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../register_screen.dart';
+import '../services/auth_service.dart';
+import '../game_screen.dart';
 
 class LoginViewModel extends ChangeNotifier {
   // Singleton pattern
@@ -8,11 +11,16 @@ class LoginViewModel extends ChangeNotifier {
   factory LoginViewModel() => _instance;
   LoginViewModel._internal();
 
+  final AuthService _authService = AuthService();
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
 
   bool _isMusicMuted = false;
   bool get isMusicMuted => _isMusicMuted;
@@ -32,20 +40,48 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void login() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+  // ─── LOGIN ─────────────────────────────────────────────────
+
+  Future<void> login(BuildContext context) async {
+    // Clear previous error
+    _errorMessage = null;
+
+    if (emailController.text.trim().isEmpty ||
+        passwordController.text.isEmpty) {
+      _errorMessage = 'Please enter email and password.';
+      notifyListeners();
       return;
     }
 
     _setLoading(true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      await _authService.signIn(
+        email: emailController.text,
+        password: passwordController.text,
+      );
 
-    // TODO: Implement actual authentication logic
-    print("Login with Email: ${emailController.text}, Password: ${passwordController.text}");
+      // Login successful
+      _errorMessage = null;
+      emailController.clear();
+      passwordController.clear();
 
-    _setLoading(false);
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const GameScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _friendlyError(e.code);
+    } catch (e) {
+      _errorMessage = 'An unexpected error occurred. Please try again.';
+    } finally {
+      _setLoading(false);
+    }
   }
+
+  // ─── NAVIGATION ────────────────────────────────────────────
 
   void navigateToSignUp(BuildContext context) async {
     // Pause music before navigating
@@ -64,6 +100,8 @@ class LoginViewModel extends ChangeNotifier {
     }
   }
 
+  // ─── MUSIC ─────────────────────────────────────────────────
+
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
     if (_isMusicMuted) {
@@ -71,24 +109,34 @@ class LoginViewModel extends ChangeNotifier {
     } else {
       _audioPlayer.resume();
     }
-    print("Toggling Music. Muted: $_isMusicMuted");
     notifyListeners();
   }
+
+  // ─── HELPERS ───────────────────────────────────────────────
 
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
   }
 
+  /// Converts Firebase error codes to user-friendly messages.
+  String _friendlyError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No account found with this email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'invalid-email':
+        return 'Invalid email address.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'invalid-credential':
+        return 'Invalid email or password.';
+      default:
+        return 'Login failed. Please try again.';
+    }
+  }
+
   // We no longer dispose the audio player since it's a singleton
   // and needs to survive across screen re-visits.
-  /*
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-  */
 }
