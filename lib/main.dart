@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
-import 'login_screen.dart';
-import 'game_screen.dart';
+import 'services/auth_service.dart';
+import 'views/login_screen.dart';
+import 'views/game_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +18,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Check if user is already signed in
-    final user = FirebaseAuth.instance.currentUser;
+    // Use AuthService instead of direct FirebaseAuth access
+    final user = AuthService().currentUser;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,

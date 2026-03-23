@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
@@ -18,13 +17,18 @@ class RegisterViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  bool _registrationSuccess = false;
+  bool get registrationSuccess => _registrationSuccess;
+
   // ─── REGISTER ──────────────────────────────────────────────
 
-  /// Validates inputs, calls AuthService.signUp, and navigates
-  /// back to the login screen on success.
-  Future<void> register(BuildContext context) async {
-    // Clear any previous error
+  /// Validates inputs and calls AuthService.signUp.
+  /// Sets [registrationSuccess] to true on success — the View
+  /// is responsible for navigation and showing success messages.
+  Future<void> register() async {
+    // Clear any previous state
     _errorMessage = null;
+    _registrationSuccess = false;
 
     // ── Validation ──
     final username = nameController.text.trim();
@@ -66,16 +70,7 @@ class RegisterViewModel extends ChangeNotifier {
       // Sign out so user must log in manually
       await _authService.signOut();
 
-      // Success — go to login screen
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration successful! Please log in.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context);
-      }
+      _registrationSuccess = true;
     } on FirebaseAuthException catch (e) {
       debugPrint('🔥 FirebaseAuthException: ${e.code} - ${e.message}');
       _errorMessage = _friendlyError(e.code);
@@ -88,6 +83,11 @@ class RegisterViewModel extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// Resets the registrationSuccess flag after navigation is handled.
+  void resetRegistrationSuccess() {
+    _registrationSuccess = false;
   }
 
   // ─── HELPERS ───────────────────────────────────────────────

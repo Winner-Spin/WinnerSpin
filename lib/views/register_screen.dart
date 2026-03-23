@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/animated_image_button.dart';
+import '../viewmodels/register_viewmodel.dart';
 import 'login_screen.dart';
-import 'viewmodels/register_viewmodel.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -27,6 +28,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         builder: (context, child) {
           // Show error snackbar when errorMessage changes
           _showErrorIfNeeded(context);
+
+          // Handle navigation on registration success
+          _handleRegistrationSuccess(context);
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -127,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             )
                           : _buildKayitButton(
                               onTap: () {
-                                _viewModel.register(context);
+                                _viewModel.register();
                               },
                             ),
                     ),
@@ -153,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                                 color: Colors.pinkAccent, width: 2),
@@ -190,6 +194,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         },
       ),
     );
+  }
+
+  // ─── NAVIGATION (View responsibility) ───────────────────────
+
+  void _handleRegistrationSuccess(BuildContext context) {
+    if (_viewModel.registrationSuccess) {
+      _viewModel.resetRegistrationSuccess();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registration successful! Please log in.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      });
+    }
   }
 
   // ─── ERROR HANDLING ──────────────────────────────────────────

@@ -1,9 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../register_screen.dart';
 import '../services/auth_service.dart';
-import '../game_screen.dart';
 
 class LoginViewModel extends ChangeNotifier {
   // Singleton pattern
@@ -22,6 +20,9 @@ class LoginViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  bool _loginSuccess = false;
+  bool get loginSuccess => _loginSuccess;
+
   bool _isMusicMuted = false;
   bool get isMusicMuted => _isMusicMuted;
 
@@ -34,7 +35,6 @@ class LoginViewModel extends ChangeNotifier {
     _isMusicInitialized = true;
     
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    // Use AssetSource for local assets from the `assets` folder
     await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
     _isMusicMuted = false;
     notifyListeners();
@@ -42,9 +42,10 @@ class LoginViewModel extends ChangeNotifier {
 
   // ─── LOGIN ─────────────────────────────────────────────────
 
-  Future<void> login(BuildContext context) async {
-    // Clear previous error
+  Future<void> login() async {
+    // Clear previous state
     _errorMessage = null;
+    _loginSuccess = false;
 
     if (emailController.text.trim().isEmpty ||
         passwordController.text.isEmpty) {
@@ -65,13 +66,7 @@ class LoginViewModel extends ChangeNotifier {
       _errorMessage = null;
       emailController.clear();
       passwordController.clear();
-
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const GameScreen()),
-        );
-      }
+      _loginSuccess = true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _friendlyError(e.code);
     } catch (e) {
@@ -81,23 +76,9 @@ class LoginViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── NAVIGATION ────────────────────────────────────────────
-
-  void navigateToSignUp(BuildContext context) async {
-    // Pause music before navigating
-    if (!_isMusicMuted) {
-      await _audioPlayer.pause();
-    }
-
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RegisterScreen()),
-    );
-
-    // Resume music when returning (if it wasn't muted)
-    if (!_isMusicMuted) {
-      await _audioPlayer.resume();
-    }
+  /// Resets the loginSuccess flag after navigation is handled.
+  void resetLoginSuccess() {
+    _loginSuccess = false;
   }
 
   // ─── MUSIC ─────────────────────────────────────────────────
@@ -110,6 +91,20 @@ class LoginViewModel extends ChangeNotifier {
       _audioPlayer.resume();
     }
     notifyListeners();
+  }
+
+  /// Pauses music when navigating away from the login screen.
+  Future<void> onNavigatingAway() async {
+    if (!_isMusicMuted) {
+      await _audioPlayer.pause();
+    }
+  }
+
+  /// Resumes music when returning to the login screen.
+  Future<void> onReturned() async {
+    if (!_isMusicMuted) {
+      await _audioPlayer.resume();
+    }
   }
 
   // ─── HELPERS ───────────────────────────────────────────────
@@ -136,7 +131,4 @@ class LoginViewModel extends ChangeNotifier {
         return 'Login failed. Please try again.';
     }
   }
-
-  // We no longer dispose the audio player since it's a singleton
-  // and needs to survive across screen re-visits.
 }
