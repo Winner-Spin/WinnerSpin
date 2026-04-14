@@ -51,8 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     top: screenH * 0.07,
                     right: screenW * 0.07,
                     child: AnimatedImageButton(
-                      imagePath:
-                          'lib/images/register_screen/music_button.png',
+                      imagePath: 'lib/images/register_screen/music_button.png',
                       width: 46,
                       onTap: () {
                         // TODO: Toggle music
@@ -126,9 +125,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     right: screenW * 0.21,
                     child: Center(
                       child: _viewModel.isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : _buildKayitButton(
                               onTap: () {
                                 _viewModel.register();
@@ -141,49 +138,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     bottom: screenH * 0.12,
                     left: screenW * 0.15,
                     right: screenW * 0.15,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: Colors.pinkAccent, width: 2),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Already have an account? ',
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                'Login!',
-                                style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    child: Center(
+                      child: AnimatedImageButton(
+                        imagePath: 'lib/images/register_screen/image.png',
+                        width: 250,
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -226,10 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.redAccent,
-            ),
+            SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
           );
         }
       });
