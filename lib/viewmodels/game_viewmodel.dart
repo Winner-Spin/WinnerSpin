@@ -1,10 +1,11 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/slot_engine.dart';
+import '../services/pool_service.dart';
+import '../models/pool_state.dart';
 
 class GameViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
-  final Random _random = Random();
 
   // ─── USER DATA ──────────────────────────────────────────────
 
@@ -20,42 +21,10 @@ class GameViewModel extends ChangeNotifier {
   bool _loggedOut = false;
   bool get loggedOut => _loggedOut;
 
-  // ─── SLOT ITEMS ─────────────────────────────────────────────
+  // ─── SLOT GRID STATE (6 columns × 5 rows) ──────────────────
 
-  /// All available slot item asset paths.
-  static const List<String> slotItems = [
-    'lib/images/slot_main_screen/Items/Apple.png',
-    'lib/images/slot_main_screen/Items/cilek.png',
-    'lib/images/slot_main_screen/Items/karpuz.png',
-    'lib/images/slot_main_screen/Items/muz.png',
-    'lib/images/slot_main_screen/Items/seftali.png',
-    'lib/images/slot_main_screen/Items/uzum.png',
-    'lib/images/slot_main_screen/Items/Kalp.png',
-    'lib/images/slot_main_screen/Items/cupCake.png',
-    'lib/images/slot_main_screen/Items/pembe_ayi.png',
-    'lib/images/slot_main_screen/Items/yesil_ayi.png',
-    'lib/images/slot_main_screen/Items/mavi_kare.png',
-    'lib/images/slot_main_screen/Items/yesil_kare.png',
-  ];
-
-  /// Multiplier items (special symbols).
-  static const List<String> multiplierItems = [
-    'lib/images/slot_main_screen/Items/2x_carpan.png',
-    'lib/images/slot_main_screen/Items/3x_carpan.png',
-    'lib/images/slot_main_screen/Items/5x_carpan.png',
-    'lib/images/slot_main_screen/Items/10x_carpan.png',
-    'lib/images/slot_main_screen/Items/25x_carpan.png',
-    'lib/images/slot_main_screen/Items/50x_carpan.png',
-    'lib/images/slot_main_screen/Items/100x_carpan.png',
-  ];
-
-  /// Combined list of all items for reel generation.
-  List<String> get allItems => [...slotItems, ...multiplierItems];
-
-  // ─── SLOT GRID STATE (5 columns × 3 rows) ──────────────────
-
-  static const int columns = 6;
-  static const int rows = 5;
+  static const int columns = SlotEngine.columns;
+  static const int rows = SlotEngine.rows;
 
   /// The 6×5 grid: grid[col][row] = asset path.
   late List<List<String>> _grid;
@@ -82,24 +51,40 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+  // ─── POOL STATE ─────────────────────────────────────────────
+
+  PoolState _pool = PoolState();
+
+  /// Cached spin result (pre-calculated by the engine).
+  SpinResult? _pendingResult;
+
   // ─── CONSTRUCTOR ────────────────────────────────────────────
 
   GameViewModel() {
-    _grid = _generateRandomGrid();
+    // Generate initial display grid using normal mode weights.
+    final result = SlotEngine.spin(_pool, 0);
+    _grid = result.grid;
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
   }
 
-  // ─── FETCH USER DATA ────────────────────────────────────────
+  // ─── FETCH USER DATA + POOL ─────────────────────────────────
 
   Future<void> fetchUserData() async {
     try {
       final user = _authService.currentUser;
       if (user != null) {
-        final data = await _authService.getUserData(user.uid);
+        // Fetch user profile and pool state in parallel.
+        final results = await Future.wait([
+          _authService.getUserData(user.uid),
+          PoolService.load(user.uid),
+        ]);
 
-        if (data != null) {
-          _username = data['username'] ?? 'Kullanıcı';
-          _email = data['email'] ?? 'Email Yok';
+        final userData = results[0] as Map<String, dynamic>?;
+        _pool = results[1] as PoolState;
+
+        if (userData != null) {
+          _username = userData['username'] ?? 'Kullanıcı';
+          _email = userData['email'] ?? 'Email Yok';
         } else {
           _username = 'Bilinmiyor';
           _email = 'Bilinmiyor';
@@ -117,7 +102,8 @@ class GameViewModel extends ChangeNotifier {
 
   // ─── SPIN ───────────────────────────────────────────────────
 
-  /// Prepares the spin: deducts bet, sets previous grid, and generates the new target grid immediately.
+  /// Prepares the spin: deducts bet, runs the math engine,
+  /// and sets the new target grid for animation.
   void spin() {
     if (_isSpinning) return;
     if (_balance < _betAmount) return;
@@ -125,20 +111,38 @@ class GameViewModel extends ChangeNotifier {
     _isSpinning = true;
     _balance -= _betAmount;
     _lastWin = 0.0;
-    
-    // Snapshot the current grid
+
+    // Record bet in pool.
+    _pool.recordBet(_betAmount);
+
+    // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
-    
-    // Generate target grid immediately for the UI to use in animations
-    _grid = _generateRandomGrid();
-    
+
+    // Run the entire math engine synchronously.
+    // This pre-calculates all tumble rounds and the total win.
+    _pendingResult = SlotEngine.spin(_pool, _betAmount);
+
+    // Set the grid the UI will animate towards.
+    _grid = _pendingResult!.grid;
+
     notifyListeners();
   }
 
-  /// Called precisely when the final SlotReel completes its drop-in animation.
+  /// Called when the final SlotReel completes its drop-in animation.
   void onSpinComplete() {
-    _lastWin = _calculateWin();
-    _balance += _lastWin;
+    if (_pendingResult != null) {
+      _lastWin = _pendingResult!.totalWin;
+      _balance += _lastWin;
+
+      // Record payout in pool.
+      _pool.recordPayout(_lastWin);
+
+      // Save to Firestore periodically (every 10 spins).
+      _savePoolIfNeeded();
+
+      _pendingResult = null;
+    }
+
     _isSpinning = false;
     notifyListeners();
   }
@@ -162,6 +166,8 @@ class GameViewModel extends ChangeNotifier {
   // ─── SIGN OUT ───────────────────────────────────────────────
 
   Future<void> signOut() async {
+    // Force save pool state before logging out.
+    await _forceSavePool();
     await _authService.signOut();
     _loggedOut = true;
     notifyListeners();
@@ -172,45 +178,29 @@ class GameViewModel extends ChangeNotifier {
     _loggedOut = false;
   }
 
-  // ─── HELPERS ────────────────────────────────────────────────
+  // ─── POOL PERSISTENCE ──────────────────────────────────────
 
-  /// Generates a random 5×3 grid of slot items.
-  List<List<String>> _generateRandomGrid() {
-    final items = allItems;
-    return List.generate(columns, (_) {
-      return List.generate(rows, (_) {
-        return items[_random.nextInt(items.length)];
-      });
-    });
-  }
-
-  /// Basic win calculation — checks rows for 3+ matching symbols.
-  double _calculateWin() {
-    double totalWin = 0.0;
-
-    for (int row = 0; row < rows; row++) {
-      // Check consecutive matches from left
-      int matchCount = 1;
-      String firstSymbol = _grid[0][row];
-
-      for (int col = 1; col < columns; col++) {
-        if (_grid[col][row] == firstSymbol) {
-          matchCount++;
-        } else {
-          break;
-        }
-      }
-
-      if (matchCount >= 3) {
-        double multiplier = matchCount == 5
-            ? 10.0
-            : matchCount == 4
-                ? 5.0
-                : 2.0;
-        totalWin += _betAmount * multiplier;
+  /// Saves pool to Firestore if the save interval has been reached.
+  void _savePoolIfNeeded() {
+    if (_pool.shouldSave) {
+      final uid = _authService.currentUser?.uid;
+      if (uid != null) {
+        // Fire-and-forget — non-blocking async write.
+        PoolService.save(uid, _pool);
       }
     }
+  }
 
-    return totalWin;
+  /// Forces an immediate pool save (used on logout/background).
+  Future<void> _forceSavePool() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      await PoolService.save(uid, _pool);
+    }
+  }
+
+  /// Call this when the app goes to background to persist pool data.
+  Future<void> onAppPaused() async {
+    await _forceSavePool();
   }
 }

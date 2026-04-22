@@ -12,7 +12,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
 
   late AnimationController _spinButtonController;
@@ -21,6 +21,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _viewModel.addListener(_onViewModelChange);
     _viewModel.fetchUserData();
 
@@ -40,7 +41,16 @@ class _GameScreenState extends State<GameScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _viewModel.onAppPaused();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _spinButtonController.dispose();
     super.dispose();
@@ -101,7 +111,7 @@ class _GameScreenState extends State<GameScreen>
 
               // ── WIN OVERLAY ─────────────────────────────
               Positioned(
-                top: screenH * 0.42,
+                top: screenH * 0.55,
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: AnimatedBuilder(
