@@ -58,6 +58,12 @@ class GameViewModel extends ChangeNotifier {
   /// Cached spin result (pre-calculated by the engine).
   SpinResult? _pendingResult;
 
+  // ─── FREE SPINS STATE ───────────────────────────────────────
+  
+  int _freeSpinsRemaining = 0;
+  int get freeSpinsRemaining => _freeSpinsRemaining;
+  bool get isInFreeSpins => _freeSpinsRemaining > 0;
+
   // ─── CONSTRUCTOR ────────────────────────────────────────────
 
   GameViewModel() {
@@ -106,21 +112,29 @@ class GameViewModel extends ChangeNotifier {
   /// and sets the new target grid for animation.
   void spin() {
     if (_isSpinning) return;
-    if (_balance < _betAmount) return;
+    
+    // Check if we are in free spins mode
+    final bool isFreeSpin = isInFreeSpins;
+
+    // Normal spin: check and deduct balance
+    if (!isFreeSpin) {
+      if (_balance < _betAmount) return;
+      _balance -= _betAmount;
+      _pool.recordBet(_betAmount); // Only record bet if it costs money
+    } else {
+      // Consume one free spin
+      _freeSpinsRemaining--;
+    }
 
     _isSpinning = true;
-    _balance -= _betAmount;
     _lastWin = 0.0;
-
-    // Record bet in pool.
-    _pool.recordBet(_betAmount);
 
     // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
 
     // Run the entire math engine synchronously.
-    // This pre-calculates all tumble rounds and the total win.
-    _pendingResult = SlotEngine.spin(_pool, _betAmount);
+    // Pass the isFreeSpin flag to boost multipliers!
+    _pendingResult = SlotEngine.spin(_pool, _betAmount, isFreeSpins: isFreeSpin);
 
     // Set the grid the UI will animate towards.
     _grid = _pendingResult!.grid;
@@ -133,6 +147,11 @@ class GameViewModel extends ChangeNotifier {
     if (_pendingResult != null) {
       _lastWin = _pendingResult!.totalWin;
       _balance += _lastWin;
+
+      // Award free spins if triggered
+      if (_pendingResult!.freeSpinsTriggered) {
+        _freeSpinsRemaining += 10;
+      }
 
       // Record payout in pool.
       _pool.recordPayout(_lastWin);

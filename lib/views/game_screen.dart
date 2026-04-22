@@ -109,6 +109,22 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
 
+              // ── FREE SPINS OVERLAY ──────────────────────
+              Positioned(
+                top: screenH * 0.15,
+                left: screenW * 0.1,
+                right: screenW * 0.1,
+                child: AnimatedBuilder(
+                  animation: _viewModel,
+                  builder: (context, child) {
+                    if (_viewModel.isInFreeSpins) {
+                      return _buildFreeSpinsBanner();
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+
               // ── WIN OVERLAY ─────────────────────────────
               Positioned(
                 top: screenH * 0.55,
@@ -662,5 +678,57 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
     }
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // FREE SPINS BANNER
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildFreeSpinsBanner() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Colors.pinkAccent, Colors.purpleAccent],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.pinkAccent.withValues(alpha: 0.6),
+                  blurRadius: 15,
+                  spreadRadius: 3,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.star, color: Colors.yellow, size: 28),
+                const SizedBox(width: 8),
+                Text(
+                  "BEDAVA DÖNÜŞ: ${_viewModel.freeSpinsRemaining}",
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.star, color: Colors.yellow, size: 28),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

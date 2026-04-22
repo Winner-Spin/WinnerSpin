@@ -44,11 +44,11 @@ class PoolState {
   GameMode get currentMode {
     if (totalSpins < 50) return GameMode.normal;
     final deficit = _rtpDeficit;
-    if (deficit > 0.10) return GameMode.jackpot;   // underpaying by 10%+
-    if (deficit > 0.05) return GameMode.generous;   // underpaying by 5-10%
-    if (deficit > -0.03) return GameMode.normal;    // within ±3% of target
-    if (deficit > -0.08) return GameMode.tight;     // overpaying by 3-8%
-    return GameMode.recovery;                        // overpaying by 8%+
+    if (deficit > 0.25) return GameMode.jackpot;    // underpaying by 25%+
+    if (deficit > 0.10) return GameMode.generous;   // underpaying by 10-25%
+    if (deficit > -0.05) return GameMode.normal;    // within -5% to +10% of target
+    if (deficit > -0.15) return GameMode.tight;     // overpaying by 5-15%
+    return GameMode.recovery;                       // overpaying by 15%+
   }
 
   // ─── MUTATION ─────────────────────────────────────────────────
