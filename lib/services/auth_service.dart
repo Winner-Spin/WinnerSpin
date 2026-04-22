@@ -63,4 +63,20 @@ class AuthService {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
+  // ─── USER DATA ─────────────────────────────────────────────
+
+  /// Fetches user profile data from Firestore.
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      // Return null on failure to prevent app crashes and data leaks.
+      return null;
+    }
+  }
 }

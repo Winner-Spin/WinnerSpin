@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GameViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -55,12 +54,16 @@ class GameViewModel extends ChangeNotifier {
 
   // ─── SLOT GRID STATE (5 columns × 3 rows) ──────────────────
 
-  static const int columns = 5;
-  static const int rows = 3;
+  static const int columns = 6;
+  static const int rows = 5;
 
-  /// The 5×3 grid: grid[col][row] = asset path.
+  /// The 6×5 grid: grid[col][row] = asset path.
   late List<List<String>> _grid;
   List<List<String>> get grid => _grid;
+
+  /// The previous grid (used for drop-out animation).
+  List<List<String>> _previousGrid = [];
+  List<List<String>> get previousGrid => _previousGrid;
 
   // ─── BALANCE & BET ──────────────────────────────────────────
 
@@ -83,6 +86,7 @@ class GameViewModel extends ChangeNotifier {
 
   GameViewModel() {
     _grid = _generateRandomGrid();
+    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
   }
 
   // ─── FETCH USER DATA ────────────────────────────────────────
@@ -91,13 +95,9 @@ class GameViewModel extends ChangeNotifier {
     try {
       final user = _authService.currentUser;
       if (user != null) {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final data = await _authService.getUserData(user.uid);
 
-        if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>;
+        if (data != null) {
           _username = data['username'] ?? 'Kullanıcı';
           _email = data['email'] ?? 'Email Yok';
         } else {
@@ -106,7 +106,7 @@ class GameViewModel extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Firestore fetch error: $e');
+      debugPrint('Data fetch error: $e');
       _username = 'Hata oluştu';
       _email = 'Hata oluştu';
     } finally {
@@ -117,7 +117,7 @@ class GameViewModel extends ChangeNotifier {
 
   // ─── SPIN ───────────────────────────────────────────────────
 
-  /// Performs a simple spin: deducts bet, randomizes grid, calculates win.
+  /// Prepares the spin: deducts bet, sets previous grid, and generates the new target grid immediately.
   void spin() {
     if (_isSpinning) return;
     if (_balance < _betAmount) return;
@@ -125,16 +125,22 @@ class GameViewModel extends ChangeNotifier {
     _isSpinning = true;
     _balance -= _betAmount;
     _lastWin = 0.0;
+    
+    // Snapshot the current grid
+    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+    
+    // Generate target grid immediately for the UI to use in animations
+    _grid = _generateRandomGrid();
+    
     notifyListeners();
+  }
 
-    // Simulate a short delay then resolve
-    Future.delayed(const Duration(milliseconds: 600), () {
-      _grid = _generateRandomGrid();
-      _lastWin = _calculateWin();
-      _balance += _lastWin;
-      _isSpinning = false;
-      notifyListeners();
-    });
+  /// Called precisely when the final SlotReel completes its drop-in animation.
+  void onSpinComplete() {
+    _lastWin = _calculateWin();
+    _balance += _lastWin;
+    _isSpinning = false;
+    notifyListeners();
   }
 
   // ─── BET CONTROLS ───────────────────────────────────────────

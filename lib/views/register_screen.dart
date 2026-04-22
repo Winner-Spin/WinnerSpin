@@ -14,7 +14,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final RegisterViewModel _viewModel = RegisterViewModel();
 
   @override
+  void initState() {
+    super.initState();
+    _viewModel.addListener(_onViewModelChange);
+  }
+
+  void _onViewModelChange() {
+    _showErrorIfNeeded(context);
+    _handleRegistrationSuccess(context);
+  }
+
+  @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChange);
     _viewModel.dispose();
     super.dispose();
   }
@@ -26,12 +38,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
-          // Show error snackbar when errorMessage changes
-          _showErrorIfNeeded(context);
-
-          // Handle navigation on registration success
-          _handleRegistrationSuccess(context);
-
           return LayoutBuilder(
             builder: (context, constraints) {
               final double screenH = constraints.maxHeight;
@@ -165,19 +171,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ─── NAVIGATION (View responsibility) ───────────────────────
 
   void _handleRegistrationSuccess(BuildContext context) {
+    if (!mounted) return;
     if (_viewModel.registrationSuccess) {
       _viewModel.resetRegistrationSuccess();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registration successful! Please log in.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registration successful! Please log in.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context);
     }
   }
 
@@ -186,16 +189,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _lastShownError;
 
   void _showErrorIfNeeded(BuildContext context) {
+    if (!mounted) return;
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
-          );
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
+      );
     }
   }
 

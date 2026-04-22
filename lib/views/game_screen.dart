@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/game_viewmodel.dart';
+import '../widgets/slot_reel.dart';
 import 'login_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    _viewModel.addListener(_onViewModelChange);
     _viewModel.fetchUserData();
 
     _spinButtonController = AnimationController(
@@ -33,8 +35,13 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  void _onViewModelChange() {
+    _handleLogout(context);
+  }
+
   @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChange);
     _spinButtonController.dispose();
     super.dispose();
   }
@@ -42,63 +49,72 @@ class _GameScreenState extends State<GameScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _viewModel,
-        builder: (context, child) {
-          _handleLogout(context);
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double screenH = constraints.maxHeight;
+          final double screenW = constraints.maxWidth;
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final double screenH = constraints.maxHeight;
-              final double screenW = constraints.maxWidth;
+          return Stack(
+            children: [
+              // ── BACKGROUND ──────────────────────────────
+              Positioned.fill(
+                child: Image.asset(
+                  'lib/images/slot_main_screen/nihai arka plan.png',
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
 
-              return Stack(
-                children: [
-                  // ── BACKGROUND ──────────────────────────────
-                  Positioned.fill(
-                    child: Image.asset(
-                      'lib/images/slot_main_screen/nihai arka plan.png',
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                    ),
-                  ),
+              // ── TOP BAR (User info + Balance) ───────────
+              Positioned(
+                top: screenH * 0.045,
+                left: screenW * 0.04,
+                right: screenW * 0.04,
+                child: AnimatedBuilder(
+                  animation: _viewModel,
+                  builder: (context, child) => _buildTopBar(screenW),
+                ),
+              ),
 
-                  // ── TOP BAR (User info + Balance) ───────────
-                  Positioned(
-                    top: screenH * 0.045,
-                    left: screenW * 0.04,
-                    right: screenW * 0.04,
-                    child: _buildTopBar(screenW),
-                  ),
+              // ── SLOT GRID (5×3) ─────────────────────────
+              Positioned(
+                top: screenH * 0.195,
+                left: screenW * 0.065,
+                right: screenW * 0.065,
+                height: screenH * 0.32,
+                child: AnimatedBuilder(
+                  animation: _viewModel,
+                  builder: (context, child) => _buildSlotGrid(),
+                ),
+              ),
 
-                  // ── SLOT GRID (5×3) ─────────────────────────
-                  Positioned(
-                    top: screenH * 0.155,
-                    left: screenW * 0.065,
-                    right: screenW * 0.065,
-                    height: screenH * 0.38,
-                    child: _buildSlotGrid(),
-                  ),
+              // ── BOTTOM CONTROL PANEL ────────────────────
+              Positioned(
+                bottom: screenH * 0.02,
+                left: screenW * 0.04,
+                right: screenW * 0.04,
+                child: AnimatedBuilder(
+                  animation: _viewModel,
+                  builder: (context, child) => _buildBottomPanel(screenW, screenH),
+                ),
+              ),
 
-                  // ── BOTTOM CONTROL PANEL ────────────────────
-                  Positioned(
-                    bottom: screenH * 0.02,
-                    left: screenW * 0.04,
-                    right: screenW * 0.04,
-                    child: _buildBottomPanel(screenW, screenH),
-                  ),
-
-                  // ── WIN OVERLAY ─────────────────────────────
-                  if (_viewModel.lastWin > 0 && !_viewModel.isSpinning)
-                    Positioned(
-                      top: screenH * 0.42,
-                      left: screenW * 0.15,
-                      right: screenW * 0.15,
-                      child: _buildWinBanner(),
-                    ),
-                ],
-              );
-            },
+              // ── WIN OVERLAY ─────────────────────────────
+              Positioned(
+                top: screenH * 0.42,
+                left: screenW * 0.15,
+                right: screenW * 0.15,
+                child: AnimatedBuilder(
+                  animation: _viewModel,
+                  builder: (context, child) {
+                    if (_viewModel.lastWin > 0 && !_viewModel.isSpinning) {
+                      return _buildWinBanner();
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -285,47 +301,20 @@ class _GameScreenState extends State<GameScreen>
                         )
                       : null,
                 ),
-                child: Column(
-                  children:
-                      List.generate(GameViewModel.rows, (row) {
-                    return Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        switchInCurve: Curves.easeOut,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: ScaleTransition(
-                              scale: animation,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Container(
-                          key: ValueKey(
-                              '${_viewModel.grid[col][row]}_${col}_${row}_${DateTime.now().millisecondsSinceEpoch}'),
-                          decoration: BoxDecoration(
-                            border: row < GameViewModel.rows - 1
-                                ? Border(
-                                    bottom: BorderSide(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.08),
-                                      width: 1,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: Image.asset(
-                            _viewModel.grid[col][row],
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+                child: SlotReel(
+                  columnIndex: col,
+                  previousItems: List.generate(
+                    GameViewModel.rows,
+                    (row) => _viewModel.previousGrid[col][row],
+                  ),
+                  targetItems: List.generate(
+                    GameViewModel.rows,
+                    (row) => _viewModel.grid[col][row],
+                  ),
+                  spinning: _viewModel.isSpinning,
+                  onComplete: col == GameViewModel.columns - 1
+                      ? () => _viewModel.onSpinComplete()
+                      : null,
                 ),
               ),
             );
@@ -653,18 +642,15 @@ class _GameScreenState extends State<GameScreen>
   // ═══════════════════════════════════════════════════════════════
 
   void _handleLogout(BuildContext context) {
+    if (!mounted) return;
     if (_viewModel.loggedOut) {
       _viewModel.resetLoggedOut();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const LoginScreen(),
-            ),
-          );
-        }
-      });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
+        ),
+      );
     }
   }
 }
