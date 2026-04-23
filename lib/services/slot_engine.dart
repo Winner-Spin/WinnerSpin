@@ -49,14 +49,28 @@ class SlotEngine {
   };
 
   /// Max win multiplier allowed per game mode (Protects RTP).
-  static double _getMaxWinMultiplier(GameMode mode) {
+  /// Dynamically limits based on the current pool balance to prevent bankruptcy.
+  static double _getMaxWinMultiplier(GameMode mode, PoolState pool, double betAmount) {
+    // Determine the absolute ceiling based on the mode
+    double modeCeiling;
     switch (mode) {
-      case GameMode.recovery: return 5.0;     // Extremely tight
-      case GameMode.tight: return 15.0;       // Tight
-      case GameMode.normal: return 50.0;      // Normal
-      case GameMode.generous: return 250.0;   // Generous
-      case GameMode.jackpot: return 5000.0;   // Jackpot
+      case GameMode.recovery: modeCeiling = 10.0; break;     // Very tight limit
+      case GameMode.tight: modeCeiling = 100.0; break;       // Tight limit
+      case GameMode.normal: modeCeiling = 2500.0; break;     // High volatility target
+      case GameMode.generous: modeCeiling = 5000.0; break;   // Very generous
+      case GameMode.jackpot: modeCeiling = 10000.0; break;   // Insane potential
     }
+
+    // For the first 50 spins, ignore pool balance to draw players in
+    if (pool.totalSpins < 50) return modeCeiling;
+
+    // After 50 spins, never allow a single spin to drain more than 50% of the pool.
+    // Calculate the multiplier that would drain 50% of the pool balance.
+    final safePoolMultiplier = (pool.poolBalance * 0.5) / betAmount;
+
+    // We take the minimum of the mode's absolute ceiling and the safe pool multiplier.
+    // But we guarantee at least a 5x minimum multiplier even if the pool is totally empty.
+    return max(5.0, min(modeCeiling, safePoolMultiplier));
   }
 
   /// Weights for picking WHICH symbol wins initially.
@@ -77,7 +91,7 @@ class SlotEngine {
   static SpinResult spin(PoolState pool, double betAmount, {bool isFreeSpins = false}) {
     final mode = pool.currentMode;
     final weights = _buildAdjustedWeights(mode, isFreeSpins);
-    final maxAllowedWin = _getMaxWinMultiplier(mode) * betAmount;
+    final maxAllowedWin = _getMaxWinMultiplier(mode, pool, betAmount) * betAmount;
 
     // Check if we should trigger free spins naturally in this spin
     // (Only triggers if we are NOT already in free spins)
@@ -97,18 +111,26 @@ class SlotEngine {
     for (int attempt = 0; attempt < 50; attempt++) {
       final initialGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
       
-      // Simulate tumbles naturally (allowing chance for chains)
+      // Simulate tumbles naturally (allowing chance for chains/combos)
       final simResult = _runSimulation(initialGrid, weights, betAmount, safeRefill: false);
 
       // Check if the simulation resulted in a win within our allowed budget
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
-        return simResult; // Valid natural cascade!
+        return simResult; // Valid natural cascade found!
       }
     }
 
     // 3. Fallback: If natural cascade failed 50 times (too lucky), force a safe ending.
-    final fallbackGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
-    return _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true);
+    // We loop this as well to ENSURE we NEVER exceed the maxAllowedWin budget.
+    while (true) {
+      final fallbackGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
+      // safeRefill: true ensures no new combos drop, keeping the win amount strictly bounded
+      final simResult = _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true);
+      
+      if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
+        return simResult; // Valid fallback found within budget!
+      }
+    }
   }
 
   // ─── SIMULATION ENGINE ────────────────────────────────────────
@@ -293,12 +315,25 @@ class SlotEngine {
 
   static List<_WeightedSymbol> _buildAdjustedWeights(GameMode mode, bool isFreeSpins) {
     final multipliers = SymbolRegistry.weightMultipliers[mode]!;
+    
+    // Dynamically adjust Free Spins multiplier boost based on game mode (pool state)
+    double fsMultiplierBoost = 1.0;
+    if (isFreeSpins) {
+      switch (mode) {
+        case GameMode.recovery: fsMultiplierBoost = 10.0; break;
+        case GameMode.tight: fsMultiplierBoost = 25.0; break;
+        case GameMode.normal: fsMultiplierBoost = 50.0; break;
+        case GameMode.generous: fsMultiplierBoost = 100.0; break;
+        case GameMode.jackpot: fsMultiplierBoost = 200.0; break;
+      }
+    }
+
     return [
       for (final sym in SymbolRegistry.all)
         _WeightedSymbol(
           sym.assetPath, 
-          // Boost multiplier weights massively if in Free Spins mode!
-          sym.baseWeight * (multipliers[sym.tier] ?? 1.0) * (isFreeSpins && sym.isMultiplier ? 50.0 : 1.0)
+          // Boost multiplier weights dynamically if in Free Spins mode!
+          sym.baseWeight * (multipliers[sym.tier] ?? 1.0) * (sym.isMultiplier ? fsMultiplierBoost : 1.0)
         ),
     ];
   }
