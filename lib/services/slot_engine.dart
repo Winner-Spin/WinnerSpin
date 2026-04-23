@@ -94,6 +94,21 @@ class SlotEngine {
   static SpinResult spin(PoolState pool, double betAmount, {bool isFreeSpins = false}) {
     final mode = pool.currentMode;
     final weights = _buildAdjustedWeights(mode, isFreeSpins);
+
+    // Initial grid generation at app startup passes betAmount = 0.
+    // If we run the win logic with 0 bet, totalWin becomes 0.0, which fails
+    // the (totalWin > 0) check in the while loop, causing an infinite freeze.
+    if (betAmount <= 0) {
+      return SpinResult(
+        grid: _generateSafeGrid(weights),
+        totalWin: 0,
+        tumbleCount: 0,
+        freeSpinsTriggered: false,
+        scatterCount: 0,
+        scatterPayout: 0,
+      );
+    }
+
     final maxAllowedWin = _getMaxWinMultiplier(mode, pool, betAmount) * betAmount;
 
     // Check if we should trigger free spins naturally in this spin
