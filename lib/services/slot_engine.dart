@@ -68,9 +68,12 @@ class SlotEngine {
     // Calculate the multiplier that would drain 50% of the pool balance.
     final safePoolMultiplier = (pool.poolBalance * 0.5) / betAmount;
 
-    // We take the minimum of the mode's absolute ceiling and the safe pool multiplier.
-    // But we guarantee at least a 5x minimum multiplier even if the pool is totally empty.
-    return max(5.0, min(modeCeiling, safePoolMultiplier));
+    // Dynamic Minimum Ceiling:
+    // If the pool is negative or empty, restrict the minimum payout ceiling to 1.0x.
+    // Otherwise, maintain a 5.0x minimum ceiling so normal play doesn't feel completely dead.
+    double absoluteMinimum = pool.poolBalance <= 0 ? 1.0 : 5.0;
+
+    return max(absoluteMinimum, min(modeCeiling, safePoolMultiplier));
   }
 
   /// Weights for picking WHICH symbol wins initially.
