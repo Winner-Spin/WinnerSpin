@@ -344,12 +344,22 @@ class SlotEngine {
 
   static SlotSymbol _pickWinningSymbol(GameMode mode) {
     final regular = SymbolRegistry.all.where((s) => s.isRegular).toList();
-    final totalW = _winSymbolWeights.values.fold<double>(0, (s, v) => s + v);
-    double roll = _rng.nextDouble() * totalW;
-
+    final multipliers = SymbolRegistry.weightMultipliers[mode] ?? {};
+    
+    double totalW = 0;
+    final adjustedWeights = <SlotSymbol, double>{};
+    
     for (final sym in regular) {
-      final w = _winSymbolWeights[sym.id] ?? 0;
-      roll -= w;
+      final baseW = _winSymbolWeights[sym.id] ?? 0;
+      final mult = multipliers[sym.tier] ?? 1.0;
+      final adjW = baseW * mult;
+      adjustedWeights[sym] = adjW;
+      totalW += adjW;
+    }
+
+    double roll = _rng.nextDouble() * totalW;
+    for (final sym in regular) {
+      roll -= adjustedWeights[sym]!;
       if (roll <= 0) return sym;
     }
     return regular.first;
