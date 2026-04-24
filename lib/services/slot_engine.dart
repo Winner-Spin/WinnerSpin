@@ -36,7 +36,7 @@ class SlotEngine {
     GameMode.tight: 0.32,
     GameMode.normal: 0.40, // Increased to match Sweet Bonanza
     GameMode.generous: 0.48,
-    GameMode.jackpot: 0.55,
+    GameMode.jackpot: 0.45,
   };
 
   /// Probability of naturally triggering Free Spins per game mode.
@@ -45,7 +45,7 @@ class SlotEngine {
     GameMode.tight: 0.003,      // 0.3%
     GameMode.normal: 0.01,      // 1.0%
     GameMode.generous: 0.02,    // 2.0%
-    GameMode.jackpot: 0.05,     // 5.0%
+    GameMode.jackpot: 0.03,     // 3.0%
   };
 
   /// Max win multiplier allowed per game mode (Protects RTP).
@@ -68,10 +68,15 @@ class SlotEngine {
     // Calculate the multiplier that would drain 50% of the pool balance.
     final safePoolMultiplier = (pool.poolBalance * 0.5) / betAmount;
 
-    // Dynamic Minimum Ceiling:
-    // If the pool is negative or empty, restrict the minimum payout ceiling to 1.0x.
-    // Otherwise, maintain a 5.0x minimum ceiling so normal play doesn't feel completely dead.
-    double absoluteMinimum = pool.poolBalance <= 0 ? 1.0 : 5.0;
+    // Gradual Budget Floor to prevent cliff effects
+    double absoluteMinimum;
+    if (pool.poolBalance <= 0) {
+      absoluteMinimum = 1.0;
+    } else if (pool.poolBalance < betAmount * 10) {
+      absoluteMinimum = 2.0;
+    } else {
+      absoluteMinimum = 5.0;
+    }
 
     return max(absoluteMinimum, min(modeCeiling, safePoolMultiplier));
   }
@@ -111,9 +116,13 @@ class SlotEngine {
 
     final maxAllowedWin = _getMaxWinMultiplier(mode, pool, betAmount) * betAmount;
 
+    // A free spin trigger costs at LEAST 3.25x the bet (3x scatter + 0.25x min win).
+    // If the maxAllowedWin is less than that, we CANNOT afford to trigger free spins.
+    final bool canAffordFs = maxAllowedWin >= (3.25 * betAmount);
+
     // Check if we should trigger free spins naturally in this spin
-    // (Only triggers if we are NOT already in free spins)
-    final bool triggersFs = !isFreeSpins && (_rng.nextDouble() < (_fsTriggerRate[mode] ?? 0.01));
+    // (Only triggers if we are NOT already in free spins AND we can afford it)
+    final bool triggersFs = !isFreeSpins && canAffordFs && (_rng.nextDouble() < (_fsTriggerRate[mode] ?? 0.01));
 
     // 1. Decide win or loss based on hit rate
     final shouldWin = triggersFs || _rng.nextDouble() < (_hitRate[mode] ?? 0.40);
@@ -140,7 +149,8 @@ class SlotEngine {
 
     // 3. Fallback: If natural cascade failed 50 times (too lucky), force a safe ending.
     // We loop this as well to ENSURE we NEVER exceed the maxAllowedWin budget.
-    while (true) {
+    int fallbackAttempts = 0;
+    while (fallbackAttempts++ < 100) {
       final fallbackGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
       // safeRefill: true ensures no new combos drop, keeping the win amount strictly bounded
       final simResult = _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true);
@@ -149,6 +159,10 @@ class SlotEngine {
         return simResult; // Valid fallback found within budget!
       }
     }
+
+    // 4. Hard Fail-Safe: If 100 fallback attempts mathematically failed to meet budget,
+    // abort the win and return a guaranteed losing grid to prevent application freeze.
+    return _runSimulation(_generateSafeGrid(weights), weights, betAmount, safeRefill: true);
   }
 
   // ─── SIMULATION ENGINE ────────────────────────────────────────
@@ -168,11 +182,10 @@ class SlotEngine {
     final scatterPayout = scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
     final freeSpinsTriggered = scatterCount >= 4;
 
-    double totalWin = 0;
+    double totalBaseWin = 0;
     int tumbleCount = 0;
 
     while (true) {
-      final currentMultiplier = _collectMultipliers(grid);
       final counts = _countRegularSymbols(grid);
 
       final winners = <String>[];
@@ -188,13 +201,9 @@ class SlotEngine {
         }
       }
 
-      if (winners.isEmpty) break;
+      if (winners.isEmpty) break; // No more wins in this tumble
 
-      if (currentMultiplier > 0) {
-        tumbleWin *= currentMultiplier;
-      }
-
-      totalWin += tumbleWin;
+      totalBaseWin += tumbleWin;
       tumbleCount++;
 
       _removeSymbols(grid, winners);
@@ -207,7 +216,8 @@ class SlotEngine {
       }
     }
 
-    totalWin += scatterPayout;
+    final finalMultiplier = _collectMultipliers(grid);
+    double totalWin = (totalBaseWin * max(1.0, finalMultiplier)) + scatterPayout;
 
     return SpinResult(
       grid: _deepCopy(startGrid), // UI needs the initial state, not the empty exploded grid
@@ -280,7 +290,16 @@ class SlotEngine {
       final sym = SymbolRegistry.byPath(picked);
       
       if (sym == null) return picked;
-      if (sym.isMultiplier) return picked;
+      
+      if (sym.isMultiplier) {
+        final currentMults = counts['TOTAL_MULTIPLIERS'] ?? 0;
+        if (currentMults < 3) {
+          counts['TOTAL_MULTIPLIERS'] = currentMults + 1;
+          return picked;
+        } else {
+          continue; // Cap reached, try again
+        }
+      }
       
       final currentCount = counts[picked] ?? 0;
       if (sym.isScatter) {
@@ -338,11 +357,11 @@ class SlotEngine {
     double fsMultiplierBoost = 1.0;
     if (isFreeSpins) {
       switch (mode) {
-        case GameMode.recovery: fsMultiplierBoost = 10.0; break;
-        case GameMode.tight: fsMultiplierBoost = 25.0; break;
-        case GameMode.normal: fsMultiplierBoost = 50.0; break;
-        case GameMode.generous: fsMultiplierBoost = 100.0; break;
-        case GameMode.jackpot: fsMultiplierBoost = 200.0; break;
+        case GameMode.recovery: fsMultiplierBoost = 2.0; break;
+        case GameMode.tight: fsMultiplierBoost = 5.0; break;
+        case GameMode.normal: fsMultiplierBoost = 10.0; break;
+        case GameMode.generous: fsMultiplierBoost = 15.0; break;
+        case GameMode.jackpot: fsMultiplierBoost = 25.0; break;
       }
     }
 
@@ -427,14 +446,20 @@ class SlotEngine {
   static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
+    int totalMults = 0;
     
     // Count existing to enforce caps
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         final path = grid[c][r];
-        if (path.isNotEmpty) counts[path] = (counts[path] ?? 0) + 1;
+        if (path.isNotEmpty) {
+          counts[path] = (counts[path] ?? 0) + 1;
+          final sym = SymbolRegistry.byPath(path);
+          if (sym != null && sym.isMultiplier) totalMults++;
+        }
       }
     }
+    counts['TOTAL_MULTIPLIERS'] = totalMults;
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
@@ -448,10 +473,37 @@ class SlotEngine {
   /// Refills empty spaces purely based on random weights (NATURAL CASCADES!)
   static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
+    
+    int totalMults = 0;
+    for (int c = 0; c < columns; c++) {
+      for (int r = 0; r < rows; r++) {
+        final path = grid[c][r];
+        if (path.isNotEmpty) {
+          final sym = SymbolRegistry.byPath(path);
+          if (sym != null && sym.isMultiplier) totalMults++;
+        }
+      }
+    }
+
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         if (grid[c][r].isEmpty) {
-          grid[c][r] = _pickWeighted(weights, totalW);
+          // Pick randomly, but cap multipliers to 3
+          for (int attempt = 0; attempt < 20; attempt++) {
+            final picked = _pickWeighted(weights, totalW);
+            final sym = SymbolRegistry.byPath(picked);
+            if (sym != null && sym.isMultiplier) {
+              if (totalMults < 3) {
+                totalMults++;
+                grid[c][r] = picked;
+                break;
+              }
+            } else {
+              grid[c][r] = picked;
+              break;
+            }
+          }
+          if (grid[c][r].isEmpty) grid[c][r] = weights.first.assetPath;
         }
       }
     }
