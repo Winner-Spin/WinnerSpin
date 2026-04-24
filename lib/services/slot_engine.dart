@@ -235,10 +235,11 @@ class SlotEngine {
   static List<List<String>> _generateSafeGrid(List<_WeightedSymbol> weights) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
+    final maxMults = _rollMaxMultipliers();
 
     return List.generate(columns, (_) {
       return List.generate(rows, (_) {
-        return _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3);
+        return _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
       });
     });
   }
@@ -283,9 +284,11 @@ class SlotEngine {
       counts[scatterPath] = scatterCount;
     }
 
+    final maxMults = _rollMaxMultipliers();
+
     for (int i = 0; i < _totalSlots; i++) {
       if (cells[i].isEmpty) {
-        cells[i] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3);
+        cells[i] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
       }
     }
 
@@ -299,7 +302,7 @@ class SlotEngine {
     List<_WeightedSymbol> weights, 
     double totalWeight,
     Map<String, int> counts, 
-    {required int maxRegular, required int maxScatter}
+    {required int maxRegular, required int maxScatter, required int maxMultiplier}
   ) {
     for (int attempt = 0; attempt < 20; attempt++) {
       final picked = _pickWeighted(weights, totalWeight);
@@ -309,7 +312,7 @@ class SlotEngine {
       
       if (sym.isMultiplier) {
         final currentMults = counts['TOTAL_MULTIPLIERS'] ?? 0;
-        if (currentMults < 3) {
+        if (currentMults < maxMultiplier) {
           counts['TOTAL_MULTIPLIERS'] = currentMults + 1;
           return picked;
         } else {
@@ -372,6 +375,15 @@ class SlotEngine {
     if (r < 0.85) return 10; // 15%
     if (r < 0.95) return 11; // 10%
     return 12;               // 5% 
+  }
+
+  static int _rollMaxMultipliers() {
+    final r = _rng.nextDouble();
+    if (r < 0.80) return 2;  // 80%
+    if (r < 0.92) return 3;  // 12%
+    if (r < 0.97) return 4;  // 5%
+    if (r < 0.99) return 5;  // 2%
+    return 6;                // 1%
   }
 
   // ─── WEIGHTED RANDOM ──────────────────────────────────────────
@@ -486,11 +498,12 @@ class SlotEngine {
       }
     }
     counts['TOTAL_MULTIPLIERS'] = totalMults;
+    final maxMults = _rollMaxMultipliers();
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         if (grid[c][r].isEmpty) {
-          grid[c][r] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3);
+          grid[c][r] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
         }
       }
     }
@@ -510,16 +523,18 @@ class SlotEngine {
         }
       }
     }
+    
+    final maxMults = _rollMaxMultipliers();
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         if (grid[c][r].isEmpty) {
-          // Pick randomly, but cap multipliers to 3
+          // Pick randomly, but cap multipliers to dynamic maxMults
           for (int attempt = 0; attempt < 20; attempt++) {
             final picked = _pickWeighted(weights, totalW);
             final sym = SymbolRegistry.byPath(picked);
             if (sym != null && sym.isMultiplier) {
-              if (totalMults < 3) {
+              if (totalMults < maxMults) {
                 totalMults++;
                 grid[c][r] = picked;
                 break;
