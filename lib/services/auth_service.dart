@@ -37,6 +37,8 @@ class AuthService {
       'username': username.trim(),
       'email': email.trim(),
       'createdAt': FieldValue.serverTimestamp(),
+      'balance': 10000.0,
+      'freeSpinsRemaining': 0,
     });
 
     return user;

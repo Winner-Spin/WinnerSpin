@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/slot_engine.dart';
 import '../services/pool_service.dart';
@@ -91,6 +92,8 @@ class GameViewModel extends ChangeNotifier {
         if (userData != null) {
           _username = userData['username'] ?? 'Kullanıcı';
           _email = userData['email'] ?? 'Email Yok';
+          _balance = (userData['balance'] ?? 10000.0).toDouble();
+          _freeSpinsRemaining = userData['freeSpinsRemaining'] ?? 0;
         } else {
           _username = 'Bilinmiyor';
           _email = 'Bilinmiyor';
@@ -199,6 +202,17 @@ class GameViewModel extends ChangeNotifier {
 
   // ─── POOL PERSISTENCE ──────────────────────────────────────
 
+  /// Saves player state (balance, free spins) to Firestore
+  void _savePlayerState() {
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'balance': _balance,
+        'freeSpinsRemaining': _freeSpinsRemaining,
+      }, SetOptions(merge: true));
+    }
+  }
+
   /// Saves pool to Firestore if the save interval has been reached.
   void _savePoolIfNeeded() {
     if (_pool.shouldSave) {
@@ -206,6 +220,7 @@ class GameViewModel extends ChangeNotifier {
       if (uid != null) {
         // Fire-and-forget — non-blocking async write.
         PoolService.save(uid, _pool);
+        _savePlayerState();
       }
     }
   }
@@ -215,6 +230,10 @@ class GameViewModel extends ChangeNotifier {
     final uid = _authService.currentUser?.uid;
     if (uid != null) {
       await PoolService.save(uid, _pool);
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'balance': _balance,
+        'freeSpinsRemaining': _freeSpinsRemaining,
+      }, SetOptions(merge: true));
     }
   }
 
