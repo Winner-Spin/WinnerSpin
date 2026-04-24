@@ -256,16 +256,32 @@ class SlotEngine {
       cells[positions[posIndex++]] = winSymbol.assetPath;
     }
 
-    // Force 4 scatters if trigger is active
+    int scatterCount = 0;
+    String scatterPath = '';
+    // Force scatters if trigger is active
     if (forceScatters) {
-      final scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
-      for (int i = 0; i < 4 && posIndex < _totalSlots; i++) {
+      scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
+      
+      // Determine scatter count: 90% for 4, 8% for 5, 2% for 6
+      final r = _rng.nextDouble();
+      if (r < 0.90) {
+        scatterCount = 4;
+      } else if (r < 0.98) {
+        scatterCount = 5;
+      } else {
+        scatterCount = 6;
+      }
+
+      for (int i = 0; i < scatterCount && posIndex < _totalSlots; i++) {
         cells[positions[posIndex++]] = scatterPath;
       }
     }
 
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{winSymbol.assetPath: winCount};
+    if (scatterCount > 0) {
+      counts[scatterPath] = scatterCount;
+    }
 
     for (int i = 0; i < _totalSlots; i++) {
       if (cells[i].isEmpty) {
