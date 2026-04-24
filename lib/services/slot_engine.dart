@@ -99,13 +99,14 @@ class SlotEngine {
   static SpinResult spin(PoolState pool, double betAmount, {bool isFreeSpins = false}) {
     final mode = pool.currentMode;
     final weights = _buildAdjustedWeights(mode, isFreeSpins);
+    final spinMaxMults = _rollMaxMultipliers();
 
     // Initial grid generation at app startup passes betAmount = 0.
     // If we run the win logic with 0 bet, totalWin becomes 0.0, which fails
     // the (totalWin > 0) check in the while loop, causing an infinite freeze.
     if (betAmount <= 0) {
       return SpinResult(
-        grid: _generateSafeGrid(weights),
+        grid: _generateSafeGrid(weights, spinMaxMults),
         totalWin: 0,
         tumbleCount: 0,
         freeSpinsTriggered: false,
@@ -129,17 +130,17 @@ class SlotEngine {
 
     if (!shouldWin) {
       // Guaranteed losing spin (no 8+ matches, max 3 scatters)
-      final grid = _generateSafeGrid(weights);
-      return _runSimulation(grid, weights, betAmount, safeRefill: true);
+      final grid = _generateSafeGrid(weights, spinMaxMults);
+      return _runSimulation(grid, weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
     }
 
     // 2. Winning Spin: Try to generate a NATURAL cascade sequence
     // Rejection sampling: We generate a cascade. If it pays too much, we throw it away and try again.
     for (int attempt = 0; attempt < 50; attempt++) {
-      final initialGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
+      final initialGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs);
       
       // Simulate tumbles naturally (allowing chance for chains/combos)
-      final simResult = _runSimulation(initialGrid, weights, betAmount, safeRefill: false);
+      final simResult = _runSimulation(initialGrid, weights, betAmount, safeRefill: false, maxMults: spinMaxMults);
 
       // Check if the simulation resulted in a win within our allowed budget
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
@@ -151,9 +152,9 @@ class SlotEngine {
     // We loop this as well to ENSURE we NEVER exceed the maxAllowedWin budget.
     int fallbackAttempts = 0;
     while (fallbackAttempts++ < 100) {
-      final fallbackGrid = _generateWinningGrid(weights, mode, forceScatters: triggersFs);
+      final fallbackGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs);
       // safeRefill: true ensures no new combos drop, keeping the win amount strictly bounded
-      final simResult = _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true);
+      final simResult = _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
       
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult; // Valid fallback found within budget!
@@ -162,7 +163,7 @@ class SlotEngine {
 
     // 4. Hard Fail-Safe: If 100 fallback attempts mathematically failed to meet budget,
     // abort the win and return a guaranteed losing grid to prevent application freeze.
-    return _runSimulation(_generateSafeGrid(weights), weights, betAmount, safeRefill: true);
+    return _runSimulation(_generateSafeGrid(weights, spinMaxMults), weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
   }
 
   // ─── SIMULATION ENGINE ────────────────────────────────────────
@@ -172,7 +173,7 @@ class SlotEngine {
     List<List<String>> startGrid, 
     List<_WeightedSymbol> weights, 
     double betAmount, 
-    {required bool safeRefill}
+    {required bool safeRefill, required int maxMults}
   ) {
     final grid = _deepCopy(startGrid);
     
@@ -210,9 +211,9 @@ class SlotEngine {
       _applyGravity(grid);
       
       if (safeRefill) {
-        _fillEmptySafe(grid, weights);
+        _fillEmptySafe(grid, weights, maxMults);
       } else {
-        _fillEmptyRandom(grid, weights); // Natural cascade chance!
+        _fillEmptyRandom(grid, weights, maxMults); // Natural cascade chance!
       }
     }
 
@@ -232,10 +233,9 @@ class SlotEngine {
   // ─── GRID GENERATION ──────────────────────────────────────────
 
   /// Generates a grid where NO regular symbol reaches 8, and scatters are capped at 3.
-  static List<List<String>> _generateSafeGrid(List<_WeightedSymbol> weights) {
+  static List<List<String>> _generateSafeGrid(List<_WeightedSymbol> weights, int maxMults) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
-    final maxMults = _rollMaxMultipliers();
 
     return List.generate(columns, (_) {
       return List.generate(rows, (_) {
@@ -245,7 +245,7 @@ class SlotEngine {
   }
 
   /// Generates a grid with exactly 8-12 of ONE symbol, rest safe.
-  static List<List<String>> _generateWinningGrid(List<_WeightedSymbol> weights, GameMode mode, {bool forceScatters = false}) {
+  static List<List<String>> _generateWinningGrid(List<_WeightedSymbol> weights, GameMode mode, int maxMults, {bool forceScatters = false}) {
     final winSymbol = _pickWinningSymbol(mode);
     final winCount = _pickWinCount();
     final cells = List<String>.filled(_totalSlots, '');
@@ -283,8 +283,6 @@ class SlotEngine {
     if (scatterCount > 0) {
       counts[scatterPath] = scatterCount;
     }
-
-    final maxMults = _rollMaxMultipliers();
 
     for (int i = 0; i < _totalSlots; i++) {
       if (cells[i].isEmpty) {
@@ -481,7 +479,7 @@ class SlotEngine {
   }
 
   /// Refills empty spaces safely (Caps regular symbols to prevent new wins)
-  static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights) {
+  static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
     int totalMults = 0;
@@ -498,7 +496,6 @@ class SlotEngine {
       }
     }
     counts['TOTAL_MULTIPLIERS'] = totalMults;
-    final maxMults = _rollMaxMultipliers();
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
@@ -510,7 +507,7 @@ class SlotEngine {
   }
 
   /// Refills empty spaces purely based on random weights (NATURAL CASCADES!)
-  static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights) {
+  static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     
     int totalMults = 0;
@@ -523,8 +520,6 @@ class SlotEngine {
         }
       }
     }
-    
-    final maxMults = _rollMaxMultipliers();
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
