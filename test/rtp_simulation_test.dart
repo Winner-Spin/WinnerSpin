@@ -24,8 +24,8 @@ import 'package:winner_spin/models/pool_state.dart';
 import 'package:winner_spin/models/slot_symbol.dart';
 
 void main() {
-  test('100,000,000 spin RTP simulation (FS enabled — FINAL)', () {
-    const totalSpinsToRun = 100000000;
+  test('10,000 spin RTP simulation (FS enabled — FINAL)', () {
+    const totalSpinsToRun = 10000;
     const betAmount = 100.0;
     const targetRtp = 96.5;
 

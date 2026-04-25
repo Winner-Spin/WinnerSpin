@@ -35,6 +35,20 @@ class GameViewModel extends ChangeNotifier {
   List<List<String>> _previousGrid = [];
   List<List<String>> get previousGrid => _previousGrid;
 
+  /// During a tumble, asset paths whose cells should fade out.
+  /// Empty when no tumble is in progress.
+  Set<String> _fadingPaths = const {};
+  Set<String> get fadingPaths => _fadingPaths;
+
+  /// True while we are stepping through cascade tumbles
+  /// (after the initial reel drop-in completes).
+  bool _isTumbling = false;
+  bool get isTumbling => _isTumbling;
+
+  /// True if a spin or its cascade tumbles are still in progress.
+  /// UI uses this to disable the spin button and keep the "spinning" visuals.
+  bool get isBusy => _isSpinning || _isTumbling;
+
   // ─── BALANCE & BET ──────────────────────────────────────────
 
   double _balance = 10000.0;
@@ -56,7 +70,7 @@ class GameViewModel extends ChangeNotifier {
   int get speedMultiplier => _speedMultiplier;
 
   void toggleSpeed() {
-    if (_isSpinning) return;
+    if (_isSpinning || _isTumbling) return;
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
@@ -79,7 +93,7 @@ class GameViewModel extends ChangeNotifier {
   GameViewModel() {
     // Generate initial display grid using normal mode weights.
     final result = SlotEngine.spin(_pool, 0);
-    _grid = result.grid;
+    _grid = result.initialGrid;
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
   }
 
@@ -123,8 +137,8 @@ class GameViewModel extends ChangeNotifier {
   /// Prepares the spin: deducts bet, runs the math engine,
   /// and sets the new target grid for animation.
   void spin() {
-    if (_isSpinning) return;
-    
+    if (_isSpinning || _isTumbling) return;
+
     // Check if we are in free spins mode
     final bool isFreeSpin = isInFreeSpins;
 
@@ -140,6 +154,7 @@ class GameViewModel extends ChangeNotifier {
 
     _isSpinning = true;
     _lastWin = 0.0;
+    _fadingPaths = const {};
 
     // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
@@ -148,33 +163,66 @@ class GameViewModel extends ChangeNotifier {
     // Pass the isFreeSpin flag to boost multipliers!
     _pendingResult = SlotEngine.spin(_pool, _betAmount, isFreeSpins: isFreeSpin);
 
-    // Set the grid the UI will animate towards.
-    _grid = _pendingResult!.grid;
+    // Set the initial grid the UI will animate towards via reel drop-in.
+    // Tumbles are played back AFTER drop-in completes (in onSpinComplete).
+    _grid = _pendingResult!.initialGrid;
 
     notifyListeners();
   }
 
-  /// Called when the final SlotReel completes its drop-in animation.
-  void onSpinComplete() {
-    if (_pendingResult != null) {
-      _lastWin = _pendingResult!.totalWin;
-      _balance += _lastWin;
+  /// Duration that matched cells take to fade out before being replaced.
+  static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
 
-      // Award free spins if triggered
-      if (_pendingResult!.freeSpinsTriggered) {
-        _freeSpinsRemaining += _pendingResult!.isRetrigger ? 5 : 10;
-      }
+  /// Time the new (refilled) grid is held visible before the next tumble starts.
+  /// Also gives the per-cell drop-in animation time to settle.
+  static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
-      // Record payout in pool.
-      _pool.recordPayout(_lastWin);
-
-      // Save to Firestore periodically (every 10 spins).
-      _savePoolIfNeeded();
-
-      _pendingResult = null;
+  /// Called when the final SlotReel completes its initial drop-in animation.
+  /// Plays back any cascade tumbles, then awards the win.
+  Future<void> onSpinComplete() async {
+    final result = _pendingResult;
+    if (result == null) {
+      _isSpinning = false;
+      notifyListeners();
+      return;
     }
 
+    // The reels finished their initial spin animation.
     _isSpinning = false;
+
+    // Play cascade tumbles (matched fade out → next grid drops new symbols).
+    if (result.tumbles.isNotEmpty) {
+      _isTumbling = true;
+
+      for (final tumble in result.tumbles) {
+        // 1) Fade out the cells whose paths matched this tumble.
+        _fadingPaths = tumble.winningPaths;
+        notifyListeners();
+        await Future.delayed(_tumbleFadeDuration);
+
+        // 2) Swap to the post-tumble grid; SlotReel drops new symbols
+        //    into cells whose paths changed.
+        _grid = tumble.gridAfter;
+        _fadingPaths = const {};
+        notifyListeners();
+        await Future.delayed(_tumbleSettleDuration);
+      }
+
+      _isTumbling = false;
+    }
+
+    // Award the final win (already includes multipliers + scatter bonus).
+    _lastWin = result.totalWin;
+    _balance += _lastWin;
+
+    if (result.freeSpinsTriggered) {
+      _freeSpinsRemaining += result.isRetrigger ? 5 : 10;
+    }
+
+    _pool.recordPayout(_lastWin);
+    _savePoolIfNeeded();
+
+    _pendingResult = null;
     notifyListeners();
   }
 

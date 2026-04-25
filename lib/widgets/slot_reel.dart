@@ -15,6 +15,10 @@ class SlotReel extends StatefulWidget {
   /// Set to true to trigger spin animation.
   final bool spinning;
 
+  /// Asset paths whose cells should fade out (during a cascade tumble).
+  /// Empty when no tumble is in progress.
+  final Set<String> fadingPaths;
+
   /// Stagger delay before this reel starts moving.
   final Duration delay;
 
@@ -32,6 +36,7 @@ class SlotReel extends StatefulWidget {
     required this.previousItems,
     required this.targetItems,
     required this.spinning,
+    this.fadingPaths = const {},
     this.speedMultiplier = 1,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 1200),
@@ -224,13 +229,14 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                   left: 0,
                   right: 0,
                   height: itemH,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Image.asset(
-                      items[i],
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.medium,
-                    ),
+                  child: _TumbleCell(
+                    // Stable key per (column, row) so the cell state
+                    // (current path + animation controllers) survives across
+                    // tumble grid swaps and animates the path change.
+                    key: ValueKey('cell-${widget.columnIndex}-$i'),
+                    path: items[i],
+                    isFading: widget.fadingPaths.contains(items[i]),
+                    itemH: itemH,
                   ),
                 );
               }),
@@ -280,5 +286,114 @@ class _HeftyBounceCurve extends Curve {
     final double t1 = t - 1.0;
     const double s = 1.0;
     return (t1 * t1 * ((s + 1.0) * t1 + s) + 1.0);
+  }
+}
+
+/// A single cell of the slot grid that supports two cascade-tumble effects
+/// independently of the column-wide spin animation in [SlotReel]:
+///   • Fade-out when [isFading] flips to true (matched symbol disappears).
+///   • Drop-in from above when [path] changes (new symbol falls into place).
+///
+/// Used by [SlotReel] only in the static (post-drop-in) state. During the
+/// initial reel spin, the column-wide drop-out / drop-in animation runs
+/// instead.
+class _TumbleCell extends StatefulWidget {
+  final String path;
+  final bool isFading;
+  final double itemH;
+
+  const _TumbleCell({
+    super.key,
+    required this.path,
+    required this.isFading,
+    required this.itemH,
+  });
+
+  @override
+  State<_TumbleCell> createState() => _TumbleCellState();
+}
+
+class _TumbleCellState extends State<_TumbleCell>
+    with TickerProviderStateMixin {
+  late final AnimationController _fadeController;
+  late final AnimationController _dropController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _dropAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _dropController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+    _dropAnimation =
+        CurvedAnimation(parent: _dropController, curve: Curves.easeOutCubic);
+
+    // Settle in the resting state — no entry animation on first build,
+    // because the column-level drop-in already covered initial display.
+    _dropController.value = 1.0;
+    _fadeController.value = widget.isFading ? 1.0 : 0.0;
+  }
+
+  @override
+  void didUpdateWidget(_TumbleCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Path changed → new symbol falls in from above.
+    // Also clear any leftover fade so the incoming symbol is fully opaque.
+    if (widget.path != oldWidget.path) {
+      _fadeController.value = 0.0;
+      _dropController.forward(from: 0.0);
+      return;
+    }
+
+    // Path unchanged: just toggle fade state.
+    if (widget.isFading != oldWidget.isFading) {
+      if (widget.isFading) {
+        _fadeController.forward(from: 0.0);
+      } else {
+        _fadeController.value = 0.0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _dropController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_fadeAnimation, _dropAnimation]),
+      builder: (context, child) {
+        final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
+        final opacity = (1.0 - _fadeAnimation.value).clamp(0.0, 1.0);
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: Opacity(
+            opacity: opacity,
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Image.asset(
+          widget.path,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+        ),
+      ),
+    );
   }
 }

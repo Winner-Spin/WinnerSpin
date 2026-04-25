@@ -2,9 +2,31 @@ import 'dart:math';
 import '../models/slot_symbol.dart';
 import '../models/pool_state.dart';
 
+/// One tumble step: which symbols won + the grid state AFTER removal/gravity/refill.
+class TumbleStep {
+  /// Asset paths of regular symbols that won (8+ count) this tumble.
+  /// UI uses this to fade out matching cells before showing [gridAfter].
+  final Set<String> winningPaths;
+
+  /// Grid state after this tumble's removal + gravity + refill.
+  final List<List<String>> gridAfter;
+
+  /// Base win amount for this tumble (before global multiplier / scatter bonus).
+  final double winAmount;
+
+  const TumbleStep({
+    required this.winningPaths,
+    required this.gridAfter,
+    required this.winAmount,
+  });
+}
+
 /// Result of a single spin (including all tumble rounds).
 class SpinResult {
-  final List<List<String>> grid;
+  /// The grid that drops in initially (before any tumbles).
+  final List<List<String>> initialGrid;
+  /// Ordered tumble steps. Empty if the initial grid had no winning matches.
+  final List<TumbleStep> tumbles;
   final double totalWin;
   final int tumbleCount;
   final bool freeSpinsTriggered;
@@ -15,7 +37,8 @@ class SpinResult {
   final double scatterPayout;
 
   const SpinResult({
-    required this.grid,
+    required this.initialGrid,
+    required this.tumbles,
     required this.totalWin,
     required this.tumbleCount,
     required this.freeSpinsTriggered,
@@ -175,7 +198,8 @@ class SlotEngine {
     // the (totalWin > 0) check in the while loop, causing an infinite freeze.
     if (betAmount <= 0) {
       return SpinResult(
-        grid: _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins),
+        initialGrid: _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins),
+        tumbles: const [],
         totalWin: 0,
         tumbleCount: 0,
         freeSpinsTriggered: false,
@@ -273,6 +297,7 @@ class SlotEngine {
 
     double totalBaseWin = 0;
     int tumbleCount = 0;
+    final tumbles = <TumbleStep>[];
 
     while (true) {
       final counts = _countRegularSymbols(grid);
@@ -295,14 +320,21 @@ class SlotEngine {
       totalBaseWin += tumbleWin;
       tumbleCount++;
 
+      final winningPaths = winners.toSet();
       _removeSymbols(grid, winners);
       _applyGravity(grid);
-      
+
       if (safeRefill) {
         _fillEmptySafe(grid, weights, maxMults, isFreeSpins: isFreeSpins);
       } else {
         _fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins); // Natural cascade chance!
       }
+
+      tumbles.add(TumbleStep(
+        winningPaths: winningPaths,
+        gridAfter: _deepCopy(grid),
+        winAmount: tumbleWin,
+      ));
     }
 
     final finalMultiplier = _collectMultipliers(grid);
@@ -318,7 +350,8 @@ class SlotEngine {
     double totalWin = (totalBaseWin * max(1.0, finalMultiplier)) + scatterPayout;
 
     return SpinResult(
-      grid: _deepCopy(startGrid), // UI needs the initial state, not the empty exploded grid
+      initialGrid: _deepCopy(startGrid), // UI shows this first, then plays through tumbles
+      tumbles: tumbles,
       totalWin: totalWin,
       tumbleCount: tumbleCount,
       freeSpinsTriggered: freeSpinsTriggered,

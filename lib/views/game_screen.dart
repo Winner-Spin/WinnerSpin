@@ -338,6 +338,7 @@ class _GameScreenState extends State<GameScreen>
                     (row) => _viewModel.grid[col][row],
                   ),
                   spinning: _viewModel.isSpinning,
+                  fadingPaths: _viewModel.fadingPaths,
                   speedMultiplier: _viewModel.speedMultiplier,
                   onComplete: col == GameViewModel.columns - 1
                       ? () => _viewModel.onSpinComplete()
@@ -450,7 +451,7 @@ class _GameScreenState extends State<GameScreen>
               width: screenW * 0.55,
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                gradient: _viewModel.isSpinning ||
+                gradient: _viewModel.isBusy ||
                         _viewModel.balance < _viewModel.betAmount
                     ? LinearGradient(
                         colors: [
@@ -469,14 +470,14 @@ class _GameScreenState extends State<GameScreen>
                       ),
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: _viewModel.isSpinning
+                  color: _viewModel.isBusy
                       ? Colors.grey.shade400
                       : Colors.greenAccent.shade200.withValues(alpha: 0.6),
                   width: 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (_viewModel.isSpinning
+                    color: (_viewModel.isBusy
                             ? Colors.grey
                             : Colors.green)
                         .withValues(alpha: 0.4),
@@ -484,7 +485,7 @@ class _GameScreenState extends State<GameScreen>
                     offset: const Offset(0, 4),
                   ),
                   BoxShadow(
-                    color: (_viewModel.isSpinning
+                    color: (_viewModel.isBusy
                             ? Colors.grey
                             : Colors.greenAccent)
                         .withValues(alpha: 0.2),
@@ -494,7 +495,7 @@ class _GameScreenState extends State<GameScreen>
                 ],
               ),
               child: Center(
-                child: _viewModel.isSpinning
+                child: _viewModel.isBusy
                     ? Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
