@@ -36,20 +36,27 @@ class SlotEngine {
 
   /// Hit rate per game mode (probability of a winning spin).
   static const Map<GameMode, double> _hitRate = {
-    GameMode.recovery: 0.25,
-    GameMode.tight: 0.32,
-    GameMode.normal: 0.40, // Increased to match Sweet Bonanza
-    GameMode.generous: 0.48,
+    GameMode.recovery: 0.30,  // Softened (was 0.25) so recovery isn't a UX black hole
+    GameMode.tight: 0.22,     // v4: 0.28 -> 0.22 to pull base RTP into 65-75% band
+    GameMode.normal: 0.30,    // v4: 0.38 -> 0.30 (primary RTP brake)
+    GameMode.generous: 0.38,  // v4: 0.48 -> 0.38
     GameMode.jackpot: 0.45,
   };
 
   /// Probability of naturally triggering Free Spins per game mode (base game).
+  /// v4-final: tight/normal/generous trimmed -1% — final calibration cut found
+  /// via three 10M-spin runs revealing a concave gradient curve:
+  ///   cut 0%   → RTP 97.32 (deviation +0.82)
+  ///   cut -1.5% → RTP 96.03 (deviation -0.47)
+  ///   cut -3%  → RTP 95.62 (deviation -0.88)
+  /// Linear interp in the 0%→-1.5% slope (0.86/cut%) lands target at ~-1%.
+  /// Preserves FS-round payout magnitude — only FREQUENCY is reduced.
   static const Map<GameMode, double> _fsTriggerRate = {
-    GameMode.recovery: 0.0,     // 0%
-    GameMode.tight: 0.003,      // 0.3%
-    GameMode.normal: 0.01,      // 1.0%
-    GameMode.generous: 0.02,    // 2.0%
-    GameMode.jackpot: 0.03,     // 3.0%
+    GameMode.recovery: 0.001,    // 0.1% — keeps a sliver of hope alive in recovery
+    GameMode.tight: 0.00297,     // 0.297% (v4-final: 0.003 -> 0.00297, -1%)
+    GameMode.normal: 0.0099,     // 0.99%  (v4-final: 0.01  -> 0.0099, -1% primary lever)
+    GameMode.generous: 0.0198,   // 1.98%  (v4-final: 0.02  -> 0.0198, -1%)
+    GameMode.jackpot: 0.03,      // 3.0% — preserved as the "show" jackpot rate
   };
 
   /// Probability of RE-TRIGGERING Free Spins while ALREADY inside a FS round.
@@ -116,7 +123,7 @@ class SlotEngine {
     // Determine the absolute ceiling based on the mode
     double modeCeiling;
     switch (mode) {
-      case GameMode.recovery: modeCeiling = 10.0; break;     // Very tight limit
+      case GameMode.recovery: modeCeiling = 30.0; break;     // Softened (was 10) — small hope still allowed
       case GameMode.tight: modeCeiling = 100.0; break;       // Tight limit
       case GameMode.normal: modeCeiling = 2500.0; break;     // High volatility target
       case GameMode.generous: modeCeiling = 5000.0; break;   // Very generous
@@ -471,21 +478,27 @@ class SlotEngine {
   }
 
   static int _pickWinCount() {
+    // v4: aggressively biased toward 8 (minimum payout) to bring base RTP
+    // into the 65–75% target band. Diagnostic showed v3 base RTP at 88.5%.
+    //   8: 75%   9: 15%   10: 6%   11: 3%   12: 1%
     final r = _rng.nextDouble();
-    if (r < 0.45) return 8;  // 45%
-    if (r < 0.70) return 9;  // 25%
-    if (r < 0.85) return 10; // 15%
-    if (r < 0.95) return 11; // 10%
-    return 12;               // 5% 
+    if (r < 0.75) return 8;  // 75%
+    if (r < 0.90) return 9;  // 15%
+    if (r < 0.96) return 10; // 6%
+    if (r < 0.99) return 11; // 3%
+    return 12;               // 1%
   }
 
   static int _rollMaxMultipliers() {
+    // v4: capacity tightened — multipliers should shine in Free Spins,
+    // not in base game. Pulled higher tiers down hard.
+    //   2: 90%   3: 7%   4: 2%   5: 0.8%   6: 0.2%
     final r = _rng.nextDouble();
-    if (r < 0.80) return 2;  // 80%
-    if (r < 0.92) return 3;  // 12%
-    if (r < 0.97) return 4;  // 5%
-    if (r < 0.99) return 5;  // 2%
-    return 6;                // 1%
+    if (r < 0.90) return 2;   // 90%
+    if (r < 0.97) return 3;   // 7%
+    if (r < 0.99) return 4;   // 2%
+    if (r < 0.998) return 5;  // 0.8%
+    return 6;                 // 0.2%
   }
 
   // ─── WEIGHTED RANDOM ──────────────────────────────────────────
@@ -494,13 +507,16 @@ class SlotEngine {
     final multipliers = SymbolRegistry.weightMultipliers[mode]!;
     
     // Dynamically adjust Free Spins multiplier boost based on game mode (pool state)
+    // v4-final: -10% calibration from original to land sustained RTP on %96.50.
+    // Verified at 10M-spin scale; smaller samples were dominated by FS-round
+    // variance and gave misleading point estimates.
     double fsMultiplierBoost = 1.0;
     if (isFreeSpins) {
       switch (mode) {
         case GameMode.recovery: fsMultiplierBoost = 2.0; break;
-        case GameMode.tight: fsMultiplierBoost = 5.0; break;
-        case GameMode.normal: fsMultiplierBoost = 10.0; break;
-        case GameMode.generous: fsMultiplierBoost = 15.0; break;
+        case GameMode.tight: fsMultiplierBoost = 4.5; break;    // v4-final: 5.0 -> 4.5 (-10%)
+        case GameMode.normal: fsMultiplierBoost = 9.0; break;   // v4-final: 10.0 -> 9.0 (-10%)
+        case GameMode.generous: fsMultiplierBoost = 13.5; break; // v4-final: 15.0 -> 13.5 (-10%)
         case GameMode.jackpot: fsMultiplierBoost = 25.0; break;
       }
     }

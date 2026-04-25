@@ -210,11 +210,13 @@ class SymbolRegistry {
       SymbolTier.multiplier: 0.2,
     },
     GameMode.tight: {
+      // v2 tightening: tight is now a real brake, not just "slightly less normal".
+      // mid 1.05 -> 0.95, high 0.7 -> 0.5, multiplier 0.5 -> 0.4
       SymbolTier.low: 1.2,
-      SymbolTier.mid: 1.05,
-      SymbolTier.high: 0.7,
+      SymbolTier.mid: 0.95,
+      SymbolTier.high: 0.5,
       SymbolTier.scatter: 0.8,
-      SymbolTier.multiplier: 0.5,
+      SymbolTier.multiplier: 0.4,
     },
     GameMode.normal: {
       SymbolTier.low: 1.0,

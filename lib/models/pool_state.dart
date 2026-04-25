@@ -44,11 +44,15 @@ class PoolState {
   GameMode get currentMode {
     if (totalSpins < 50) return GameMode.normal;
     final deficit = _rtpDeficit;
-    if (deficit > 0.25) return GameMode.jackpot;    // underpaying by 25%+
-    if (deficit > 0.10) return GameMode.generous;   // underpaying by 10-25%
-    if (deficit > -0.05) return GameMode.normal;    // within -5% to +10% of target
-    if (deficit > -0.15) return GameMode.tight;     // overpaying by 5-15%
-    return GameMode.recovery;                       // overpaying by 15%+
+    // Tightened thresholds (v2): the previous bands let the pool drift to
+    // ~+2.4% RTP on average without ever engaging the brake. Narrowed bands
+    // make `tight`/`generous` engage earlier so the system self-corrects
+    // toward the 96.5% target faster, without touching base-game payouts.
+    if (deficit > 0.20) return GameMode.jackpot;    // underpaying by 20%+
+    if (deficit > 0.05) return GameMode.generous;   // underpaying by 5-20%
+    if (deficit > -0.02) return GameMode.normal;    // within -2% to +5% of target
+    if (deficit > -0.10) return GameMode.tight;     // overpaying by 2-10%
+    return GameMode.recovery;                       // overpaying by 10%+
   }
 
   // ─── MUTATION ─────────────────────────────────────────────────
