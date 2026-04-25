@@ -8,6 +8,9 @@ class SpinResult {
   final double totalWin;
   final int tumbleCount;
   final bool freeSpinsTriggered;
+  /// True if this trigger occurred WHILE the player was already in a Free Spins
+  /// round (i.e. a re-trigger). ViewModel should award +5 spins instead of +10.
+  final bool isRetrigger;
   final int scatterCount;
   final double scatterPayout;
 
@@ -18,6 +21,7 @@ class SpinResult {
     required this.freeSpinsTriggered,
     required this.scatterCount,
     required this.scatterPayout,
+    this.isRetrigger = false,
   });
 }
 
@@ -39,7 +43,7 @@ class SlotEngine {
     GameMode.jackpot: 0.45,
   };
 
-  /// Probability of naturally triggering Free Spins per game mode.
+  /// Probability of naturally triggering Free Spins per game mode (base game).
   static const Map<GameMode, double> _fsTriggerRate = {
     GameMode.recovery: 0.0,     // 0%
     GameMode.tight: 0.003,      // 0.3%
@@ -47,6 +51,64 @@ class SlotEngine {
     GameMode.generous: 0.02,    // 2.0%
     GameMode.jackpot: 0.03,     // 3.0%
   };
+
+  /// Probability of RE-TRIGGERING Free Spins while ALREADY inside a FS round.
+  /// Higher than the initial trigger rate because:
+  ///   1. The player is in a "lucky phase" — retriggers are part of the core thrill.
+  ///   2. Each retrigger only awards +5 spins (vs +10 initial), so cost is bounded.
+  static const Map<GameMode, double> _fsRetriggerRate = {
+    GameMode.recovery: 0.0,     // 0% (recovery never grants FS in any form)
+    GameMode.tight: 0.02,       // 2%
+    GameMode.normal: 0.04,      // 4%
+    GameMode.generous: 0.06,    // 6%
+    GameMode.jackpot: 0.08,     // 8%
+  };
+
+  /// Estimated AVERAGE payout per single Free Spin (in xBet) per mode.
+  /// Used by the Virtual Cost guard to forecast the future debt of awarding
+  /// a FS round BEFORE the engine commits to it.
+  /// NOTE: These constants are coarse estimates and SHOULD be calibrated by
+  /// running a Monte-Carlo simulation (SlotEngine.spin in a loop with
+  /// isFreeSpins=true, then averaging totalWin / betAmount).
+  static const Map<GameMode, double> _fsAvgPayoutPerSpin = {
+    GameMode.recovery: 2.0,
+    GameMode.tight: 3.0,
+    GameMode.normal: 5.0,
+    GameMode.generous: 8.0,
+    GameMode.jackpot: 12.0,
+  };
+
+  /// Safety multiplier on top of expected FS cost.
+  /// 2.0 = "only commit to FS if pool can cover 2x the average cost."
+  static const double _fsSafetyFactor = 2.0;
+
+  /// Spins awarded per FS event.
+  static const int _fsAwardInitial = 10;
+  static const int _fsAwardRetrigger = 5;
+
+  /// Estimated total cost of awarding a FS round (in xBet).
+  /// = scatter reward (typical 4-scatter case) + (#spins × avg payout per spin)
+  static double _expectedFsCostMultiplier(GameMode mode, bool isRetrigger) {
+    final perSpin = _fsAvgPayoutPerSpin[mode] ?? 5.0;
+    final fsCount = isRetrigger ? _fsAwardRetrigger : _fsAwardInitial;
+    const scatterReward = 3.0; // 4-scatter pays 3x (90% of forced cases)
+    return scatterReward + (perSpin * fsCount);
+  }
+
+  /// Virtual Cost budget guard. Returns true only if the pool can safely
+  /// absorb the EXPECTED future cost of an entire FS round.
+  /// Bypassed during the first 50-spin warmup to keep early UX exciting.
+  static bool _canAffordFsRound(
+    PoolState pool,
+    double betAmount,
+    GameMode mode,
+    bool isRetrigger,
+  ) {
+    if (pool.totalSpins < 50) return true; // warmup: no budget gate
+    final virtualCost =
+        _expectedFsCostMultiplier(mode, isRetrigger) * betAmount * _fsSafetyFactor;
+    return pool.poolBalance >= virtualCost;
+  }
 
   /// Max win multiplier allowed per game mode (Protects RTP).
   /// Dynamically limits based on the current pool balance to prevent bankruptcy.
@@ -106,7 +168,7 @@ class SlotEngine {
     // the (totalWin > 0) check in the while loop, causing an infinite freeze.
     if (betAmount <= 0) {
       return SpinResult(
-        grid: _generateSafeGrid(weights, spinMaxMults),
+        grid: _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins),
         totalWin: 0,
         tumbleCount: 0,
         freeSpinsTriggered: false,
@@ -117,30 +179,48 @@ class SlotEngine {
 
     final maxAllowedWin = _getMaxWinMultiplier(mode, pool, betAmount) * betAmount;
 
-    // A free spin trigger costs at LEAST 3.25x the bet (3x scatter + 0.25x min win).
-    // If the maxAllowedWin is less than that, we CANNOT afford to trigger free spins.
-    final bool canAffordFs = maxAllowedWin >= (3.25 * betAmount);
 
-    // Check if we should trigger free spins naturally in this spin
-    // (Only triggers if we are NOT already in free spins AND we can afford it)
-    final bool triggersFs = !isFreeSpins && canAffordFs && (_rng.nextDouble() < (_fsTriggerRate[mode] ?? 0.01));
+
+
+    // ─── FREE SPINS TRIGGER DECISION (with Virtual Cost guard) ───
+    //
+    // Two distinct paths:
+    //   1. Base game  → may trigger initial FS round (+10 spins)
+    //   2. Inside FS  → may RE-trigger (+5 spins)
+    //
+    // BOTH paths now go through the Virtual Cost guard, which estimates the
+    // total future debt of the awarded FS round (scatter payout + N spins ×
+    final bool isRetriggerAttempt = isFreeSpins;
+    final double fsRate = isRetriggerAttempt
+        ? (_fsRetriggerRate[mode] ?? 0.0)
+        : (_fsTriggerRate[mode] ?? 0.0);
+    final bool canAffordFs =
+        _canAffordFsRound(pool, betAmount, mode, isRetriggerAttempt) &&
+            maxAllowedWin >= (3.25 * betAmount); // also keep per-spin floor
+    final bool triggersFs = canAffordFs && (_rng.nextDouble() < fsRate);
+
+
+
+
 
     // 1. Decide win or loss based on hit rate
     final shouldWin = triggersFs || _rng.nextDouble() < (_hitRate[mode] ?? 0.40);
 
     if (!shouldWin) {
       // Guaranteed losing spin (no 8+ matches, max 3 scatters)
-      final grid = _generateSafeGrid(weights, spinMaxMults);
-      return _runSimulation(grid, weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
+      final grid = _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins);
+      return _runSimulation(grid, weights, betAmount,
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
     }
 
     // 2. Winning Spin: Try to generate a NATURAL cascade sequence
     // Rejection sampling: We generate a cascade. If it pays too much, we throw it away and try again.
     for (int attempt = 0; attempt < 50; attempt++) {
-      final initialGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs);
+      final initialGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs, isFreeSpins: isFreeSpins);
       
       // Simulate tumbles naturally (allowing chance for chains/combos)
-      final simResult = _runSimulation(initialGrid, weights, betAmount, safeRefill: false, maxMults: spinMaxMults);
+      final simResult = _runSimulation(initialGrid, weights, betAmount,
+          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
 
       // Check if the simulation resulted in a win within our allowed budget
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
@@ -149,39 +229,40 @@ class SlotEngine {
     }
 
     // 3. Fallback: If natural cascade failed 50 times (too lucky), force a safe ending.
-    // We loop this as well to ENSURE we NEVER exceed the maxAllowedWin budget.
     int fallbackAttempts = 0;
     while (fallbackAttempts++ < 100) {
-      final fallbackGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs);
+      final fallbackGrid = _generateWinningGrid(weights, mode, spinMaxMults, forceScatters: triggersFs, isFreeSpins: isFreeSpins);
       // safeRefill: true ensures no new combos drop, keeping the win amount strictly bounded
-      final simResult = _runSimulation(fallbackGrid, weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
-      
+
+
+      final simResult = _runSimulation(fallbackGrid, weights, betAmount,
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
+
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult; // Valid fallback found within budget!
       }
     }
 
     // 4. Hard Fail-Safe: If 100 fallback attempts mathematically failed to meet budget,
-    // abort the win and return a guaranteed losing grid to prevent application freeze.
-    return _runSimulation(_generateSafeGrid(weights, spinMaxMults), weights, betAmount, safeRefill: true, maxMults: spinMaxMults);
+    return _runSimulation(_generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins), weights, betAmount,
+        safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
   }
 
   // ─── SIMULATION ENGINE ────────────────────────────────────────
 
   /// Runs the full tumble loop in memory and returns the final SpinResult.
   static SpinResult _runSimulation(
-    List<List<String>> startGrid, 
-    List<_WeightedSymbol> weights, 
-    double betAmount, 
-    {required bool safeRefill, required int maxMults}
+    List<List<String>> startGrid,
+    List<_WeightedSymbol> weights,
+    double betAmount,
+    {required bool safeRefill,
+    required int maxMults,
+    bool isFreeSpins = false}
   ) {
     final grid = _deepCopy(startGrid);
-    
-    final scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
-    final scatterCount = _countAsset(grid, scatterPath);
+
     final scatterSymbol = SymbolRegistry.all.firstWhere((s) => s.isScatter);
-    final scatterPayout = scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
-    final freeSpinsTriggered = scatterCount >= 4;
+    final scatterPath = scatterSymbol.assetPath;
 
     double totalBaseWin = 0;
     int tumbleCount = 0;
@@ -211,13 +292,22 @@ class SlotEngine {
       _applyGravity(grid);
       
       if (safeRefill) {
-        _fillEmptySafe(grid, weights, maxMults);
+        _fillEmptySafe(grid, weights, maxMults, isFreeSpins: isFreeSpins);
       } else {
-        _fillEmptyRandom(grid, weights, maxMults); // Natural cascade chance!
+        _fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins); // Natural cascade chance!
       }
     }
 
     final finalMultiplier = _collectMultipliers(grid);
+
+    // Evaluate scatters AFTER all tumbles to allow natural cascades to build up scatters
+    final scatterCount = _countAsset(grid, scatterPath);
+    final scatterPayout = scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
+    // Sweet Bonanza-style asymmetric trigger:
+    //   - Base game: need 4+ scatters to start a FS round.
+    //   - Inside FS: only 3+ scatters needed to retrigger.
+    final freeSpinsTriggered = isFreeSpins ? (scatterCount >= 3) : (scatterCount >= 4);
+
     double totalWin = (totalBaseWin * max(1.0, finalMultiplier)) + scatterPayout;
 
     return SpinResult(
@@ -225,6 +315,9 @@ class SlotEngine {
       totalWin: totalWin,
       tumbleCount: tumbleCount,
       freeSpinsTriggered: freeSpinsTriggered,
+      // A retrigger is, by definition, a FS-trigger that occurs WHILE the
+      // player is already inside a free spins round.
+      isRetrigger: isFreeSpins && freeSpinsTriggered,
       scatterCount: scatterCount,
       scatterPayout: scatterPayout,
     );
@@ -232,20 +325,20 @@ class SlotEngine {
 
   // ─── GRID GENERATION ──────────────────────────────────────────
 
-  /// Generates a grid where NO regular symbol reaches 8, and scatters are capped at 3.
-  static List<List<String>> _generateSafeGrid(List<_WeightedSymbol> weights, int maxMults) {
+  /// Generates a grid where NO regular symbol reaches 8, and scatters are capped.
+  static List<List<String>> _generateSafeGrid(List<_WeightedSymbol> weights, int maxMults, {bool isFreeSpins = false}) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
 
     return List.generate(columns, (_) {
       return List.generate(rows, (_) {
-        return _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
+        return _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: isFreeSpins ? 2 : 3, maxMultiplier: maxMults);
       });
     });
   }
 
   /// Generates a grid with exactly 8-12 of ONE symbol, rest safe.
-  static List<List<String>> _generateWinningGrid(List<_WeightedSymbol> weights, GameMode mode, int maxMults, {bool forceScatters = false}) {
+  static List<List<String>> _generateWinningGrid(List<_WeightedSymbol> weights, GameMode mode, int maxMults, {bool forceScatters = false, bool isFreeSpins = false}) {
     final winSymbol = _pickWinningSymbol(mode);
     final winCount = _pickWinCount();
     final cells = List<String>.filled(_totalSlots, '');
@@ -263,14 +356,25 @@ class SlotEngine {
     if (forceScatters) {
       scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
       
-      // Determine scatter count: 90% for 4, 8% for 5, 2% for 6
       final r = _rng.nextDouble();
-      if (r < 0.90) {
-        scatterCount = 4;
-      } else if (r < 0.98) {
-        scatterCount = 5;
+      if (isFreeSpins) {
+        // Retrigger distribution: 90% for 3, 8% for 4, 2% for 5
+        if (r < 0.90) {
+          scatterCount = 3;
+        } else if (r < 0.98) {
+          scatterCount = 4;
+        } else {
+          scatterCount = 5;
+        }
       } else {
-        scatterCount = 6;
+        // Initial trigger distribution: 90% for 4, 8% for 5, 2% for 6
+        if (r < 0.90) {
+          scatterCount = 4;
+        } else if (r < 0.98) {
+          scatterCount = 5;
+        } else {
+          scatterCount = 6;
+        }
       }
 
       for (int i = 0; i < scatterCount && posIndex < _totalSlots; i++) {
@@ -286,7 +390,7 @@ class SlotEngine {
 
     for (int i = 0; i < _totalSlots; i++) {
       if (cells[i].isEmpty) {
-        cells[i] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
+        cells[i] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: isFreeSpins ? 2 : 3, maxMultiplier: maxMults);
       }
     }
 
@@ -479,7 +583,7 @@ class SlotEngine {
   }
 
   /// Refills empty spaces safely (Caps regular symbols to prevent new wins)
-  static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults) {
+  static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults, {bool isFreeSpins = false}) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
     final counts = <String, int>{};
     int totalMults = 0;
@@ -500,26 +604,33 @@ class SlotEngine {
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         if (grid[c][r].isEmpty) {
-          grid[c][r] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: 3, maxMultiplier: maxMults);
+          grid[c][r] = _pickSafe(weights, totalW, counts, maxRegular: 7, maxScatter: isFreeSpins ? 2 : 3, maxMultiplier: maxMults);
         }
       }
     }
   }
 
-  /// Refills empty spaces purely based on random weights (NATURAL CASCADES!)
-  static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults) {
+  /// Refills empty spaces randomly based on weights (Can create new cascades).
+  static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults, {bool isFreeSpins = false}) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
-    
+
     int totalMults = 0;
+    int totalScatters = 0;
+    final scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
+
+    // Count existing to enforce caps
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
         final path = grid[c][r];
         if (path.isNotEmpty) {
           final sym = SymbolRegistry.byPath(path);
           if (sym != null && sym.isMultiplier) totalMults++;
+          if (path == scatterPath) totalScatters++;
         }
       }
     }
+
+    final maxScatter = isFreeSpins ? 2 : 3;
 
     for (int c = 0; c < columns; c++) {
       for (int r = 0; r < rows; r++) {
@@ -531,6 +642,12 @@ class SlotEngine {
             if (sym != null && sym.isMultiplier) {
               if (totalMults < maxMults) {
                 totalMults++;
+                grid[c][r] = picked;
+                break;
+              }
+            } else if (sym != null && sym.isScatter) {
+              if (totalScatters < maxScatter) {
+                totalScatters++;
                 grid[c][r] = picked;
                 break;
               }
