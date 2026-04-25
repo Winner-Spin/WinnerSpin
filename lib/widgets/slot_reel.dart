@@ -24,12 +24,15 @@ class SlotReel extends StatefulWidget {
   /// Called when this reel's animation completes.
   final VoidCallback? onComplete;
 
+  final int speedMultiplier;
+
   const SlotReel({
     super.key,
     required this.columnIndex,
     required this.previousItems,
     required this.targetItems,
     required this.spinning,
+    this.speedMultiplier = 1,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 1200),
     this.onComplete,
@@ -66,9 +69,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   Future<void> _startSpin() async {
     if (!mounted) return;
 
-    const int dropOutDurationMs = 500;
-    final int columnDelayMs = 100;
-    final int dropOutDelayMs = widget.columnIndex * columnDelayMs;
+    int speedMult = widget.speedMultiplier;
+    int dropOutDurationMs = 500 ~/ speedMult;
+    int columnDelayMs = speedMult > 1 ? 0 : 100;
+    int dropOutDelayMs = widget.columnIndex * columnDelayMs;
 
     if (dropOutDelayMs > 0) {
       await Future.delayed(Duration(milliseconds: dropOutDelayMs));
@@ -78,7 +82,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     _controller?.dispose();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: dropOutDurationMs),
+      duration: Duration(milliseconds: dropOutDurationMs),
     );
     // Main sequence is linear; specific curves are applied per-item via Intervals.
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
@@ -103,12 +107,12 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     await Future.delayed(Duration(milliseconds: totalEmptyWaitMs));
     if (!mounted) return;
 
-    const int dropInDurationMs = 900;
+    int dropInDurationMs = 900 ~/ speedMult;
 
     _controller?.dispose();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: dropInDurationMs),
+      duration: Duration(milliseconds: dropInDurationMs),
     );
 
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
@@ -135,11 +139,12 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     bool isDropOut,
   ) {
     int rowCount = GameViewModel.rows;
+    int speedMult = widget.speedMultiplier;
 
     int reverseIndex = (rowCount - 1) - index;
 
-    double totalDuration = isDropOut ? 500.0 : 900.0;
-    double staggerMs = isDropOut ? 28.0 : 30.0;
+    double totalDuration = isDropOut ? (500.0 / speedMult) : (900.0 / speedMult);
+    double staggerMs = speedMult > 1 ? 0.0 : (isDropOut ? 28.0 : 30.0);
     double durationVal = totalDuration - (reverseIndex * staggerMs);
 
     double itemDurationFraction = (durationVal / totalDuration).clamp(0.3, 1.0);
@@ -150,7 +155,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       1.0,
     );
 
-    final Curve curveType = isDropOut ? Curves.easeInCubic : Curves.easeOutQuad;
+    final Curve curveType = isDropOut 
+        ? Curves.easeInCubic 
+        : (speedMult > 1 ? _heftyBounceCurve : Curves.easeOutQuad);
 
     final Curve itemCurve = Interval(
       startDelayFraction,
@@ -271,7 +278,7 @@ class _HeftyBounceCurve extends Curve {
   @override
   double transformInternal(double t) {
     final double t1 = t - 1.0;
-    const double s = 0.15;
+    const double s = 1.0;
     return (t1 * t1 * ((s + 1.0) * t1 + s) + 1.0);
   }
 }

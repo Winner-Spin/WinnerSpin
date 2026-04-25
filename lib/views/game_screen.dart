@@ -338,6 +338,7 @@ class _GameScreenState extends State<GameScreen>
                     (row) => _viewModel.grid[col][row],
                   ),
                   spinning: _viewModel.isSpinning,
+                  speedMultiplier: _viewModel.speedMultiplier,
                   onComplete: col == GameViewModel.columns - 1
                       ? () => _viewModel.onSpinComplete()
                       : null,
@@ -358,6 +359,11 @@ class _GameScreenState extends State<GameScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Speed selection button
+        _buildSpeedButton(),
+        
+        const SizedBox(height: 10),
+
         // Bet controls row
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -588,6 +594,56 @@ class _GameScreenState extends State<GameScreen>
           ],
         ),
         child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+
+  Widget _buildSpeedButton() {
+    String arrows = '>';
+    if (_viewModel.speedMultiplier == 2) arrows = '>>';
+    if (_viewModel.speedMultiplier == 3) arrows = '>>>';
+
+    return GestureDetector(
+      onTap: _viewModel.toggleSpeed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.grey.shade400.withValues(alpha: 0.8),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_viewModel.speedMultiplier}x',
+              style: GoogleFonts.outfit(
+                color: Colors.amber.shade300,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              arrows,
+              style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

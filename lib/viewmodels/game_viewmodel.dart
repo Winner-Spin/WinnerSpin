@@ -52,6 +52,15 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+  int _speedMultiplier = 1;
+  int get speedMultiplier => _speedMultiplier;
+
+  void toggleSpeed() {
+    if (_isSpinning) return;
+    _speedMultiplier = (_speedMultiplier % 3) + 1;
+    notifyListeners();
+  }
+
   // ─── POOL STATE ─────────────────────────────────────────────
 
   PoolState _pool = PoolState();
