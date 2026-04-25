@@ -162,7 +162,7 @@ class GameViewModel extends ChangeNotifier {
 
       // Award free spins if triggered
       if (_pendingResult!.freeSpinsTriggered) {
-        _freeSpinsRemaining += 10;
+        _freeSpinsRemaining += _pendingResult!.isRetrigger ? 5 : 10;
       }
 
       // Record payout in pool.
