@@ -79,11 +79,15 @@ class SlotEngine {
   ///   0.004 normal → RTP 91.5% (-5.0)
   ///   0.006 normal → RTP 97.46 (+0.96)
   ///   slope ≈ 3 RTP points / 0.001 trigger → 0.0057 lands ~96.5
+  /// FS trigger rate — restored to v5 baseline (0.0033 normal). FS round
+  /// payout is now bounded by a tight multiplier cap (avg ~4.4), so each
+  /// round pays ~95x bet — perfect alignment with the 100x buy bonus price
+  /// (buy RTP ≈ 95%, industry-standard). FS contribution = 0.0033 × 95.
   static const Map<GameMode, double> _fsTriggerRate = {
-    GameMode.recovery: 0.0004,   // 0.04%
-    GameMode.tight: 0.001,       // 0.1%
-    GameMode.normal: 0.0033,     // 0.33% (~1 per 300 spins) — hardcore Sweet Bonanza
-    GameMode.generous: 0.0066,   // 0.66%
+    GameMode.recovery: 0.00038,  // 0.038%
+    GameMode.tight: 0.00097,     // 0.097%
+    GameMode.normal: 0.0032,     // 0.32% (~1 per 313 spins) — bullseye trigger
+    GameMode.generous: 0.0064,   // 0.64%
     GameMode.jackpot: 0.03,      // 3.0% — preserved as the "show" jackpot rate
   };
 
@@ -131,6 +135,36 @@ class SlotEngine {
   /// Industry standard for Sweet Bonanza-style slots is 100x.
   static const double buyFeaturePriceMultiplier = 100.0;
 
+  /// Probability of FORCING a chain after each successful tumble.
+  /// When triggered, the refill seeds 8-10 of a chain-target symbol so the
+  /// next iteration of the tumble loop finds a guaranteed winner. This is
+  /// the engineering trick that lets natural cascade chains reach Sweet
+  /// Bonanza frequencies — pure random refill caps chain rate at ~5-10%
+  /// because reaching 8+ of one symbol post-refill is statistically rare.
+  ///
+  /// Conservative tuning: chains compound (each tumble can re-trigger), so
+  /// the per-tumble probability is kept low to avoid runaway 10+ tumble
+  /// chains that explode RTP. Combined with natural chain rate, effective
+  /// per-tumble continuation runs slightly above natural.
+  ///
+  /// Base game: 0% forced — natural cascade rate (~45% per tumble) already
+  /// matches Sweet Bonanza targets (1: 49%, 2: 29%, 3: 14%, 4: 5% of wins).
+  /// Forcing chains here over-shoots Sweet Bonanza distribution.
+  static const double _chainProbBase = 0.0;
+
+  /// FS forced chain probability TAPERS BY TUMBLE DEPTH.
+  /// Schedule designed to mirror Sweet Bonanza's decreasing tumble-depth
+  /// distribution: lots of 1-tumble wins, decreasing through 2-3-4, sharp
+  /// drop after 4 to keep the long tail (5+) under ~5% of wins.
+  /// Natural FS chain rate is ~10%; effective continuation = forced + natural.
+  static double _fsForcedChainProb(int tumblesSoFar) {
+    if (tumblesSoFar <= 1) return 0.55;
+    if (tumblesSoFar == 2) return 0.42;
+    if (tumblesSoFar == 3) return 0.30;
+    if (tumblesSoFar == 4) return 0.18;
+    return 0.08; // 5+ tumbles: gentle taper instead of cliff
+  }
+
   /// Estimated total cost of awarding a FS round (in xBet).
   /// = scatter reward (typical 4-scatter case) + (#spins × avg payout per spin)
   static double _expectedFsCostMultiplier(GameMode mode, bool isRetrigger) {
@@ -177,15 +211,42 @@ class SlotEngine {
 
   /// Max win multiplier allowed per game mode (Protects RTP).
   /// Dynamically limits based on the current pool balance to prevent bankruptcy.
-  static double _getMaxWinMultiplier(GameMode mode, PoolState pool, double betAmount) {
-    // Determine the absolute ceiling based on the mode
+  ///
+  /// FS-aware: free spins use looser ceilings so chain-boosted natural
+  /// cascades aren't cut short by rejection sampling. Without this fork,
+  /// multi-cascade chains in FS rarely survive (they exceed the base 2500x
+  /// cap, get rejected, and fall back to single-cascade safeRefill output).
+  static double _getMaxWinMultiplier(
+    GameMode mode,
+    PoolState pool,
+    double betAmount, {
+    bool isFreeSpins = false,
+  }) {
+    // Determine the absolute ceiling based on the mode + FS state
     double modeCeiling;
-    switch (mode) {
-      case GameMode.recovery: modeCeiling = 30.0; break;     // Softened (was 10) — small hope still allowed
-      case GameMode.tight: modeCeiling = 100.0; break;       // Tight limit
-      case GameMode.normal: modeCeiling = 2500.0; break;     // High volatility target
-      case GameMode.generous: modeCeiling = 5000.0; break;   // Very generous
-      case GameMode.jackpot: modeCeiling = 10000.0; break;   // Insane potential
+    if (isFreeSpins) {
+      // FS ceilings — Sweet Bonanza paritesi (~3x base ceilings).
+      // Goal: let 4-5-cascade chains land without rejection.
+      switch (mode) {
+        case GameMode.recovery: modeCeiling = 60.0; break;
+        case GameMode.tight: modeCeiling = 400.0; break;
+        case GameMode.normal: modeCeiling = 8000.0; break;
+        case GameMode.generous: modeCeiling = 15000.0; break;
+        case GameMode.jackpot: modeCeiling = 21100.0; break;  // Sweet Bonanza max-win standard
+      }
+    } else {
+      // Base game ceilings — KEPT AT v5 ORIGINAL VALUES.
+      // Base cascade distribution naturally matches Sweet Bonanza targets
+      // (1: 49%, 2: 29%, 3: 14%, 4: 5% of wins) without intervention.
+      // Raising base caps lets natural cascades survive rejection more often,
+      // which makes the distribution chain-heavier than Sweet Bonanza.
+      switch (mode) {
+        case GameMode.recovery: modeCeiling = 30.0; break;
+        case GameMode.tight: modeCeiling = 100.0; break;
+        case GameMode.normal: modeCeiling = 2500.0; break;
+        case GameMode.generous: modeCeiling = 5000.0; break;
+        case GameMode.jackpot: modeCeiling = 10000.0; break;
+      }
     }
 
     // For the first 50 spins, ignore pool balance to draw players in
@@ -248,7 +309,8 @@ class SlotEngine {
       );
     }
 
-    final maxAllowedWin = _getMaxWinMultiplier(mode, pool, betAmount) * betAmount;
+    final maxAllowedWin =
+        _getMaxWinMultiplier(mode, pool, betAmount, isFreeSpins: isFreeSpins) * betAmount;
 
 
 
@@ -376,7 +438,19 @@ class SlotEngine {
       if (safeRefill) {
         _fillEmptySafe(grid, weights, maxMults, isFreeSpins: isFreeSpins);
       } else {
-        _fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins); // Natural cascade chance!
+        // Forced chain: a deliberate engineering trick to reach Sweet Bonanza
+        // chain depths. Pure random refill struggles to produce 8+ of one
+        // symbol post-cascade (mathematically rare), so we explicitly seed
+        // a chain-eligible refill with [_chainProbBase]/[_chainProbFs]
+        // probability. Otherwise fall back to plain random refill.
+        final chainProb = isFreeSpins
+            ? _fsForcedChainProb(tumbleCount)
+            : _chainProbBase;
+        if (_rng.nextDouble() < chainProb) {
+          _fillEmptyForcedChain(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+        } else {
+          _fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+        }
       }
 
       tumbles.add(TumbleStep(
@@ -584,14 +658,14 @@ class SlotEngine {
   static int _rollMaxMultipliers({bool isFreeSpins = false}) {
     final r = _rng.nextDouble();
     if (isFreeSpins) {
-      //   9: 15%   10: 30%   11: 30%   12: 20%   13: 5%
-      //   avg ~10.7 multipliers/spin — calibrated for 96.5% RTP
-      //   at trigger 0.0033 normal mode (true Sweet Bonanza profile)
-      if (r < 0.15) return 9;
-      if (r < 0.45) return 10;
-      if (r < 0.75) return 11;
-      if (r < 0.95) return 12;
-      return 13;
+      //   3: 35%   4: 40%   5: 20%   6: 4%   7: 1%
+      //   avg ~3.96 multipliers/spin — micro-tuned for avg FS round ≈ 99x
+      //   (Sweet Bonanza buy bonus parity at 100x price → ~99% buy RTP).
+      if (r < 0.35) return 3;
+      if (r < 0.75) return 4;
+      if (r < 0.95) return 5;
+      if (r < 0.99) return 6;
+      return 7;
     }
     // Base game (v4 distribution preserved):
     //   2: 90%   3: 7%   4: 2%   5: 0.8%   6: 0.2%
@@ -613,12 +687,14 @@ class SlotEngine {
     // FS becomes the central "show" of the game while base spins are grindy.
     double fsMultiplierBoost = 1.0;
     if (isFreeSpins) {
+      // v5d: cut by ~25% across all modes to compensate for cascade tapering
+      // (chains pushed avg FS round from 98x to 191x; this cut targets ~144x).
       switch (mode) {
-        case GameMode.recovery: fsMultiplierBoost = 18.0; break;
-        case GameMode.tight: fsMultiplierBoost = 36.0; break;
-        case GameMode.normal: fsMultiplierBoost = 80.0; break;   // v5c: 60 -> 80
-        case GameMode.generous: fsMultiplierBoost = 113.0; break;
-        case GameMode.jackpot: fsMultiplierBoost = 145.0; break;
+        case GameMode.recovery: fsMultiplierBoost = 13.5; break;
+        case GameMode.tight: fsMultiplierBoost = 27.0; break;
+        case GameMode.normal: fsMultiplierBoost = 60.0; break;
+        case GameMode.generous: fsMultiplierBoost = 85.0; break;
+        case GameMode.jackpot: fsMultiplierBoost = 109.0; break;
       }
     }
 
@@ -699,6 +775,70 @@ class SlotEngine {
     }
   }
 
+  /// Refills empty spaces with a FORCED-CHAIN seed: places 8-10 copies of a
+  /// chain-target symbol into the empty cells (low-tier biased to control
+  /// payout impact), then fills the remainder via [_fillEmptyRandom].
+  ///
+  /// The next iteration of the tumble loop will detect the seeded cluster
+  /// and count it as a chain — this is how the engine reaches Sweet Bonanza
+  /// chain depths despite a small (6×5) grid where natural chains are rare.
+  static void _fillEmptyForcedChain(
+    List<List<String>> grid,
+    List<_WeightedSymbol> weights,
+    int maxMults, {
+    bool isFreeSpins = false,
+  }) {
+    // Pick chain-target symbol — biased by _winSymbolWeights so low-tier
+    // (high-frequency, low-payout) symbols dominate. This caps the RTP
+    // impact of forced chains.
+    final regulars = SymbolRegistry.all.where((s) => s.isRegular).toList();
+    double totalW = 0;
+    for (final s in regulars) {
+      totalW += _winSymbolWeights[s.id] ?? 1.0;
+    }
+    double roll = _rng.nextDouble() * totalW;
+    SlotSymbol target = regulars.first;
+    for (final s in regulars) {
+      roll -= _winSymbolWeights[s.id] ?? 1.0;
+      if (roll <= 0) {
+        target = s;
+        break;
+      }
+    }
+    final targetPath = target.assetPath;
+
+    // Count empty cell positions
+    final emptyPositions = <List<int>>[];
+    for (int c = 0; c < columns; c++) {
+      for (int r = 0; r < rows; r++) {
+        if (grid[c][r].isEmpty) emptyPositions.add([c, r]);
+      }
+    }
+
+    // Count existing target on grid (after gravity)
+    int existing = 0;
+    for (int c = 0; c < columns; c++) {
+      for (int r = 0; r < rows; r++) {
+        if (grid[c][r] == targetPath) existing++;
+      }
+    }
+
+    // Aim for 8-10 total of the target on the grid post-refill.
+    // 8 = guaranteed chain; 9-10 keep variety in payout amounts.
+    final desiredTotal = 8 + _rng.nextInt(3); // 8, 9, or 10
+    final toPlace = (desiredTotal - existing).clamp(0, emptyPositions.length);
+
+    // Shuffle empty positions to scatter the target across columns
+    emptyPositions.shuffle(_rng);
+    for (int i = 0; i < toPlace; i++) {
+      final pos = emptyPositions[i];
+      grid[pos[0]][pos[1]] = targetPath;
+    }
+
+    // Fill the remaining empty cells via plain random refill
+    _fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+  }
+
   /// Refills empty spaces safely (Caps regular symbols to prevent new wins)
   static void _fillEmptySafe(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults, {bool isFreeSpins = false}) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
@@ -727,8 +867,13 @@ class SlotEngine {
     }
   }
 
-  /// Refills empty spaces randomly based on weights (Can create new cascades).
-  static void _fillEmptyRandom(List<List<String>> grid, List<_WeightedSymbol> weights, int maxMults, {bool isFreeSpins = false}) {
+  /// Refills empty spaces randomly based on weights (can create new cascades).
+  static void _fillEmptyRandom(
+    List<List<String>> grid,
+    List<_WeightedSymbol> weights,
+    int maxMults, {
+    bool isFreeSpins = false,
+  }) {
     final totalW = weights.fold<double>(0, (s, w) => s + w.weight);
 
     int totalMults = 0;

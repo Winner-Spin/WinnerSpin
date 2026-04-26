@@ -166,28 +166,28 @@ class SymbolRegistry {
     SlotSymbol(
       id: 'multi_10x',
       assetPath: 'lib/images/slot_main_screen/Items/10x_carpan.png',
-      baseWeight: 0.05,
+      baseWeight: 0.05,   // restored to v5 original
       tier: SymbolTier.multiplier,
       multiplierValue: 10,
     ),
     SlotSymbol(
       id: 'multi_25x',
       assetPath: 'lib/images/slot_main_screen/Items/25x_carpan.png',
-      baseWeight: 0.02,
+      baseWeight: 0.02,   // restored to v5 original
       tier: SymbolTier.multiplier,
       multiplierValue: 25,
     ),
     SlotSymbol(
       id: 'multi_50x',
       assetPath: 'lib/images/slot_main_screen/Items/50x_carpan.png',
-      baseWeight: 0.01,
+      baseWeight: 0.01,   // restored to v5 original
       tier: SymbolTier.multiplier,
       multiplierValue: 50,
     ),
     SlotSymbol(
       id: 'multi_100x',
       assetPath: 'lib/images/slot_main_screen/Items/100x_carpan.png',
-      baseWeight: 0.002,
+      baseWeight: 0.002,  // restored to v5 original
       tier: SymbolTier.multiplier,
       multiplierValue: 100,
     ),
