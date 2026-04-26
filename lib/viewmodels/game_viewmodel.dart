@@ -72,7 +72,6 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
-<<<<<<< Updated upstream
   /// Ante Bet: when active, the player pays 1.25× their base bet and the
   /// engine doubles the FS trigger rate for that spin. Payouts are still
   /// computed against the 1.0× base bet (per project spec).
@@ -93,13 +92,12 @@ class GameViewModel extends ChangeNotifier {
   bool get canBuyFreeSpins =>
       !isBusy &&
       !isInFreeSpins &&
-      _balance >= buyFeaturePrice &&
+      _userBalance >= buyFeaturePrice &&
       SlotEngine.canAffordBuyFs(_pool, _betAmount);
-=======
+
   /// Winning cell positions (encoded as col * 100 + row) from the last spin.
   Set<int> _winningPositions = {};
   Set<int> get winningPositions => _winningPositions;
->>>>>>> Stashed changes
 
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
@@ -209,17 +207,11 @@ class GameViewModel extends ChangeNotifier {
     // Normal spin: check and deduct balance (1.25× when ante is active).
     // Inside FS rounds, ante is ignored (FS spins are always free).
     if (!isFreeSpin) {
-<<<<<<< Updated upstream
       final cost = effectiveBetCost;
-      if (_balance < cost) return;
+      if (_userBalance < cost) return;
       _balance -= cost;
+      _userBalance -= cost;
       _pool.recordBet(cost); // Pool sees the full ante-inflated wager.
-=======
-      if (_userBalance < _betAmount) return;
-      _balance -= _betAmount;
-      _userBalance -= _betAmount;
-      _pool.recordBet(_betAmount); // Only record bet if it costs money
->>>>>>> Stashed changes
     } else {
       // Consume one free spin
       _freeSpinsRemaining--;
@@ -227,11 +219,8 @@ class GameViewModel extends ChangeNotifier {
 
     _isSpinning = true;
     _lastWin = 0.0;
-<<<<<<< Updated upstream
     _fadingPaths = const {};
-=======
     _winningPositions = {};
->>>>>>> Stashed changes
 
     // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
@@ -254,7 +243,6 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-<<<<<<< Updated upstream
   /// Player-initiated Buy Free Spins.
   /// Charges 100× base bet to the player and pool, then queues a 10-spin
   /// FS round. The next [spin] call (or the auto-spin loop, if enabled)
@@ -264,18 +252,10 @@ class GameViewModel extends ChangeNotifier {
   /// or pool can't safely accommodate it per the Virtual Cost guard).
   void buyFreeSpins() {
     if (!canBuyFreeSpins) return;
-=======
-  /// Called when the final SlotReel completes its drop-in animation.
-  void onSpinComplete() {
-    if (_pendingResult != null) {
-      _lastWin = _pendingResult!.totalWin;
-      _balance += _lastWin;
-      _userBalance += _lastWin;
-      _winningPositions = _pendingResult!.winningPositions;
->>>>>>> Stashed changes
 
     final price = buyFeaturePrice;
     _balance -= price;
+    _userBalance -= price;
     // Pool gets the full 100× fee credited as wagered.
     _pool.recordBet(price);
     _freeSpinsRemaining += 10;
@@ -283,14 +263,8 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-<<<<<<< Updated upstream
   /// Duration that matched cells take to fade out before being replaced.
   static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
-=======
-      // Save to Firestore periodically (every 10 spins).
-      _savePoolIfNeeded();
-      _savePlayerState();
->>>>>>> Stashed changes
 
   /// Time the new (refilled) grid is held visible before the next tumble starts.
   /// Also gives the per-cell drop-in animation time to settle.
@@ -333,6 +307,8 @@ class GameViewModel extends ChangeNotifier {
     // Award the final win (already includes multipliers + scatter bonus).
     _lastWin = result.totalWin;
     _balance += _lastWin;
+    _userBalance += _lastWin;
+    _winningPositions = result.winningPositions;
 
     if (result.freeSpinsTriggered) {
       _freeSpinsRemaining += result.isRetrigger ? 5 : 10;
@@ -340,6 +316,7 @@ class GameViewModel extends ChangeNotifier {
 
     _pool.recordPayout(_lastWin);
     _savePoolIfNeeded();
+    _savePlayerState();
 
     _pendingResult = null;
     notifyListeners();

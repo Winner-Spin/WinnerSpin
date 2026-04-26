@@ -438,11 +438,8 @@ class SlotEngine {
 
     double totalBaseWin = 0;
     int tumbleCount = 0;
-<<<<<<< Updated upstream
     final tumbles = <TumbleStep>[];
-=======
     final winningPositions = <int>{};
->>>>>>> Stashed changes
 
     while (true) {
       final counts = _countRegularSymbols(grid);
