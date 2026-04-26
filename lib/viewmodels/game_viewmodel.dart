@@ -66,12 +66,43 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+  /// Ante Bet: when active, the player pays 1.25× their base bet and the
+  /// engine doubles the FS trigger rate for that spin. Payouts are still
+  /// computed against the 1.0× base bet (per project spec).
+  bool _anteBetActive = false;
+  bool get anteBetActive => _anteBetActive;
+
+  /// Effective amount deducted per non-FS spin (1.25× when ante is active).
+  double get effectiveBetCost =>
+      _anteBetActive ? _betAmount * 1.25 : _betAmount;
+
+  /// Cost in TL of the Buy Free Spins feature at the current bet level.
+  double get buyFeaturePrice =>
+      _betAmount * SlotEngine.buyFeaturePriceMultiplier;
+
+  /// Whether the player can currently buy a FS round.
+  /// Blocks during spin/tumble, while already in FS, when balance is short,
+  /// and when the pool's Virtual Cost guard says it can't accommodate one.
+  bool get canBuyFreeSpins =>
+      !isBusy &&
+      !isInFreeSpins &&
+      _balance >= buyFeaturePrice &&
+      SlotEngine.canAffordBuyFs(_pool, _betAmount);
+
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
 
   void toggleSpeed() {
     if (_isSpinning || _isTumbling) return;
     _speedMultiplier = (_speedMultiplier % 3) + 1;
+    notifyListeners();
+  }
+
+  /// Flips the Ante Bet on/off. Disallowed during a spin, a cascade,
+  /// or while inside a Free Spins round.
+  void toggleAnteBet() {
+    if (isBusy || isInFreeSpins) return;
+    _anteBetActive = !_anteBetActive;
     notifyListeners();
   }
 
@@ -142,11 +173,13 @@ class GameViewModel extends ChangeNotifier {
     // Check if we are in free spins mode
     final bool isFreeSpin = isInFreeSpins;
 
-    // Normal spin: check and deduct balance
+    // Normal spin: check and deduct balance (1.25× when ante is active).
+    // Inside FS rounds, ante is ignored (FS spins are always free).
     if (!isFreeSpin) {
-      if (_balance < _betAmount) return;
-      _balance -= _betAmount;
-      _pool.recordBet(_betAmount); // Only record bet if it costs money
+      final cost = effectiveBetCost;
+      if (_balance < cost) return;
+      _balance -= cost;
+      _pool.recordBet(cost); // Pool sees the full ante-inflated wager.
     } else {
       // Consume one free spin
       _freeSpinsRemaining--;
@@ -159,13 +192,39 @@ class GameViewModel extends ChangeNotifier {
     // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
 
-    // Run the entire math engine synchronously.
-    // Pass the isFreeSpin flag to boost multipliers!
-    _pendingResult = SlotEngine.spin(_pool, _betAmount, isFreeSpins: isFreeSpin);
+    // Run the engine synchronously.
+    //   - betAmount: ALWAYS the 1.0× base; the +25% from ante is overhead
+    //     paid into the pool, NOT part of the payout calculation.
+    //   - anteBet: doubles the FS trigger rate for this base spin only.
+    _pendingResult = SlotEngine.spin(
+      _pool,
+      _betAmount,
+      isFreeSpins: isFreeSpin,
+      anteBet: _anteBetActive && !isFreeSpin,
+    );
 
     // Set the initial grid the UI will animate towards via reel drop-in.
     // Tumbles are played back AFTER drop-in completes (in onSpinComplete).
     _grid = _pendingResult!.initialGrid;
+
+    notifyListeners();
+  }
+
+  /// Player-initiated Buy Free Spins.
+  /// Charges 100× base bet to the player and pool, then queues a 10-spin
+  /// FS round. The next [spin] call (or the auto-spin loop, if enabled)
+  /// consumes the first free spin.
+  ///
+  /// Blocked when [canBuyFreeSpins] is false (busy, in FS, short balance,
+  /// or pool can't safely accommodate it per the Virtual Cost guard).
+  void buyFreeSpins() {
+    if (!canBuyFreeSpins) return;
+
+    final price = buyFeaturePrice;
+    _balance -= price;
+    // Pool gets the full 100× fee credited as wagered.
+    _pool.recordBet(price);
+    _freeSpinsRemaining += 10;
 
     notifyListeners();
   }
