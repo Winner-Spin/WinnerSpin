@@ -134,7 +134,9 @@ class SlotEngine {
   /// Estimated total cost of awarding a FS round (in xBet).
   /// = scatter reward (typical 4-scatter case) + (#spins × avg payout per spin)
   static double _expectedFsCostMultiplier(GameMode mode, bool isRetrigger) {
-    final perSpin = _fsAvgPayoutPerSpin[mode] ?? 5.0;
+    // Fallback matches the v5 normal-mode estimate so an unrecognised mode
+    // doesn't quietly underestimate FS cost (the v4 fallback was 5.0).
+    final perSpin = _fsAvgPayoutPerSpin[mode] ?? 10.0;
     final fsCount = isRetrigger ? _fsAwardRetrigger : _fsAwardInitial;
     const scatterReward = 3.0; // 4-scatter pays 3x (90% of forced cases)
     return scatterReward + (perSpin * fsCount);
@@ -257,8 +259,10 @@ class SlotEngine {
     //   1. Base game  → may trigger initial FS round (+10 spins)
     //   2. Inside FS  → may RE-trigger (+5 spins)
     //
-    // BOTH paths now go through the Virtual Cost guard, which estimates the
+    // BOTH paths go through the Virtual Cost guard, which estimates the
     // total future debt of the awarded FS round (scatter payout + N spins ×
+    // average payout per spin) and refuses to commit if the pool can't
+    // safely cover it. See [_canAffordFsRound] for the math.
     final bool isRetriggerAttempt = isFreeSpins;
     final double baseFsRate = isRetriggerAttempt
         ? (_fsRetriggerRate[mode] ?? 0.0)
@@ -277,8 +281,10 @@ class SlotEngine {
 
 
 
-    // 1. Decide win or loss based on hit rate
-    final shouldWin = triggersFs || _rng.nextDouble() < (_hitRate[mode] ?? 0.40);
+    // 1. Decide win or loss based on hit rate.
+    // Fallback matches the v5 normal-mode rate so an unrecognised mode
+    // doesn't quietly inflate hit rate (the v4 fallback was 0.40).
+    final shouldWin = triggersFs || _rng.nextDouble() < (_hitRate[mode] ?? 0.30);
 
     if (!shouldWin) {
       // Guaranteed losing spin (no 8+ matches, max 3 scatters)
