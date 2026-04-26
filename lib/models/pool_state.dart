@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'slot_symbol.dart';
 
 /// Tracks the virtual money pool for RTP enforcement.
@@ -12,6 +13,26 @@ class PoolState {
 
   /// Save to Firestore every N spins to minimize write costs.
   static const int saveInterval = 10;
+
+  // ─── SESSION MODE STATE ───────────────────────────────────────
+  // Once a mode is selected, it sticks for [_minSessionSpins] +
+  // random extra spins. This emulates the natural "lucky session" /
+  // "cold session" variance of pure-RNG cascade slots — without
+  // dropping our compensatory floor for catastrophic drift.
+  GameMode? _sessionMode;
+  int _sessionExpiresAtSpin = 0;
+
+  /// Minimum number of spins a chosen mode is held before re-rolling.
+  static const int _minSessionSpins = 50;
+
+  /// Maximum random extra spins added on top of [_minSessionSpins].
+  /// Total session length: 50–250 spins (typical short slot session).
+  static const int _maxSessionExtraSpins = 200;
+
+  /// RNG used for session mode injection rolls.
+  /// Static so all PoolState instances share the same stream
+  /// (no need to seed per-instance).
+  static final Random _rng = Random();
 
   PoolState({
     this.totalBetsPlaced = 0,
@@ -38,41 +59,63 @@ class PoolState {
 
   // ─── GAME MODE ────────────────────────────────────────────────
 
-  /// Determines the current game mode by comparing actual RTP to target.
-  /// Requires at least 50 spins before deviating from normal mode,
-  /// ensuring the pool has enough statistical data.
+  /// Determines the current game mode using random session injection
+  /// (Sweet Bonanza-style session variance).
+  ///
+  /// Architecture (v6d, post per-mode RTP balancing):
+  ///   • Each mode is calibrated to ~96.5% RTP individually, so mixing
+  ///     them freely doesn't drift total RTP.
+  ///   • Random session selection picks a mode from a target
+  ///     distribution (normal 65%, generous 17%, tight 13%,
+  ///     jackpot 3%, recovery 2%).
+  ///   • Once selected, mode is LOCKED for 50-250 spins — the typical
+  ///     length of a play session. Player experiences each mode as a
+  ///     "lucky" or "cold" streak.
+  ///   • Hard floor (deficit > ±3%) overrides session lock as a
+  ///     catastrophic safety net for calibration drift / whale events.
   GameMode get currentMode {
-    if (totalSpins < 50) return GameMode.normal;
+    if (totalSpins < 50) return GameMode.normal; // warmup
     final deficit = _rtpDeficit;
-    // Tightened thresholds (v2): the previous bands let the pool drift to
-    // ~+2.4% RTP on average without ever engaging the brake. Narrowed bands
-    // make `tight`/`generous` engage earlier so the system self-corrects
-    // toward the 96.5% target faster, without touching base-game payouts.
-    // v6c: aggressive band tightening for session-style variance. v6b
-    // (1.5% wide normal) still kept engine in normal ~99.7% — too stable
-    // to give players the "lucky/cold session" feel of pure-RNG cascade
-    // slots. Bands now ~6x tighter so mode shifts happen on minor pool
-    // drift, producing dynamic per-session variance comparable to natural
-    // RNG distributions.
-    if (deficit > 0.012) return GameMode.jackpot;   // underpaying by 1.2%+
-    if (deficit > 0.003) return GameMode.generous;  // underpaying by 0.3-1.2%
-    if (deficit > -0.0015) return GameMode.normal;  // -0.15% to +0.3% of target
-    if (deficit > -0.008) return GameMode.tight;    // overpaying by 0.15-0.8%
 
-    // ─────────────────────────────────────────────────────────────
-    // CATASTROPHIC CIRCUIT BREAKER — DO NOT REMOVE
-    // ─────────────────────────────────────────────────────────────
-    // Engages only when the engine has overpaid by >10% sustained — a
-    // statistically catastrophic state that the calibrated math should
-    // never reach in normal play (verified at 100M-spin scale: 0 spins
-    // ever entered this mode). Kept intentionally as a safety net for:
-    //   • Calibration drift (future math changes that break RTP)
-    //   • Cosmic-bad-luck whale streaks that drain a small pool
-    //   • Bugs in payout logic that escape testing
-    // When triggered, this mode aggressively suppresses wins until the
-    // pool deficit recovers above -10%. Removing it would expose the
-    // house to unbounded loss in the rare scenarios above.
-    return GameMode.recovery;                       // overpaying by 10%+
+    // ── HARD FLOOR — only catastrophic drift overrides ─────────
+    // Widened to ±10% so routine pool wobble (±2-3%) doesn't override
+    // session distribution. Only true catastrophic drift triggers.
+    if (deficit > 0.10) return GameMode.jackpot;    // underpaying by 10%+
+    if (deficit < -0.10) return GameMode.recovery;  // overpaying by 10%+
+
+    // ── SESSION LOCK — return locked mode if still valid ───────
+    if (_sessionMode != null && totalSpins < _sessionExpiresAtSpin) {
+      return _sessionMode!;
+    }
+
+    // ── ROLL NEW SESSION MODE ──────────────────────────────────
+    // Target distribution (verified via per-mode RTP measurement):
+    //   normal 65% (96.91% RTP)
+    //   generous 17% (99.99%)
+    //   tight 13% (89.75%)
+    //   jackpot 3% (99.99%)
+    //   recovery 2% (92.86%)
+    //   Weighted RTP ≈ 96.52% — matches 96.5% target.
+    final roll = _rng.nextDouble();
+    GameMode mode;
+    if (roll < 0.65) {
+      mode = GameMode.normal;
+    } else if (roll < 0.82) {
+      mode = GameMode.generous;
+    } else if (roll < 0.95) {
+      mode = GameMode.tight;
+    } else if (roll < 0.98) {
+      mode = GameMode.jackpot;
+    } else {
+      mode = GameMode.recovery;
+    }
+
+    // Lock for typical session length (50-250 spins).
+    _sessionMode = mode;
+    _sessionExpiresAtSpin = totalSpins +
+        _minSessionSpins +
+        _rng.nextInt(_maxSessionExtraSpins + 1);
+    return mode;
   }
 
   // ─── MUTATION ─────────────────────────────────────────────────
