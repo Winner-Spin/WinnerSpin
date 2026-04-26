@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
@@ -7,6 +9,7 @@ import '../models/pool_state.dart';
 
 class GameViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSubscription;
 
   // ─── USER DATA ──────────────────────────────────────────────
 
@@ -54,6 +57,9 @@ class GameViewModel extends ChangeNotifier {
   double _balance = 10000.0;
   double get balance => _balance;
 
+  double _userBalance = 10000.0;
+  double get userBalance => _userBalance;
+
   double _betAmount = 100.0;
   double get betAmount => _betAmount;
 
@@ -66,6 +72,7 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+<<<<<<< Updated upstream
   /// Ante Bet: when active, the player pays 1.25× their base bet and the
   /// engine doubles the FS trigger rate for that spin. Payouts are still
   /// computed against the 1.0× base bet (per project spec).
@@ -88,6 +95,11 @@ class GameViewModel extends ChangeNotifier {
       !isInFreeSpins &&
       _balance >= buyFeaturePrice &&
       SlotEngine.canAffordBuyFs(_pool, _betAmount);
+=======
+  /// Winning cell positions (encoded as col * 100 + row) from the last spin.
+  Set<int> _winningPositions = {};
+  Set<int> get winningPositions => _winningPositions;
+>>>>>>> Stashed changes
 
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
@@ -142,12 +154,18 @@ class GameViewModel extends ChangeNotifier {
 
         final userData = results[0] as Map<String, dynamic>?;
         _pool = results[1] as PoolState;
+        _listenToUserBalance(user.uid);
 
         if (userData != null) {
           _username = userData['username'] ?? 'Kullanıcı';
           _email = userData['email'] ?? 'Email Yok';
           _balance = (userData['balance'] ?? 10000.0).toDouble();
+          _userBalance = (userData['userBalance'] ?? 10000.0).toDouble();
           _freeSpinsRemaining = userData['freeSpinsRemaining'] ?? 0;
+
+          if (!userData.containsKey('userBalance')) {
+            _savePlayerState();
+          }
         } else {
           _username = 'Bilinmiyor';
           _email = 'Bilinmiyor';
@@ -163,6 +181,21 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
+  void _listenToUserBalance(String uid) {
+    _userSubscription?.cancel();
+    _userSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((snapshot) {
+      final data = snapshot.data();
+      if (data == null || !data.containsKey('userBalance')) return;
+
+      _userBalance = (data['userBalance'] ?? 10000.0).toDouble();
+      notifyListeners();
+    });
+  }
+
   // ─── SPIN ───────────────────────────────────────────────────
 
   /// Prepares the spin: deducts bet, runs the math engine,
@@ -176,10 +209,17 @@ class GameViewModel extends ChangeNotifier {
     // Normal spin: check and deduct balance (1.25× when ante is active).
     // Inside FS rounds, ante is ignored (FS spins are always free).
     if (!isFreeSpin) {
+<<<<<<< Updated upstream
       final cost = effectiveBetCost;
       if (_balance < cost) return;
       _balance -= cost;
       _pool.recordBet(cost); // Pool sees the full ante-inflated wager.
+=======
+      if (_userBalance < _betAmount) return;
+      _balance -= _betAmount;
+      _userBalance -= _betAmount;
+      _pool.recordBet(_betAmount); // Only record bet if it costs money
+>>>>>>> Stashed changes
     } else {
       // Consume one free spin
       _freeSpinsRemaining--;
@@ -187,7 +227,11 @@ class GameViewModel extends ChangeNotifier {
 
     _isSpinning = true;
     _lastWin = 0.0;
+<<<<<<< Updated upstream
     _fadingPaths = const {};
+=======
+    _winningPositions = {};
+>>>>>>> Stashed changes
 
     // Snapshot the current grid for drop-out animation.
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
@@ -210,6 +254,7 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+<<<<<<< Updated upstream
   /// Player-initiated Buy Free Spins.
   /// Charges 100× base bet to the player and pool, then queues a 10-spin
   /// FS round. The next [spin] call (or the auto-spin loop, if enabled)
@@ -219,6 +264,15 @@ class GameViewModel extends ChangeNotifier {
   /// or pool can't safely accommodate it per the Virtual Cost guard).
   void buyFreeSpins() {
     if (!canBuyFreeSpins) return;
+=======
+  /// Called when the final SlotReel completes its drop-in animation.
+  void onSpinComplete() {
+    if (_pendingResult != null) {
+      _lastWin = _pendingResult!.totalWin;
+      _balance += _lastWin;
+      _userBalance += _lastWin;
+      _winningPositions = _pendingResult!.winningPositions;
+>>>>>>> Stashed changes
 
     final price = buyFeaturePrice;
     _balance -= price;
@@ -229,8 +283,14 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+<<<<<<< Updated upstream
   /// Duration that matched cells take to fade out before being replaced.
   static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
+=======
+      // Save to Firestore periodically (every 10 spins).
+      _savePoolIfNeeded();
+      _savePlayerState();
+>>>>>>> Stashed changes
 
   /// Time the new (refilled) grid is held visible before the next tumble starts.
   /// Also gives the per-cell drop-in animation time to settle.
@@ -306,6 +366,8 @@ class GameViewModel extends ChangeNotifier {
   Future<void> signOut() async {
     // Force save pool state before logging out.
     await _forceSavePool();
+    await _userSubscription?.cancel();
+    _userSubscription = null;
     await _authService.signOut();
     _loggedOut = true;
     notifyListeners();
@@ -323,7 +385,7 @@ class GameViewModel extends ChangeNotifier {
     final uid = _authService.currentUser?.uid;
     if (uid != null) {
       FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'balance': _balance,
+        'userBalance': _userBalance,
         'freeSpinsRemaining': _freeSpinsRemaining,
       }, SetOptions(merge: true));
     }
@@ -347,7 +409,7 @@ class GameViewModel extends ChangeNotifier {
     if (uid != null) {
       await PoolService.save(uid, _pool);
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'balance': _balance,
+        'userBalance': _userBalance,
         'freeSpinsRemaining': _freeSpinsRemaining,
       }, SetOptions(merge: true));
     }
@@ -356,5 +418,11 @@ class GameViewModel extends ChangeNotifier {
   /// Call this when the app goes to background to persist pool data.
   Future<void> onAppPaused() async {
     await _forceSavePool();
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
   }
 }

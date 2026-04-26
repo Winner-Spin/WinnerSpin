@@ -38,6 +38,7 @@ class AuthService {
       'email': email.trim(),
       'createdAt': FieldValue.serverTimestamp(),
       'balance': 10000.0,
+      'userBalance': 10000.0,
       'freeSpinsRemaining': 0,
     });
 

@@ -246,7 +246,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '₺${_viewModel.balance.toStringAsFixed(0)}',
+                  '₺${_viewModel.userBalance.toStringAsFixed(0)}',
                   style: GoogleFonts.outfit(
                     color: Colors.white,
                     fontSize: 16,
