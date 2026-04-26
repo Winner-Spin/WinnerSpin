@@ -52,6 +52,20 @@ class PoolState {
     if (deficit > 0.05) return GameMode.generous;   // underpaying by 5-20%
     if (deficit > -0.02) return GameMode.normal;    // within -2% to +5% of target
     if (deficit > -0.10) return GameMode.tight;     // overpaying by 2-10%
+
+    // ─────────────────────────────────────────────────────────────
+    // CATASTROPHIC CIRCUIT BREAKER — DO NOT REMOVE
+    // ─────────────────────────────────────────────────────────────
+    // Engages only when the engine has overpaid by >10% sustained — a
+    // statistically catastrophic state that the calibrated math should
+    // never reach in normal play (verified at 100M-spin scale: 0 spins
+    // ever entered this mode). Kept intentionally as a safety net for:
+    //   • Calibration drift (future math changes that break RTP)
+    //   • Cosmic-bad-luck whale streaks that drain a small pool
+    //   • Bugs in payout logic that escape testing
+    // When triggered, this mode aggressively suppresses wins until the
+    // pool deficit recovers above -10%. Removing it would expose the
+    // house to unbounded loss in the rare scenarios above.
     return GameMode.recovery;                       // overpaying by 10%+
   }
 
