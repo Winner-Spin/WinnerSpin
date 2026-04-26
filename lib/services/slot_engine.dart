@@ -84,11 +84,11 @@ class SlotEngine {
   /// round pays ~95x bet — perfect alignment with the 100x buy bonus price
   /// (buy RTP ≈ 95%, industry-standard). FS contribution = 0.0033 × 95.
   static const Map<GameMode, double> _fsTriggerRate = {
-    GameMode.recovery: 0.00038,  // 0.038%
-    GameMode.tight: 0.00097,     // 0.097%
-    GameMode.normal: 0.0032,     // 0.32% (~1 per 313 spins) — bullseye trigger
-    GameMode.generous: 0.0064,   // 0.64%
-    GameMode.jackpot: 0.03,      // 3.0% — preserved as the "show" jackpot rate
+    GameMode.recovery: 0.0004,    // 0.04%
+    GameMode.tight: 0.001,        // 0.1%
+    GameMode.normal: 0.00335,     // 0.335% (~1 per 299 spins) — micro-tuned
+    GameMode.generous: 0.0067,    // 0.67%
+    GameMode.jackpot: 0.03,       // 3.0% — preserved as the "show" jackpot rate
   };
 
   /// Probability of RE-TRIGGERING Free Spins while ALREADY inside a FS round.
@@ -658,14 +658,13 @@ class SlotEngine {
   static int _rollMaxMultipliers({bool isFreeSpins = false}) {
     final r = _rng.nextDouble();
     if (isFreeSpins) {
-      //   3: 35%   4: 40%   5: 20%   6: 4%   7: 1%
-      //   avg ~3.96 multipliers/spin — micro-tuned for avg FS round ≈ 99x
-      //   (Sweet Bonanza buy bonus parity at 100x price → ~99% buy RTP).
-      if (r < 0.35) return 3;
-      if (r < 0.75) return 4;
-      if (r < 0.95) return 5;
-      if (r < 0.99) return 6;
-      return 7;
+      //   3: 45%   4: 40%   5: 12%   6: 3%
+      //   avg ~3.73 multipliers/spin — pulled down so avg FS round drops
+      //   from 101.3x → ~96x (buy bonus RTP 96/100 = 96%, SB-grade).
+      if (r < 0.45) return 3;
+      if (r < 0.85) return 4;
+      if (r < 0.97) return 5;
+      return 6;
     }
     // Base game (v4 distribution preserved):
     //   2: 90%   3: 7%   4: 2%   5: 0.8%   6: 0.2%
