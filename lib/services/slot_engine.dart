@@ -35,6 +35,7 @@ class SpinResult {
   final bool isRetrigger;
   final int scatterCount;
   final double scatterPayout;
+  final Set<int> winningPositions;
 
   const SpinResult({
     required this.initialGrid,
@@ -44,6 +45,7 @@ class SpinResult {
     required this.freeSpinsTriggered,
     required this.scatterCount,
     required this.scatterPayout,
+    this.winningPositions = const {},
     this.isRetrigger = false,
   });
 }
@@ -436,7 +438,11 @@ class SlotEngine {
 
     double totalBaseWin = 0;
     int tumbleCount = 0;
+<<<<<<< Updated upstream
     final tumbles = <TumbleStep>[];
+=======
+    final winningPositions = <int>{};
+>>>>>>> Stashed changes
 
     while (true) {
       final counts = _countRegularSymbols(grid);
@@ -455,6 +461,15 @@ class SlotEngine {
       }
 
       if (winners.isEmpty) break; // No more wins in this tumble
+
+      final winnersSet = winners.toSet();
+      for (int c = 0; c < columns; c++) {
+        for (int r = 0; r < rows; r++) {
+          if (winnersSet.contains(grid[c][r])) {
+            winningPositions.add(c * 100 + r);
+          }
+        }
+      }
 
       totalBaseWin += tumbleWin;
       tumbleCount++;
@@ -511,6 +526,7 @@ class SlotEngine {
       isRetrigger: isFreeSpins && freeSpinsTriggered,
       scatterCount: scatterCount,
       scatterPayout: scatterPayout,
+      winningPositions: winningPositions,
     );
   }
 
