@@ -48,14 +48,16 @@ class PoolState {
     // ~+2.4% RTP on average without ever engaging the brake. Narrowed bands
     // make `tight`/`generous` engage earlier so the system self-corrects
     // toward the 96.5% target faster, without touching base-game payouts.
-    // v6b: bands tightened further. v6 (3% wide normal band) still kept
-    // engine in normal 99.9% of spins — pool drift rarely exceeded ±1%.
-    // New band 1.5% wide forces real mode dynamics: tight/generous fire
-    // on routine pool wobble, jackpot/recovery only on serious drift.
-    if (deficit > 0.05) return GameMode.jackpot;    // underpaying by 5%+
-    if (deficit > 0.01) return GameMode.generous;   // underpaying by 1-5%
-    if (deficit > -0.005) return GameMode.normal;   // within -0.5% to +1% of target
-    if (deficit > -0.03) return GameMode.tight;     // overpaying by 0.5-3%
+    // v6c: aggressive band tightening for session-style variance. v6b
+    // (1.5% wide normal) still kept engine in normal ~99.7% — too stable
+    // to give players the "lucky/cold session" feel of pure-RNG cascade
+    // slots. Bands now ~6x tighter so mode shifts happen on minor pool
+    // drift, producing dynamic per-session variance comparable to natural
+    // RNG distributions.
+    if (deficit > 0.012) return GameMode.jackpot;   // underpaying by 1.2%+
+    if (deficit > 0.003) return GameMode.generous;  // underpaying by 0.3-1.2%
+    if (deficit > -0.0015) return GameMode.normal;  // -0.15% to +0.3% of target
+    if (deficit > -0.008) return GameMode.tight;    // overpaying by 0.15-0.8%
 
     // ─────────────────────────────────────────────────────────────
     // CATASTROPHIC CIRCUIT BREAKER — DO NOT REMOVE
