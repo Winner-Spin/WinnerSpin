@@ -527,7 +527,12 @@ class SlotEngine {
         return w.assetPath;
       }
     }
-    return weights.first.assetPath;
+    // Last-resort fallback: every regular is at its per-grid cap (extremely
+    // rare — mathematically requires 63+ regular slots on a 30-cell grid).
+    // Return a GUARANTEED regular symbol rather than weights.first, which
+    // could be a multiplier or scatter and would silently corrupt the
+    // calibrated win/scatter math.
+    return SymbolRegistry.all.firstWhere((s) => s.isRegular).assetPath;
   }
 
   static SlotSymbol _pickWinningSymbol(GameMode mode) {
@@ -762,7 +767,12 @@ class SlotEngine {
               break;
             }
           }
-          if (grid[c][r].isEmpty) grid[c][r] = weights.first.assetPath;
+          // Last-resort fallback: 20 random picks all violated a cap.
+          // Return a GUARANTEED regular symbol — see _pickSafe for the
+          // same reasoning (avoid silent multiplier/scatter leak).
+          if (grid[c][r].isEmpty) {
+            grid[c][r] = SymbolRegistry.all.firstWhere((s) => s.isRegular).assetPath;
+          }
         }
       }
     }
