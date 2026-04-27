@@ -1,24 +1,24 @@
-/// Tier classification for dynamic weight adjustment.
+/// Tier classification used by mode-aware weight adjustments.
 enum SymbolTier { low, mid, high, scatter, multiplier }
 
-/// Game mode determined by pool state.
+/// Pool-driven game mode. See [PoolState.currentMode] for selection logic.
 enum GameMode { recovery, tight, normal, generous, jackpot }
 
-/// Represents a single slot symbol with its properties.
+/// A single slot symbol — its asset, weight, and payout schedule.
 class SlotSymbol {
   final String id;
   final String assetPath;
   final double baseWeight;
   final SymbolTier tier;
 
-  /// Payout multipliers: {minCount: payoutMultiplier}.
-  /// e.g., {8: 0.25, 10: 0.75, 12: 2.0} means 8-9 symbols pay 0.25x bet.
+  /// Cluster-payout schedule keyed by minimum count.
+  /// {8: 0.25, 10: 0.75, 12: 2.0} → 8–9 symbols pay 0.25× bet, 10–11 pay 0.75×, 12+ pay 2×.
   final Map<int, double> payouts;
 
-  /// For multiplier symbols only.
+  /// Numeric value of multiplier symbols (e.g. 25 for the 25× multiplier).
   final int multiplierValue;
 
-  /// For scatter symbols: {minCount: payoutMultiplier}.
+  /// Scatter-payout schedule, same key shape as [payouts].
   final Map<int, double> scatterPayouts;
 
   const SlotSymbol({
@@ -35,8 +35,8 @@ class SlotSymbol {
   bool get isScatter => tier == SymbolTier.scatter;
   bool get isRegular => !isMultiplier && !isScatter;
 
-  /// Returns the payout multiplier for the given symbol count.
-  /// Checks thresholds in descending order (12+, 10+, 8+).
+  /// Resolves the payout multiplier for [count] regulars.
+  /// Walks thresholds in descending order so the highest tier matches first.
   double getPayoutForCount(int count) {
     if (count < 8) return 0.0;
     final thresholds = payouts.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -46,7 +46,7 @@ class SlotSymbol {
     return 0.0;
   }
 
-  /// Returns the scatter payout multiplier for the given count.
+  /// Resolves the scatter payout multiplier for [count] scatters.
   double getScatterPayoutForCount(int count) {
     if (scatterPayouts.isEmpty) return 0.0;
     final thresholds = scatterPayouts.keys.toList()
@@ -58,12 +58,12 @@ class SlotSymbol {
   }
 }
 
-/// Central symbol registry — single source of truth.
+/// Single source of truth for every symbol in the game.
 class SymbolRegistry {
   SymbolRegistry._();
 
   static const List<SlotSymbol> all = [
-    // ── LOW TIER ────────────────────────────────────────────────
+    // Low tier
     SlotSymbol(
       id: 'muz',
       assetPath: 'lib/images/slot_main_screen/Items/muz.png',
@@ -86,7 +86,7 @@ class SymbolRegistry {
       payouts: {8: 0.50, 10: 1.00, 12: 5.0},
     ),
 
-    // ── MID TIER ────────────────────────────────────────────────
+    // Mid tier
     SlotSymbol(
       id: 'seftali',
       assetPath: 'lib/images/slot_main_screen/Items/seftali.png',
@@ -102,7 +102,7 @@ class SymbolRegistry {
       payouts: {8: 1.00, 10: 1.50, 12: 10.0},
     ),
 
-    // ── HIGH TIER ───────────────────────────────────────────────
+    // High tier
     SlotSymbol(
       id: 'cilek',
       assetPath: 'lib/images/slot_main_screen/Items/cilek.png',
@@ -132,7 +132,7 @@ class SymbolRegistry {
       payouts: {8: 10.00, 10: 25.00, 12: 50.0},
     ),
 
-    // ── SCATTER ─────────────────────────────────────────────────
+    // Scatter
     SlotSymbol(
       id: 'cupcake',
       assetPath: 'lib/images/slot_main_screen/Items/cupCake.png',
@@ -141,7 +141,7 @@ class SymbolRegistry {
       scatterPayouts: {4: 3.0, 5: 5.0, 6: 100.0},
     ),
 
-    // ── MULTIPLIERS (Base game: extremely rare) ─────────────
+    // Multipliers — kept rare in base, amplified in FS via per-mode boost.
     SlotSymbol(
       id: 'multi_2x',
       assetPath: 'lib/images/slot_main_screen/Items/2x_carpan.png',
@@ -166,41 +166,41 @@ class SymbolRegistry {
     SlotSymbol(
       id: 'multi_10x',
       assetPath: 'lib/images/slot_main_screen/Items/10x_carpan.png',
-      baseWeight: 0.05,   // restored to v5 original
+      baseWeight: 0.05,
       tier: SymbolTier.multiplier,
       multiplierValue: 10,
     ),
     SlotSymbol(
       id: 'multi_25x',
       assetPath: 'lib/images/slot_main_screen/Items/25x_carpan.png',
-      baseWeight: 0.02,   // restored to v5 original
+      baseWeight: 0.02,
       tier: SymbolTier.multiplier,
       multiplierValue: 25,
     ),
     SlotSymbol(
       id: 'multi_50x',
       assetPath: 'lib/images/slot_main_screen/Items/50x_carpan.png',
-      baseWeight: 0.01,   // restored to v5 original
+      baseWeight: 0.01,
       tier: SymbolTier.multiplier,
       multiplierValue: 50,
     ),
     SlotSymbol(
       id: 'multi_100x',
       assetPath: 'lib/images/slot_main_screen/Items/100x_carpan.png',
-      baseWeight: 0.002,  // restored to v5 original
+      baseWeight: 0.002,
       tier: SymbolTier.multiplier,
       multiplierValue: 100,
     ),
   ];
 
-  /// Fast lookup by asset path.
+  /// Asset-path → symbol lookup, built once for O(1) access.
   static final Map<String, SlotSymbol> _byPath = {
     for (final s in all) s.assetPath: s,
   };
 
   static SlotSymbol? byPath(String path) => _byPath[path];
 
-  /// Dynamic weight multipliers per game mode and symbol tier.
+  /// Per-mode tier weight multipliers applied on top of [SlotSymbol.baseWeight].
   static const Map<GameMode, Map<SymbolTier, double>> weightMultipliers = {
     GameMode.recovery: {
       SymbolTier.low: 1.4,
@@ -210,8 +210,6 @@ class SymbolRegistry {
       SymbolTier.multiplier: 0.2,
     },
     GameMode.tight: {
-      // v2 tightening: tight is now a real brake, not just "slightly less normal".
-      // mid 1.05 -> 0.95, high 0.7 -> 0.5, multiplier 0.5 -> 0.4
       SymbolTier.low: 1.2,
       SymbolTier.mid: 0.95,
       SymbolTier.high: 0.5,
