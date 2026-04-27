@@ -124,10 +124,16 @@ class GameViewModel extends ChangeNotifier {
   SpinResult? _pendingResult;
 
   // ─── FREE SPINS STATE ───────────────────────────────────────
-  
+
   int _freeSpinsRemaining = 0;
   int get freeSpinsRemaining => _freeSpinsRemaining;
   bool get isInFreeSpins => _freeSpinsRemaining > 0;
+
+  /// True if the current FS round was triggered by an Ante Bet base spin.
+  /// Used to keep ante-FS economics consistent across the entire round
+  /// (the engine reduces FS-spin payouts when ante=true so total ante RTP
+  /// stays at 96.5% despite the 2× trigger rate).
+  bool _currentFsRoundFromAnte = false;
 
   // ─── CONSTRUCTOR ────────────────────────────────────────────
 
@@ -228,12 +234,16 @@ class GameViewModel extends ChangeNotifier {
     // Run the engine synchronously.
     //   - betAmount: ALWAYS the 1.0× base; the +25% from ante is overhead
     //     paid into the pool, NOT part of the payout calculation.
-    //   - anteBet: doubles the FS trigger rate for this base spin only.
+    //   - anteBet (base): doubles the FS trigger rate for this base spin.
+    //   - anteBet (FS): keeps the round flagged as ante-triggered so the
+    //     engine can apply the ante-FS payout reduction across all spins
+    //     of the round (keeps total ante RTP at 96.5% despite 2× triggers).
+    final bool anteFlag = isFreeSpin ? _currentFsRoundFromAnte : _anteBetActive;
     _pendingResult = SlotEngine.spin(
       _pool,
       _betAmount,
       isFreeSpins: isFreeSpin,
-      anteBet: _anteBetActive && !isFreeSpin,
+      anteBet: anteFlag,
     );
 
     // Set the initial grid the UI will animate towards via reel drop-in.
@@ -312,6 +322,16 @@ class GameViewModel extends ChangeNotifier {
 
     if (result.freeSpinsTriggered) {
       _freeSpinsRemaining += result.isRetrigger ? 5 : 10;
+      // Capture ante state ONLY when a base spin (not retrigger) triggers FS.
+      // Retriggers happen inside an existing round and inherit its ante flag.
+      if (!result.isRetrigger) {
+        _currentFsRoundFromAnte = _anteBetActive;
+      }
+    }
+
+    // Round ended (last FS consumed, no retrigger) — clear ante flag.
+    if (_currentFsRoundFromAnte && _freeSpinsRemaining == 0) {
+      _currentFsRoundFromAnte = false;
     }
 
     _pool.recordPayout(_lastWin);

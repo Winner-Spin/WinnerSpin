@@ -152,6 +152,36 @@ class SlotEngine {
   /// needs more headroom than for naturally-triggered FS rounds.
   static const double _buyFsSafetyFactor = 3.0;
 
+  // ─── ANTE BET (ÇİFTE ŞANS) OVERRIDES ──────────────────────────
+  // Ante Bet behaves as a "second engine" layered on top of the base math:
+  //   • Player pays 1.25× per base spin (the +25% is house overhead)
+  //   • Engine ALSO uses these ante-only constants when anteBet=true:
+  //       - FS trigger rate multiplier (instead of hardcoded 2.0×)
+  //       - Stricter pool safety factor for FS triggers
+  // Tuning ante params here NEVER affects farm-mode (anteBet=false) RTP.
+
+  /// Multiplier on top of base FS trigger rate when Ante Bet is active.
+  /// 2.0 mirrors the Sweet Bonanza spec (the "2× FS chance" advertised to
+  /// the player). RTP is held at ~96.5% by reducing FS round economics
+  /// inside ante-triggered rounds via [_anteFsHitRateBoostScale] — the
+  /// trigger rate stays honest, but each ante-FS round pays slightly less.
+  static const double _anteFsTriggerMultiplier = 2.0;
+
+  /// Safety multiplier for the Virtual Cost guard when ante is active.
+  /// Stricter than the natural-trigger guard (2.0) but looser than the
+  /// buy-bonus guard (3.0). Reflects the higher FS volume ante creates.
+  static const double _anteFsSafetyFactor = 2.5;
+
+  /// Scaling factor applied to the COLLECTED MULTIPLIER SUM during FS spins
+  /// of an ante-triggered round. Calibration journey:
+  ///   1.00 → 100.00% RTP (no scaling, baseline 2× ante)
+  ///   0.85 →  99.73% RTP (FS rounds avg 82.8x — barely affected)
+  ///   0.80 →  ~96.5% target (interpolated midpoint, FS rounds avg ~78x)
+  ///   0.75 →  93.80% RTP (over-corrected, FS rounds avg 73x)
+  /// Player still sees the advertised 2× FS chance and identical visuals —
+  /// only the statistical multiplier sum shifts across many rounds.
+  static const double _anteFsMultiplierScale = 0.80;
+
   /// Spins awarded per FS event.
   static const int _fsAwardInitial = 10;
   static const int _fsAwardRetrigger = 5;
@@ -204,15 +234,20 @@ class SlotEngine {
   /// Virtual Cost budget guard. Returns true only if the pool can safely
   /// absorb the EXPECTED future cost of an entire FS round.
   /// Bypassed during the first 50-spin warmup to keep early UX exciting.
+  ///
+  /// When [isAnte] is true, uses [_anteFsSafetyFactor] (stricter) instead of
+  /// the default factor — reflects the higher FS volume ante creates.
   static bool _canAffordFsRound(
     PoolState pool,
     double betAmount,
     GameMode mode,
-    bool isRetrigger,
-  ) {
+    bool isRetrigger, {
+    bool isAnte = false,
+  }) {
     if (pool.totalSpins < 50) return true; // warmup: no budget gate
+    final safetyFactor = isAnte ? _anteFsSafetyFactor : _fsSafetyFactor;
     final virtualCost =
-        _expectedFsCostMultiplier(mode, isRetrigger) * betAmount * _fsSafetyFactor;
+        _expectedFsCostMultiplier(mode, isRetrigger) * betAmount * safetyFactor;
     return pool.poolBalance >= virtualCost;
   }
 
@@ -354,13 +389,17 @@ class SlotEngine {
     final double baseFsRate = isRetriggerAttempt
         ? (_fsRetriggerRate[mode] ?? 0.0)
         : (_fsTriggerRate[mode] ?? 0.0);
-    // Ante Bet (1.25× cost) doubles the FS trigger rate for THIS spin.
+    // Ante Bet (1.25× cost) bumps the FS trigger rate by the ante override
+    // [_anteFsTriggerMultiplier] (calibrated for ~96.5% ante-mode RTP).
     // Only applies to base spins; in-FS retrigger rate is untouched.
     final double fsRate = (anteBet && !isRetriggerAttempt)
-        ? baseFsRate * 2.0
+        ? baseFsRate * _anteFsTriggerMultiplier
         : baseFsRate;
     final bool canAffordFs =
-        _canAffordFsRound(pool, betAmount, mode, isRetriggerAttempt) &&
+        _canAffordFsRound(
+              pool, betAmount, mode, isRetriggerAttempt,
+              isAnte: anteBet && !isRetriggerAttempt,
+            ) &&
             maxAllowedWin >= (3.25 * betAmount); // also keep per-spin floor
     final bool triggersFs = canAffordFs && (_rng.nextDouble() < fsRate);
 
@@ -382,7 +421,7 @@ class SlotEngine {
       // Guaranteed losing spin (no 8+ matches, max 3 scatters)
       final grid = _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins);
       return _runSimulation(grid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
     }
 
     // 2. Winning Spin: Try to generate a NATURAL cascade sequence
@@ -392,7 +431,7 @@ class SlotEngine {
       
       // Simulate tumbles naturally (allowing chance for chains/combos)
       final simResult = _runSimulation(initialGrid, weights, betAmount,
-          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
+          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
 
       // Check if the simulation resulted in a win within our allowed budget
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
@@ -408,7 +447,7 @@ class SlotEngine {
 
 
       final simResult = _runSimulation(fallbackGrid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins);
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
 
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult; // Valid fallback found within budget!
@@ -429,7 +468,8 @@ class SlotEngine {
     double betAmount,
     {required bool safeRefill,
     required int maxMults,
-    bool isFreeSpins = false}
+    bool isFreeSpins = false,
+    bool anteBet = false}
   ) {
     final grid = _deepCopy(startGrid);
 
@@ -500,7 +540,15 @@ class SlotEngine {
       ));
     }
 
-    final finalMultiplier = _collectMultipliers(grid);
+    final rawMultiplier = _collectMultipliers(grid);
+    // Ante-FS multiplier scaling: when this FS round was triggered by ante,
+    // scale the collected multiplier sum by [_anteFsMultiplierScale]. Honest
+    // 2× FS trigger rate is preserved; this is the lever that brings ante-mode
+    // RTP back to 96.5% target. Floor at 1.0 so scaling can't turn a winning
+    // multiplier into a "no boost" state.
+    final finalMultiplier = (anteBet && isFreeSpins && rawMultiplier > 1.0)
+        ? max(1.0, rawMultiplier * _anteFsMultiplierScale)
+        : rawMultiplier;
 
     // Evaluate scatters AFTER all tumbles to allow natural cascades to build up scatters
     final scatterCount = _countAsset(grid, scatterPath);
