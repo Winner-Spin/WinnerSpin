@@ -21,7 +21,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/services/slot_engine.dart';
 import 'package:winner_spin/models/pool_state.dart';
-import 'package:winner_spin/models/slot_symbol.dart';
+import 'package:winner_spin/models/game_mode.dart';
 
 void main() {
   test('30M spin RTP simulation — ANTE BET ALWAYS ON', () {

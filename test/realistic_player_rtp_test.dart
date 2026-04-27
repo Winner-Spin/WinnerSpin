@@ -19,7 +19,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/services/slot_engine.dart';
 import 'package:winner_spin/models/pool_state.dart';
-import 'package:winner_spin/models/slot_symbol.dart';
+import 'package:winner_spin/models/game_mode.dart';
 
 void main() {
   test('500K cycles of (50 farm + 50 ante + 1 buy)', () {

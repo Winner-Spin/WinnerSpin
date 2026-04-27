@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/auth_service.dart';
-import '../services/slot_engine.dart';
-import '../services/pool_service.dart';
 import '../models/pool_state.dart';
+import '../models/spin_result.dart';
+import '../services/auth_service.dart';
+import '../services/pool_service.dart';
+import '../services/slot_engine.dart';
 
 class GameViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();

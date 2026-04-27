@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'slot_symbol.dart';
+import 'game_mode.dart';
 
 /// Tracks the virtual money pool for RTP enforcement. Held in memory during
 /// gameplay and persisted to Firestore at [saveInterval] cadence.
