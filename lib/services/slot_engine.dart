@@ -182,6 +182,29 @@ class SlotEngine {
   /// only the statistical multiplier sum shifts across many rounds.
   static const double _anteFsMultiplierScale = 0.80;
 
+  // ─── BUY BONUS (FS SATIN AL) OVERRIDES ────────────────────────
+  // Buy FS behaves as a "third engine" layered on top of the base math:
+  //   • Player pays 100× bet up front to skip directly to a 10-spin FS round
+  //   • Engine ALSO uses these buy-only constants when buyFs=true:
+  //       - Multiplier scale (boost — buy rounds need more generous payouts
+  //         to hit SB-grade ~96.5% RTP from the natural 91% baseline)
+  //       - Stricter pool safety factor (already exists: _buyFsSafetyFactor)
+  // Tuning buy params here NEVER affects farm or ante RTP.
+
+  /// Scaling factor applied to the COLLECTED MULTIPLIER SUM during FS spins
+  /// of a BOUGHT round. >1.0 = boost (opposite direction from ante).
+  /// Buy rounds are deterministic (every 100×bet always triggers FS), but
+  /// the natural FS round payout is ~91x, leaving buy RTP at 91% — below
+  /// the SB-grade 96–99% standard. This scale lifts the multiplier impact
+  /// inside bought rounds so RTP lands at ~96.5%. Calibration journey:
+  ///   1.00 → 91.0% RTP (no scaling, baseline)
+  ///   1.15 → 100.0% RTP (over-corrected, hits saturation near 100%)
+  ///   1.09 →  99.1% RTP (still over — slope ~90 RTP/unit in this range)
+  ///   1.06 →  ~96.5% target (interpolated from observed sensitivity)
+  /// Buy round visuals are unchanged — only the statistical multiplier
+  /// sum shifts upward.
+  static const double _buyFsMultiplierScale = 1.06;
+
   /// Spins awarded per FS event.
   static const int _fsAwardInitial = 10;
   static const int _fsAwardRetrigger = 5;
@@ -349,6 +372,7 @@ class SlotEngine {
     double betAmount, {
     bool isFreeSpins = false,
     bool anteBet = false,
+    bool buyFs = false,
   }) {
     final mode = pool.currentMode;
     final weights = _buildAdjustedWeights(mode, isFreeSpins);
@@ -421,7 +445,7 @@ class SlotEngine {
       // Guaranteed losing spin (no 8+ matches, max 3 scatters)
       final grid = _generateSafeGrid(weights, spinMaxMults, isFreeSpins: isFreeSpins);
       return _runSimulation(grid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
     }
 
     // 2. Winning Spin: Try to generate a NATURAL cascade sequence
@@ -431,7 +455,7 @@ class SlotEngine {
       
       // Simulate tumbles naturally (allowing chance for chains/combos)
       final simResult = _runSimulation(initialGrid, weights, betAmount,
-          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
+          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
 
       // Check if the simulation resulted in a win within our allowed budget
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
@@ -447,7 +471,7 @@ class SlotEngine {
 
 
       final simResult = _runSimulation(fallbackGrid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet);
+          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
 
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult; // Valid fallback found within budget!
@@ -469,7 +493,8 @@ class SlotEngine {
     {required bool safeRefill,
     required int maxMults,
     bool isFreeSpins = false,
-    bool anteBet = false}
+    bool anteBet = false,
+    bool buyFs = false}
   ) {
     final grid = _deepCopy(startGrid);
 
@@ -541,14 +566,27 @@ class SlotEngine {
     }
 
     final rawMultiplier = _collectMultipliers(grid);
-    // Ante-FS multiplier scaling: when this FS round was triggered by ante,
-    // scale the collected multiplier sum by [_anteFsMultiplierScale]. Honest
-    // 2× FS trigger rate is preserved; this is the lever that brings ante-mode
-    // RTP back to 96.5% target. Floor at 1.0 so scaling can't turn a winning
-    // multiplier into a "no boost" state.
-    final finalMultiplier = (anteBet && isFreeSpins && rawMultiplier > 1.0)
-        ? max(1.0, rawMultiplier * _anteFsMultiplierScale)
-        : rawMultiplier;
+    // FS multiplier scaling — three mutually-exclusive paths:
+    //   • Ante-triggered FS: scale DOWN by [_anteFsMultiplierScale] (0.80) to
+    //     offset the 2× trigger rate so ante RTP holds at 96.5%.
+    //   • Bought FS: scale UP by [_buyFsMultiplierScale] (>1.0) to lift the
+    //     91% natural buy RTP to SB-grade ~96.5%.
+    //   • Farm-triggered FS: no scaling (rawMultiplier used as-is).
+    // Floor at 1.0 so scaling can't turn a winning multiplier into a "no
+    // boost" state. Buy and ante are exclusive — a bought round is by
+    // definition not ante-triggered.
+    double finalMultiplier;
+    if (isFreeSpins && rawMultiplier > 1.0) {
+      if (anteBet) {
+        finalMultiplier = max(1.0, rawMultiplier * _anteFsMultiplierScale);
+      } else if (buyFs) {
+        finalMultiplier = max(1.0, rawMultiplier * _buyFsMultiplierScale);
+      } else {
+        finalMultiplier = rawMultiplier;
+      }
+    } else {
+      finalMultiplier = rawMultiplier;
+    }
 
     // Evaluate scatters AFTER all tumbles to allow natural cascades to build up scatters
     final scatterCount = _countAsset(grid, scatterPath);

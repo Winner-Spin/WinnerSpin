@@ -135,6 +135,13 @@ class GameViewModel extends ChangeNotifier {
   /// stays at 96.5% despite the 2× trigger rate).
   bool _currentFsRoundFromAnte = false;
 
+  /// True if the current FS round was bought via the Buy Free Spins feature.
+  /// Used to keep buy-FS economics consistent across the entire round
+  /// (the engine BOOSTS FS-spin multiplier sums when buyFs=true so the
+  /// 100×bet purchase price returns ~96.5% RTP, matching the SB-grade
+  /// buy bonus standard).
+  bool _currentFsRoundFromBuy = false;
+
   // ─── CONSTRUCTOR ────────────────────────────────────────────
 
   GameViewModel() {
@@ -238,12 +245,17 @@ class GameViewModel extends ChangeNotifier {
     //   - anteBet (FS): keeps the round flagged as ante-triggered so the
     //     engine can apply the ante-FS payout reduction across all spins
     //     of the round (keeps total ante RTP at 96.5% despite 2× triggers).
+    //   - buyFs (FS only): keeps the round flagged as bought so the engine
+    //     applies the buy-FS multiplier BOOST across all spins (lifts buy
+    //     RTP from ~91% to SB-grade ~96.5%). Mutually exclusive with ante.
     final bool anteFlag = isFreeSpin ? _currentFsRoundFromAnte : _anteBetActive;
+    final bool buyFlag = isFreeSpin && _currentFsRoundFromBuy;
     _pendingResult = SlotEngine.spin(
       _pool,
       _betAmount,
       isFreeSpins: isFreeSpin,
       anteBet: anteFlag,
+      buyFs: buyFlag,
     );
 
     // Set the initial grid the UI will animate towards via reel drop-in.
@@ -269,6 +281,9 @@ class GameViewModel extends ChangeNotifier {
     // Pool gets the full 100× fee credited as wagered.
     _pool.recordBet(price);
     _freeSpinsRemaining += 10;
+    // Mark the upcoming FS round as a bought round so the engine applies
+    // the buy-FS multiplier boost on every spin until the round ends.
+    _currentFsRoundFromBuy = true;
 
     notifyListeners();
   }
@@ -329,9 +344,10 @@ class GameViewModel extends ChangeNotifier {
       }
     }
 
-    // Round ended (last FS consumed, no retrigger) — clear ante flag.
-    if (_currentFsRoundFromAnte && _freeSpinsRemaining == 0) {
-      _currentFsRoundFromAnte = false;
+    // Round ended (last FS consumed, no retrigger) — clear round flags.
+    if (_freeSpinsRemaining == 0) {
+      if (_currentFsRoundFromAnte) _currentFsRoundFromAnte = false;
+      if (_currentFsRoundFromBuy) _currentFsRoundFromBuy = false;
     }
 
     _pool.recordPayout(_lastWin);

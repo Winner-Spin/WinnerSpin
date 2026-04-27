@@ -70,7 +70,14 @@ void main() {
         fsRemaining--;
         totalFsSpins++;
 
-        final result = SlotEngine.spin(pool, betAmount, isFreeSpins: true);
+        // buyFs=true on every FS spin of a bought round → engine applies
+        // the buy-FS multiplier boost (mirrors GameViewModel state tracking).
+        final result = SlotEngine.spin(
+          pool,
+          betAmount,
+          isFreeSpins: true,
+          buyFs: true,
+        );
         pool.recordPayout(result.totalWin);
         totalPaidOut += result.totalWin;
         thisRoundPayout += result.totalWin;
