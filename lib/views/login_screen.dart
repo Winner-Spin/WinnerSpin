@@ -17,11 +17,18 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _viewModel.addListener(_onViewModelChange);
     _viewModel.initMusic();
+  }
+
+  void _onViewModelChange() {
+    _showErrorIfNeeded(context);
+    _handleLoginSuccess(context);
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChange);
     // We no longer dispose the view model because it is a singleton
     // and audio needs to be kept alive.
     super.dispose();
@@ -34,12 +41,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
-          // Show error snackbar when errorMessage changes
-          _showErrorIfNeeded(context);
-
-          // Handle navigation on login success
-          _handleLoginSuccess(context);
-
           return LayoutBuilder(
             builder: (context, constraints) {
               final double screenH = constraints.maxHeight;
@@ -148,16 +149,13 @@ class _LoginScreenState extends State<LoginScreen> {
   // ─── NAVIGATION (View responsibility) ───────────────────────
 
   void _handleLoginSuccess(BuildContext context) {
+    if (!mounted) return;
     if (_viewModel.loginSuccess) {
       _viewModel.resetLoginSuccess();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const GameScreen()),
-          );
-        }
-      });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const GameScreen()),
+      );
     }
   }
 
@@ -180,19 +178,16 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _lastShownError;
 
   void _showErrorIfNeeded(BuildContext context) {
+    if (!mounted) return;
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 

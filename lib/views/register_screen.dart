@@ -14,7 +14,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final RegisterViewModel _viewModel = RegisterViewModel();
 
   @override
+  void initState() {
+    super.initState();
+    _viewModel.addListener(_onViewModelChange);
+  }
+
+  void _onViewModelChange() {
+    _showErrorIfNeeded(context);
+    _handleRegistrationSuccess(context);
+  }
+
+  @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChange);
     _viewModel.dispose();
     super.dispose();
   }
@@ -26,12 +38,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
-          // Show error snackbar when errorMessage changes
-          _showErrorIfNeeded(context);
-
-          // Handle navigation on registration success
-          _handleRegistrationSuccess(context);
-
           return LayoutBuilder(
             builder: (context, constraints) {
               final double screenH = constraints.maxHeight;
@@ -51,8 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     top: screenH * 0.07,
                     right: screenW * 0.07,
                     child: AnimatedImageButton(
-                      imagePath:
-                          'lib/images/register_screen/music_button.png',
+                      imagePath: 'lib/images/register_screen/music_button.png',
                       width: 46,
                       onTap: () {
                         // TODO: Toggle music
@@ -126,9 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     right: screenW * 0.21,
                     child: Center(
                       child: _viewModel.isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : _buildKayitButton(
                               onTap: () {
                                 _viewModel.register();
@@ -141,49 +144,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     bottom: screenH * 0.12,
                     left: screenW * 0.15,
                     right: screenW * 0.15,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: Colors.pinkAccent, width: 2),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Already have an account? ',
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                'Login!',
-                                style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    child: Center(
+                      child: AnimatedImageButton(
+                        imagePath: 'lib/images/register_screen/image.png',
+                        width: 250,
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -199,19 +171,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ─── NAVIGATION (View responsibility) ───────────────────────
 
   void _handleRegistrationSuccess(BuildContext context) {
+    if (!mounted) return;
     if (_viewModel.registrationSuccess) {
       _viewModel.resetRegistrationSuccess();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registration successful! Please log in.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registration successful! Please log in.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context);
     }
   }
 
@@ -220,19 +189,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _lastShownError;
 
   void _showErrorIfNeeded(BuildContext context) {
+    if (!mounted) return;
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
+      );
     }
   }
 

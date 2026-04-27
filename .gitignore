@@ -56,3 +56,5 @@ login_page.png
 # Custom AI Assistant Workflows
 .agents/
 >>>>>>> d181b57 (WSPIN-12   fix: resolve branch mix-up and restore stable files)
+
+symbol_payouts.md

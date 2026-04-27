@@ -37,6 +37,9 @@ class AuthService {
       'username': username.trim(),
       'email': email.trim(),
       'createdAt': FieldValue.serverTimestamp(),
+      'balance': 10000.0,
+      'userBalance': 10000.0,
+      'freeSpinsRemaining': 0,
     });
 
     return user;
@@ -62,5 +65,21 @@ class AuthService {
   /// Signs out the current user.
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  // ─── USER DATA ─────────────────────────────────────────────
+
+  /// Fetches user profile data from Firestore.
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      // Return null on failure to prevent app crashes and data leaks.
+      return null;
+    }
   }
 }

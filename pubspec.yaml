@@ -28,4 +28,6 @@ flutter:
   assets:
     - lib/images/login_screen/
     - lib/images/register_screen/
+    - lib/images/slot_main_screen/
+    - lib/images/slot_main_screen/Items/
     - assets/audio/
