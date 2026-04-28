@@ -1,9 +1,13 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+
+import '../repositories/auth_repository.dart';
+import '../repositories/firebase_auth_repository.dart';
 
 class RegisterViewModel extends ChangeNotifier {
-  final AuthService _authService = AuthService();
+  RegisterViewModel({AuthRepository? authRepository})
+      : _authRepository = authRepository ?? FirebaseAuthRepository();
+
+  final AuthRepository _authRepository;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -20,17 +24,13 @@ class RegisterViewModel extends ChangeNotifier {
   bool _registrationSuccess = false;
   bool get registrationSuccess => _registrationSuccess;
 
-  // ─── REGISTER ──────────────────────────────────────────────
-
-  /// Validates inputs and calls AuthService.signUp.
-  /// Sets [registrationSuccess] to true on success — the View
-  /// is responsible for navigation and showing success messages.
+  /// Validates inputs and calls the repository's signUp.
+  /// On success the user is signed back out so they must log in manually;
+  /// the View handles navigation off [registrationSuccess].
   Future<void> register() async {
-    // Clear any previous state
     _errorMessage = null;
     _registrationSuccess = false;
 
-    // ── Validation ──
     final username = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text;
@@ -57,28 +57,22 @@ class RegisterViewModel extends ChangeNotifier {
       return;
     }
 
-    // ── Firebase sign-up ──
     _setLoading(true);
 
     try {
-      await _authService.signUp(
+      await _authRepository.signUp(
         email: email,
         password: password,
         username: username,
       );
-
-      // Sign out so user must log in manually
-      await _authService.signOut();
-
+      // Sign back out so the user must log in manually.
+      await _authRepository.signOut();
       _registrationSuccess = true;
-    } on FirebaseAuthException catch (e) {
-      debugPrint('🔥 FirebaseAuthException: ${e.code} - ${e.message}');
+    } on AuthException catch (e) {
+      debugPrint('Auth error: ${e.code} - ${e.rawMessage}');
       _errorMessage = _friendlyError(e.code);
-    } on FirebaseException catch (e) {
-      debugPrint('🔥 FirebaseException: ${e.code} - ${e.message}');
-      _errorMessage = _friendlyFirestoreError(e.code);
     } catch (e) {
-      debugPrint('🔥 Unexpected error: $e');
+      debugPrint('Unexpected register error: $e');
       _errorMessage = 'An unexpected error occurred: $e';
     } finally {
       _setLoading(false);
@@ -90,38 +84,26 @@ class RegisterViewModel extends ChangeNotifier {
     _registrationSuccess = false;
   }
 
-  // ─── HELPERS ───────────────────────────────────────────────
-
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
   }
 
-  /// Converts Firebase Auth error codes to user-friendly messages.
-  String _friendlyError(String code) {
+  /// Maps domain-level auth error codes to user-facing messages.
+  String _friendlyError(AuthErrorCode code) {
     switch (code) {
-      case 'email-already-in-use':
+      case AuthErrorCode.emailAlreadyInUse:
         return 'This email is already registered.';
-      case 'invalid-email':
+      case AuthErrorCode.invalidEmail:
         return 'Invalid email address.';
-      case 'weak-password':
+      case AuthErrorCode.weakPassword:
         return 'Password is too weak.';
-      case 'operation-not-allowed':
-        return 'Email/password accounts are not enabled.';
-      default:
-        return 'Registration failed ($code). Please try again.';
-    }
-  }
-
-  /// Converts Firestore error codes to user-friendly messages.
-  String _friendlyFirestoreError(String code) {
-    switch (code) {
-      case 'permission-denied':
-        return 'Database permission denied. Please contact support.';
-      case 'unavailable':
-        return 'Service is temporarily unavailable. Try again later.';
-      default:
-        return 'Database error ($code). Please try again.';
+      case AuthErrorCode.userNotFound:
+      case AuthErrorCode.wrongPassword:
+      case AuthErrorCode.userDisabled:
+      case AuthErrorCode.invalidCredential:
+      case AuthErrorCode.unknown:
+        return 'Registration failed. Please try again.';
     }
   }
 

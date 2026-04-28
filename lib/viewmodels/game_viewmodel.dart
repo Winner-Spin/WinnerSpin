@@ -1,16 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/pool_state.dart';
 import '../models/spin_result.dart';
-import '../services/auth_service.dart';
+import '../repositories/auth_repository.dart';
+import '../repositories/firebase_auth_repository.dart';
 import '../services/pool_service.dart';
 import '../services/slot_engine.dart';
 
 class GameViewModel extends ChangeNotifier {
-  final AuthService _authService = AuthService();
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSubscription;
+  final AuthRepository _authRepository;
+  StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
   // ── User data ──
 
@@ -133,7 +134,8 @@ class GameViewModel extends ChangeNotifier {
   /// buy multiplier boost on every spin (incl. retriggers).
   bool _currentFsRoundFromBuy = false;
 
-  GameViewModel() {
+  GameViewModel({AuthRepository? authRepository})
+      : _authRepository = authRepository ?? FirebaseAuthRepository() {
     // Bootstrap display grid via a zero-bet spin (engine returns a safe grid).
     final result = SlotEngine.spin(_pool, 0);
     _grid = result.initialGrid;
@@ -142,16 +144,16 @@ class GameViewModel extends ChangeNotifier {
 
   Future<void> fetchUserData() async {
     try {
-      final user = _authService.currentUser;
-      if (user != null) {
+      final uid = _authRepository.currentUserId;
+      if (uid != null) {
         final results = await Future.wait([
-          _authService.getUserData(user.uid),
-          PoolService.load(user.uid),
+          _authRepository.getUserData(uid),
+          PoolService.load(uid),
         ]);
 
         final userData = results[0] as Map<String, dynamic>?;
         _pool = results[1] as PoolState;
-        _listenToUserBalance(user.uid);
+        _listenToUserBalance(uid);
 
         if (userData != null) {
           _username = userData['username'] ?? 'Kullanıcı';
@@ -180,14 +182,8 @@ class GameViewModel extends ChangeNotifier {
 
   void _listenToUserBalance(String uid) {
     _userSubscription?.cancel();
-    _userSubscription = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .snapshots()
-        .listen((snapshot) {
-      final data = snapshot.data();
+    _userSubscription = _authRepository.watchUserData(uid).listen((data) {
       if (data == null || !data.containsKey('userBalance')) return;
-
       _userBalance = (data['userBalance'] ?? 10000.0).toDouble();
       notifyListeners();
     });
@@ -332,7 +328,7 @@ class GameViewModel extends ChangeNotifier {
     await _forceSavePool();
     await _userSubscription?.cancel();
     _userSubscription = null;
-    await _authService.signOut();
+    await _authRepository.signOut();
     _loggedOut = true;
     notifyListeners();
   }
@@ -345,19 +341,20 @@ class GameViewModel extends ChangeNotifier {
   // ── Persistence ──
 
   void _savePlayerState() {
-    final uid = _authService.currentUser?.uid;
+    final uid = _authRepository.currentUserId;
     if (uid != null) {
-      FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'userBalance': _userBalance,
-        'freeSpinsRemaining': _freeSpinsRemaining,
-      }, SetOptions(merge: true));
+      _authRepository.savePlayerState(
+        uid,
+        userBalance: _userBalance,
+        freeSpinsRemaining: _freeSpinsRemaining,
+      );
     }
   }
 
   /// Fire-and-forget pool save once the save interval has elapsed.
   void _savePoolIfNeeded() {
     if (_pool.shouldSave) {
-      final uid = _authService.currentUser?.uid;
+      final uid = _authRepository.currentUserId;
       if (uid != null) {
         PoolService.save(uid, _pool);
         _savePlayerState();
@@ -367,13 +364,14 @@ class GameViewModel extends ChangeNotifier {
 
   /// Awaited pool save used at logout / app background.
   Future<void> _forceSavePool() async {
-    final uid = _authService.currentUser?.uid;
+    final uid = _authRepository.currentUserId;
     if (uid != null) {
       await PoolService.save(uid, _pool);
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'userBalance': _userBalance,
-        'freeSpinsRemaining': _freeSpinsRemaining,
-      }, SetOptions(merge: true));
+      await _authRepository.savePlayerState(
+        uid,
+        userBalance: _userBalance,
+        freeSpinsRemaining: _freeSpinsRemaining,
+      );
     }
   }
 

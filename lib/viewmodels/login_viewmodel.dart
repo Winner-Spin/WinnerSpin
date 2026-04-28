@@ -1,15 +1,20 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../services/auth_service.dart';
+
+import '../repositories/auth_repository.dart';
+import '../repositories/firebase_auth_repository.dart';
 
 class LoginViewModel extends ChangeNotifier {
-  // Singleton pattern
+  // Singleton pattern — production-only single instance.
   static final LoginViewModel _instance = LoginViewModel._internal();
   factory LoginViewModel() => _instance;
-  LoginViewModel._internal();
+  LoginViewModel._internal() : _authRepository = FirebaseAuthRepository();
 
-  final AuthService _authService = AuthService();
+  /// Test-only constructor — lets tests inject a mock repository.
+  @visibleForTesting
+  LoginViewModel.withRepository(this._authRepository);
+
+  final AuthRepository _authRepository;
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -57,7 +62,7 @@ class LoginViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      await _authService.signIn(
+      await _authRepository.signIn(
         email: emailController.text,
         password: passwordController.text,
       );
@@ -67,7 +72,7 @@ class LoginViewModel extends ChangeNotifier {
       emailController.clear();
       passwordController.clear();
       _loginSuccess = true;
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       _errorMessage = _friendlyError(e.code);
     } catch (e) {
       _errorMessage = 'An unexpected error occurred. Please try again.';
@@ -114,20 +119,22 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Converts Firebase error codes to user-friendly messages.
-  String _friendlyError(String code) {
+  /// Maps domain-level auth error codes to user-facing messages.
+  String _friendlyError(AuthErrorCode code) {
     switch (code) {
-      case 'user-not-found':
+      case AuthErrorCode.userNotFound:
         return 'No account found with this email.';
-      case 'wrong-password':
+      case AuthErrorCode.wrongPassword:
         return 'Incorrect password.';
-      case 'invalid-email':
+      case AuthErrorCode.invalidEmail:
         return 'Invalid email address.';
-      case 'user-disabled':
+      case AuthErrorCode.userDisabled:
         return 'This account has been disabled.';
-      case 'invalid-credential':
+      case AuthErrorCode.invalidCredential:
         return 'Invalid email or password.';
-      default:
+      case AuthErrorCode.emailAlreadyInUse:
+      case AuthErrorCode.weakPassword:
+      case AuthErrorCode.unknown:
         return 'Login failed. Please try again.';
     }
   }
