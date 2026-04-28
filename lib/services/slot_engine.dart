@@ -5,6 +5,9 @@ import '../models/slot_symbol.dart';
 import '../models/spin_result.dart';
 import '../models/symbol_registry.dart';
 import '../models/tumble_step.dart';
+import 'engine/ante_config.dart';
+import 'engine/buy_config.dart';
+import 'engine/rtp_config.dart';
 
 /// Pure, stateless math engine for slot calculations.
 class SlotEngine {
@@ -15,90 +18,10 @@ class SlotEngine {
   static const int rows = 5;
   static const int _totalSlots = columns * rows; // 30
 
-  /// Probability of a winning spin per game mode.
-  static const Map<GameMode, double> _hitRate = {
-    GameMode.recovery: 0.310,
-    GameMode.tight: 0.260,
-    GameMode.normal: 0.260,
-    GameMode.generous: 0.240,
-    GameMode.jackpot: 0.260,
-  };
-
-  /// Multiplier applied to [_hitRate] inside a Free Spins round.
-  /// Higher modes get larger boosts so jackpot/generous FS feel premium.
-  static const Map<GameMode, double> _fsHitRateBoost = {
-    GameMode.recovery: 1.22,
-    GameMode.tight: 1.22,
-    GameMode.normal: 1.275,
-    GameMode.generous: 1.325,
-    GameMode.jackpot: 1.375,
-  };
-
-  /// Probability of naturally triggering Free Spins per base spin.
-  /// Doubled by Ante Bet at the spin call site (see [_anteFsTriggerMultiplier]).
-  static const Map<GameMode, double> _fsTriggerRate = {
-    GameMode.recovery: 0.00075,
-    GameMode.tight: 0.00141,
-    GameMode.normal: 0.00315,
-    GameMode.generous: 0.00517,
-    GameMode.jackpot: 0.0235,
-  };
-
-  /// Probability of re-triggering Free Spins from inside a FS round.
-  static const Map<GameMode, double> _fsRetriggerRate = {
-    GameMode.recovery: 0.0,
-    GameMode.tight: 0.01,
-    GameMode.normal: 0.02,
-    GameMode.generous: 0.03,
-    GameMode.jackpot: 0.05,
-  };
-
-  /// Estimated avg per-FS-spin payout (xBet). Drives the Virtual Cost guard.
-  /// Errs conservative — overestimates real cost to keep the pool safe.
-  static const Map<GameMode, double> _fsAvgPayoutPerSpin = {
-    GameMode.recovery: 4.0,
-    GameMode.tight: 6.0,
-    GameMode.normal: 10.0,
-    GameMode.generous: 15.0,
-    GameMode.jackpot: 22.0,
-  };
-
-  /// Pool-cover headroom for naturally-triggered FS rounds.
-  static const double _fsSafetyFactor = 2.0;
-
-  /// Stricter pool-cover headroom for player-initiated buys (whale clustering).
-  static const double _buyFsSafetyFactor = 3.0;
-
-  // ── Ante Bet overrides ──
-  // Active when anteBet=true. Never touches farm-mode RTP.
-
-  /// Ante doubles the FS trigger rate (matches the "2× FS chance" UI claim).
-  static const double _anteFsTriggerMultiplier = 2.0;
-
-  /// Ante's pool-cover headroom — between natural (2.0) and buy (3.0).
-  static const double _anteFsSafetyFactor = 2.5;
-
-  /// Scales the multiplier sum DOWN inside ante-triggered FS rounds so the
-  /// 2× trigger rate doesn't inflate ante RTP above 96.5%. Visuals unchanged.
-  static const double _anteFsMultiplierScale = 0.80;
-
-  // ── Buy Bonus overrides ──
-  // Active when buyFs=true. Never touches farm or ante RTP.
-
-  /// Scales the multiplier sum UP inside bought FS rounds. Lifts buy RTP
-  /// from the natural ~91% to industry-standard ~96.5%. Visuals unchanged.
-  static const double _buyFsMultiplierScale = 1.06;
-
-  /// Spins awarded per FS event.
-  static const int _fsAwardInitial = 10;
-  static const int _fsAwardRetrigger = 5;
-
-  /// Buy Free Spins price as a multiple of base bet.
-  static const double buyFeaturePriceMultiplier = 100.0;
-
-  /// Base-game forced-chain probability. Zero — natural cascade rate already
-  /// matches industry tumble-depth targets without seeding.
-  static const double _chainProbBase = 0.0;
+  /// Buy Free Spins price as a multiple of base bet. Re-exported here for
+  /// backwards-compatible call sites (e.g. ViewModel); the source of truth
+  /// is [BuyConfig.priceMultiplier].
+  static const double buyFeaturePriceMultiplier = BuyConfig.priceMultiplier;
 
   /// FS forced-chain probability tapered by tumble depth — keeps the long
   /// tail (5+ tumbles) under ~5% of wins while letting natural cascades
@@ -113,8 +36,8 @@ class SlotEngine {
 
   /// Estimated total xBet cost of awarding a FS round.
   static double _expectedFsCostMultiplier(GameMode mode, bool isRetrigger) {
-    final perSpin = _fsAvgPayoutPerSpin[mode] ?? 10.0;
-    final fsCount = isRetrigger ? _fsAwardRetrigger : _fsAwardInitial;
+    final perSpin = RtpConfig.fsAvgPayoutPerSpin[mode] ?? 10.0;
+    final fsCount = isRetrigger ? RtpConfig.fsAwardRetrigger : RtpConfig.fsAwardInitial;
     const scatterReward = 3.0;
     return scatterReward + (perSpin * fsCount);
   }
@@ -129,7 +52,7 @@ class SlotEngine {
     bool isAnte = false,
   }) {
     if (pool.totalSpins < 50) return true;
-    final safetyFactor = isAnte ? _anteFsSafetyFactor : _fsSafetyFactor;
+    final safetyFactor = isAnte ? AnteConfig.fsSafetyFactor : RtpConfig.fsSafetyFactor;
     final virtualCost =
         _expectedFsCostMultiplier(mode, isRetrigger) * betAmount * safetyFactor;
     return pool.poolBalance >= virtualCost;
@@ -142,7 +65,7 @@ class SlotEngine {
     final mode = pool.currentMode;
     final expectedCost = _expectedFsCostMultiplier(mode, false) * betAmount;
     final buyFee = betAmount * buyFeaturePriceMultiplier;
-    final virtualCost = expectedCost * _buyFsSafetyFactor;
+    final virtualCost = expectedCost * RtpConfig.buyFsSafetyFactor;
     return (pool.poolBalance + buyFee) >= virtualCost;
   }
 
@@ -191,19 +114,6 @@ class SlotEngine {
     return max(absoluteMinimum, min(modeCeiling, safePoolMultiplier));
   }
 
-  /// Weights for picking which symbol wins on a winning spin.
-  static const Map<String, double> _winSymbolWeights = {
-    'muz': 35,
-    'uzum': 25,
-    'karpuz': 18,
-    'seftali': 10,
-    'elma': 6,
-    'cilek': 3,
-    'pembe_ayi': 1.5,
-    'yesil_ayi': 0.8,
-    'kalp': 0.3,
-  };
-
   // ─── PUBLIC API ───────────────────────────────────────────────
 
   static SpinResult spin(
@@ -241,10 +151,10 @@ class SlotEngine {
     // ante on base spins. Both paths gated by the Virtual Cost guard.
     final bool isRetriggerAttempt = isFreeSpins;
     final double baseFsRate = isRetriggerAttempt
-        ? (_fsRetriggerRate[mode] ?? 0.0)
-        : (_fsTriggerRate[mode] ?? 0.0);
+        ? (RtpConfig.fsRetriggerRate[mode] ?? 0.0)
+        : (RtpConfig.fsTriggerRate[mode] ?? 0.0);
     final double fsRate = (anteBet && !isRetriggerAttempt)
-        ? baseFsRate * _anteFsTriggerMultiplier
+        ? baseFsRate * AnteConfig.fsTriggerMultiplier
         : baseFsRate;
     final bool canAffordFs = _canAffordFsRound(
           pool, betAmount, mode, isRetriggerAttempt,
@@ -259,8 +169,8 @@ class SlotEngine {
 
     // FS rounds boost hit rate so the round feels lucky.
     final double effectiveHitRate = isFreeSpins
-        ? min(0.95, (_hitRate[mode] ?? 0.30) * (_fsHitRateBoost[mode] ?? 1.25))
-        : (_hitRate[mode] ?? 0.30);
+        ? min(0.95, (RtpConfig.hitRate[mode] ?? 0.30) * (RtpConfig.fsHitRateBoost[mode] ?? 1.25))
+        : (RtpConfig.hitRate[mode] ?? 0.30);
     final shouldWin = triggersFs || _rng.nextDouble() < effectiveHitRate;
 
     if (!shouldWin) {
@@ -358,7 +268,7 @@ class SlotEngine {
         // guaranteed winner — natural refill rarely reaches that threshold.
         final chainProb = isFreeSpins
             ? _fsForcedChainProb(tumbleCount)
-            : _chainProbBase;
+            : RtpConfig.chainProbBase;
         if (_rng.nextDouble() < chainProb) {
           _fillEmptyForcedChain(grid, weights, maxMults, isFreeSpins: isFreeSpins);
         } else {
@@ -380,9 +290,9 @@ class SlotEngine {
     double finalMultiplier;
     if (isFreeSpins && rawMultiplier > 1.0) {
       if (anteBet) {
-        finalMultiplier = max(1.0, rawMultiplier * _anteFsMultiplierScale);
+        finalMultiplier = max(1.0, rawMultiplier * AnteConfig.fsMultiplierScale);
       } else if (buyFs) {
-        finalMultiplier = max(1.0, rawMultiplier * _buyFsMultiplierScale);
+        finalMultiplier = max(1.0, rawMultiplier * BuyConfig.fsMultiplierScale);
       } else {
         finalMultiplier = rawMultiplier;
       }
@@ -543,7 +453,7 @@ class SlotEngine {
     final adjustedWeights = <SlotSymbol, double>{};
 
     for (final sym in regular) {
-      final baseW = _winSymbolWeights[sym.id] ?? 0;
+      final baseW = RtpConfig.winSymbolWeights[sym.id] ?? 0;
       final mult = multipliers[sym.tier] ?? 1.0;
       final adjW = baseW * mult;
       adjustedWeights[sym] = adjW;
@@ -688,12 +598,12 @@ class SlotEngine {
     final regulars = SymbolRegistry.all.where((s) => s.isRegular).toList();
     double totalW = 0;
     for (final s in regulars) {
-      totalW += _winSymbolWeights[s.id] ?? 1.0;
+      totalW += RtpConfig.winSymbolWeights[s.id] ?? 1.0;
     }
     double roll = _rng.nextDouble() * totalW;
     SlotSymbol target = regulars.first;
     for (final s in regulars) {
-      roll -= _winSymbolWeights[s.id] ?? 1.0;
+      roll -= RtpConfig.winSymbolWeights[s.id] ?? 1.0;
       if (roll <= 0) {
         target = s;
         break;
