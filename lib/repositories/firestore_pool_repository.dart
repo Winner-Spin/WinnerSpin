@@ -1,28 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/pool_state.dart';
+import 'pool_repository.dart';
 
-/// Handles Firestore persistence of pool data.
-/// Optimized for minimal read/write operations:
-///   - Read: once per login
-///   - Write: every 10 spins + on logout/background
-class PoolService {
-  PoolService._();
+/// Firestore implementation of [PoolRepository].
+/// Pool state is stored under a `pool` field on the user document.
+/// Reads happen once per login; writes happen on the engine's save interval
+/// (every 10 spins) plus once on logout/background.
+class FirestorePoolRepository implements PoolRepository {
+  FirestorePoolRepository({FirebaseFirestore? firestore})
+      : _db = firestore ?? FirebaseFirestore.instance;
 
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
 
   static const String _collection = 'users';
   static const String _poolField = 'pool';
 
-  /// Loads pool state from Firestore. Returns a fresh PoolState if none exists.
-  /// Called ONCE when the user logs in.
-  static Future<PoolState> load(String uid) async {
+  @override
+  Future<PoolState> load(String uid) async {
     try {
       final doc = await _db.collection(_collection).doc(uid).get();
       if (doc.exists) {
         final data = doc.data();
         if (data != null && data.containsKey(_poolField)) {
           return PoolState.fromMap(
-              Map<String, dynamic>.from(data[_poolField]));
+            Map<String, dynamic>.from(data[_poolField]),
+          );
         }
       }
     } catch (_) {
@@ -31,9 +34,8 @@ class PoolService {
     return PoolState();
   }
 
-  /// Saves pool state to Firestore using merge to avoid overwriting
-  /// other user fields. This is a single write operation.
-  static Future<void> save(String uid, PoolState state) async {
+  @override
+  Future<void> save(String uid, PoolState state) async {
     try {
       await _db.collection(_collection).doc(uid).set(
         {_poolField: state.toMap()},

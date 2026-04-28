@@ -6,11 +6,13 @@ import '../models/pool_state.dart';
 import '../models/spin_result.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/firebase_auth_repository.dart';
-import '../services/pool_service.dart';
+import '../repositories/firestore_pool_repository.dart';
+import '../repositories/pool_repository.dart';
 import '../services/slot_engine.dart';
 
 class GameViewModel extends ChangeNotifier {
   final AuthRepository _authRepository;
+  final PoolRepository _poolRepository;
   StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
   // ── User data ──
@@ -134,8 +136,11 @@ class GameViewModel extends ChangeNotifier {
   /// buy multiplier boost on every spin (incl. retriggers).
   bool _currentFsRoundFromBuy = false;
 
-  GameViewModel({AuthRepository? authRepository})
-      : _authRepository = authRepository ?? FirebaseAuthRepository() {
+  GameViewModel({
+    AuthRepository? authRepository,
+    PoolRepository? poolRepository,
+  })  : _authRepository = authRepository ?? FirebaseAuthRepository(),
+        _poolRepository = poolRepository ?? FirestorePoolRepository() {
     // Bootstrap display grid via a zero-bet spin (engine returns a safe grid).
     final result = SlotEngine.spin(_pool, 0);
     _grid = result.initialGrid;
@@ -148,7 +153,7 @@ class GameViewModel extends ChangeNotifier {
       if (uid != null) {
         final results = await Future.wait([
           _authRepository.getUserData(uid),
-          PoolService.load(uid),
+          _poolRepository.load(uid),
         ]);
 
         final userData = results[0] as Map<String, dynamic>?;
@@ -356,7 +361,7 @@ class GameViewModel extends ChangeNotifier {
     if (_pool.shouldSave) {
       final uid = _authRepository.currentUserId;
       if (uid != null) {
-        PoolService.save(uid, _pool);
+        _poolRepository.save(uid, _pool);
         _savePlayerState();
       }
     }
@@ -366,7 +371,7 @@ class GameViewModel extends ChangeNotifier {
   Future<void> _forceSavePool() async {
     final uid = _authRepository.currentUserId;
     if (uid != null) {
-      await PoolService.save(uid, _pool);
+      await _poolRepository.save(uid, _pool);
       await _authRepository.savePlayerState(
         uid,
         userBalance: _userBalance,
