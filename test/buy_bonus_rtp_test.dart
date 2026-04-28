@@ -17,9 +17,9 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:winner_spin/services/slot_engine.dart';
-import 'package:winner_spin/models/pool_state.dart';
-import 'package:winner_spin/models/slot_symbol.dart';
+import 'package:winner_spin/features/slot/domain/engine/slot_engine.dart';
+import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
+import 'package:winner_spin/features/slot/domain/enums/game_mode.dart';
 
 void main() {
   test('3,000,000 buy bonus RTP simulation (FS-only)', () {
@@ -70,7 +70,14 @@ void main() {
         fsRemaining--;
         totalFsSpins++;
 
-        final result = SlotEngine.spin(pool, betAmount, isFreeSpins: true);
+        // buyFs=true on every FS spin of a bought round → engine applies
+        // the buy-FS multiplier boost (mirrors GameViewModel state tracking).
+        final result = SlotEngine.spin(
+          pool,
+          betAmount,
+          isFreeSpins: true,
+          buyFs: true,
+        );
         pool.recordPayout(result.totalWin);
         totalPaidOut += result.totalWin;
         thisRoundPayout += result.totalWin;

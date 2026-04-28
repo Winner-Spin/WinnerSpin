@@ -1,21 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────
-// RTP MONTE-CARLO SIMULATION
+// ANTE BET (ÇİFTE ŞANS) RTP SIMULATION
 // ─────────────────────────────────────────────────────────────────────────
 //
-// Pure in-memory simulation of SlotEngine + PoolState.
-// NO Firebase reads/writes — safe to run repeatedly without burning quota.
+// Stress-tests the engine with Ante Bet ALWAYS ON across all base spins.
 //
-// Run with:
-//   flutter test test/rtp_simulation_test.dart
+// Ante Bet mechanics:
+//   • Cost: 1.25× base bet (player pays 25% extra)
+//   • Effect: doubles the Free Spins trigger rate for that base spin
+//   • Payout: still computed against 1.0× base bet (per spec)
+//   • Pool: records the full 1.25× as wagered (the 25% is house income)
 //
-// What it measures:
-//   • Actual RTP vs target 96.5%
-//   • Hit rate (% spins that pay > 0)
-//   • FS trigger rate + retrigger rate
-//   • Mode distribution (how often the pool sits in each GameMode)
-//   • Pool balance trajectory
-//   • Max single win, average win
-//   • Recovery mode "stickiness" (avg consecutive spins stuck in recovery)
+// Expected behavior:
+//   • Wagered denominator inflates by 25% per base spin
+//   • FS rounds happen ~2× more often
+//   • Net RTP should converge near baseline 96.5% if engine is well-calibrated
+//
+// Volume: 30,000,000 spins (matches baseline rtp_simulation_test).
 // ─────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter_test/flutter_test.dart';
@@ -24,9 +24,10 @@ import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/enums/game_mode.dart';
 
 void main() {
-  test('30,000,000 spin RTP simulation (FS enabled — cascade tuned)', () {
+  test('30M spin RTP simulation — ANTE BET ALWAYS ON', () {
     const totalSpinsToRun = 30000000;
-    const betAmount = 100.0;
+    const baseBet = 100.0;
+    const anteCost = baseBet * 1.25;       // 125 TL per base spin
     const targetRtp = 96.5;
 
     final pool = PoolState();
@@ -48,15 +49,15 @@ void main() {
       for (final m in GameMode.values) m: 0,
     };
 
-    // Recovery stickiness tracking
-    int currentRecoveryStreak = 0;
-    int maxRecoveryStreak = 0;
-    final recoveryStreaks = <int>[];
-
     int fsRemaining = 0;
     int fsRoundsCompleted = 0;
     double sumOfFsRoundPayouts = 0;
     double currentFsRoundPayout = 0;
+
+    // Tracks whether the current FS round was triggered by ante. Mirrors
+    // GameViewModel._currentFsRoundFromAnte — keeps ante-FS payout
+    // reduction active across all spins of an ante-triggered round.
+    bool currentFsRoundFromAnte = false;
 
     // ─── Main loop ────────────────────────────────────────────────
     for (int i = 0; i < totalSpinsToRun; i++) {
@@ -64,26 +65,16 @@ void main() {
       final modeNow = pool.currentMode;
       modeCounts[modeNow] = (modeCounts[modeNow] ?? 0) + 1;
 
-      // Recovery streak tracking
-      if (modeNow == GameMode.recovery) {
-        currentRecoveryStreak++;
-        if (currentRecoveryStreak > maxRecoveryStreak) {
-          maxRecoveryStreak = currentRecoveryStreak;
-        }
-      } else if (currentRecoveryStreak > 0) {
-        recoveryStreaks.add(currentRecoveryStreak);
-        currentRecoveryStreak = 0;
-      }
-
       if (isFreeSpin) {
         fsRemaining--;
         freeSpinsConsumed++;
       } else {
-        pool.recordBet(betAmount);
-        totalWagered += betAmount;
+        // Ante Bet ALWAYS ON: pay 1.25x bet, pool records 1.25x as wagered.
+        pool.recordBet(anteCost);
+        totalWagered += anteCost;
         baseSpins++;
 
-        // If a FS round just ended (we were in FS last spin), record its total
+        // If a FS round just ended (last spin was the last FS), record total.
         if (currentFsRoundPayout > 0 && fsRemaining == 0) {
           sumOfFsRoundPayouts += currentFsRoundPayout;
           fsRoundsCompleted++;
@@ -91,7 +82,16 @@ void main() {
         }
       }
 
-      final result = SlotEngine.spin(pool, betAmount, isFreeSpins: isFreeSpin);
+      // Engine call:
+      //   - Base spin: anteBet=true (always, since this test forces ante on)
+      //   - FS spin: anteBet=currentFsRoundFromAnte (carry over the round's flag)
+      final bool anteFlag = isFreeSpin ? currentFsRoundFromAnte : true;
+      final result = SlotEngine.spin(
+        pool,
+        baseBet,
+        isFreeSpins: isFreeSpin,
+        anteBet: anteFlag,
+      );
 
       pool.recordPayout(result.totalWin);
       totalPaidOut += result.totalWin;
@@ -113,12 +113,19 @@ void main() {
         } else {
           initialFsTriggers++;
           fsRemaining += 10;
+          // Base spin (anteBet=true here) triggered FS → mark round as ante.
+          if (!isFreeSpin) {
+            currentFsRoundFromAnte = true;
+          }
         }
+      }
+
+      // Round ended (no more FS to consume) → clear ante flag for next round.
+      if (currentFsRoundFromAnte && fsRemaining == 0 && isFreeSpin) {
+        currentFsRoundFromAnte = false;
       }
     }
 
-    // Close any open recovery streak
-    if (currentRecoveryStreak > 0) recoveryStreaks.add(currentRecoveryStreak);
     // Close any open FS round
     if (currentFsRoundPayout > 0) {
       sumOfFsRoundPayouts += currentFsRoundPayout;
@@ -128,7 +135,7 @@ void main() {
     // ─── Output ───────────────────────────────────────────────────
     final actualRtp = totalWagered > 0 ? (totalPaidOut / totalWagered) * 100 : 0;
     final hitRate = (winningSpins / totalSpinsToRun) * 100;
-    final fsTriggerRate = baseSpins > 0
+    final fsTriggerRatePerBase = baseSpins > 0
         ? (initialFsTriggers / baseSpins) * 100
         : 0;
     final retriggerRatePerFsSpin = freeSpinsConsumed > 0
@@ -137,21 +144,23 @@ void main() {
     final avgFsRoundPayout = fsRoundsCompleted > 0
         ? sumOfFsRoundPayouts / fsRoundsCompleted
         : 0;
-    final avgRecoveryStreak = recoveryStreaks.isNotEmpty
-        ? recoveryStreaks.reduce((a, b) => a + b) / recoveryStreaks.length
-        : 0;
 
     final buf = StringBuffer();
     buf.writeln('');
     buf.writeln('═══════════════════════════════════════════════════════════════');
-    buf.writeln('         RTP MONTE-CARLO SIMULATION RESULTS (FINAL)');
+    buf.writeln('   ANTE BET (ÇİFTE ŞANS) RTP SIMULATION — 30M SPINS');
     buf.writeln('═══════════════════════════════════════════════════════════════');
+    buf.writeln('');
+    buf.writeln('▼ ANTE BET CONFIG');
+    buf.writeln('  Base bet            : ${baseBet.toStringAsFixed(2)} TL');
+    buf.writeln('  Ante cost           : ${anteCost.toStringAsFixed(2)} TL (1.25x base)');
+    buf.writeln('  Extra fee per spin  : ${(anteCost - baseBet).toStringAsFixed(2)} TL (25% overhead)');
+    buf.writeln('  FS trigger rate     : DOUBLED on base spins');
     buf.writeln('');
     buf.writeln('▼ VOLUME');
     buf.writeln('  Total spins         : $totalSpinsToRun');
     buf.writeln('    ├─ Base game      : $baseSpins (${(baseSpins / totalSpinsToRun * 100).toStringAsFixed(1)}%)');
     buf.writeln('    └─ Free spins     : $freeSpinsConsumed (${(freeSpinsConsumed / totalSpinsToRun * 100).toStringAsFixed(1)}%)');
-    buf.writeln('  Bet per spin        : ${betAmount.toStringAsFixed(2)} TL');
     buf.writeln('');
     buf.writeln('▼ FINANCIAL');
     buf.writeln('  Total wagered       : ${totalWagered.toStringAsFixed(2)} TL');
@@ -169,29 +178,25 @@ void main() {
     buf.writeln('  Avg win / spin      : ${(sumOfWins / totalSpinsToRun).toStringAsFixed(2)} TL');
     buf.writeln('  Avg win / win       : ${winningSpins > 0 ? (sumOfWins / winningSpins).toStringAsFixed(2) : "0.00"} TL');
     buf.writeln('  Max single win      : ${maxSingleWin.toStringAsFixed(2)} TL '
-        '(${(maxSingleWin / betAmount).toStringAsFixed(1)}x bet) at spin #$maxWinSpinIndex');
+        '(${(maxSingleWin / baseBet).toStringAsFixed(1)}x bet) at spin #$maxWinSpinIndex');
     buf.writeln('');
-    buf.writeln('▼ FREE SPINS');
+    buf.writeln('▼ FREE SPINS (ante doubles trigger rate)');
     buf.writeln('  Initial triggers    : $initialFsTriggers');
     buf.writeln('  Retriggers          : $retriggers');
-    buf.writeln('  Trigger rate (base) : ${fsTriggerRate.toStringAsFixed(3)}% per base spin');
+    buf.writeln('  Trigger rate (base) : ${fsTriggerRatePerBase.toStringAsFixed(3)}% per base spin '
+        '(baseline w/o ante: ~0.385%)');
     buf.writeln('  Retrigger rate (FS) : ${retriggerRatePerFsSpin.toStringAsFixed(3)}% per FS spin');
     buf.writeln('  FS rounds completed : $fsRoundsCompleted');
     buf.writeln('  Avg FS round payout : ${avgFsRoundPayout.toStringAsFixed(2)} TL '
-        '(${(avgFsRoundPayout / betAmount).toStringAsFixed(1)}x bet)');
+        '(${(avgFsRoundPayout / baseBet).toStringAsFixed(1)}x base bet)');
     buf.writeln('');
     buf.writeln('▼ MODE DISTRIBUTION');
     modeCounts.forEach((mode, count) {
       final pct = (count / totalSpinsToRun) * 100;
       final bar = '█' * (pct / 2).round();
-      buf.writeln('  ${mode.name.padRight(9)} : ${count.toString().padLeft(6)} '
+      buf.writeln('  ${mode.name.padRight(9)} : ${count.toString().padLeft(8)} '
           '(${pct.toStringAsFixed(1).padLeft(5)}%) $bar');
     });
-    buf.writeln('');
-    buf.writeln('▼ RECOVERY STICKINESS');
-    buf.writeln('  Recovery streaks    : ${recoveryStreaks.length}');
-    buf.writeln('  Max consecutive     : $maxRecoveryStreak spins');
-    buf.writeln('  Avg streak length   : ${avgRecoveryStreak.toStringAsFixed(1)} spins');
     buf.writeln('');
     buf.writeln('═══════════════════════════════════════════════════════════════');
 
