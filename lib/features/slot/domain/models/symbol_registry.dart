@@ -85,53 +85,56 @@ class SymbolRegistry {
       scatterPayouts: {4: 3.0, 5: 5.0, 6: 100.0},
     ),
 
-    // Multipliers — kept rare in base, amplified in FS via per-mode boost.
+    // Multipliers — weights shifted toward higher values so FS rounds show
+    // fewer-but-bigger multipliers (avg face value 4.48 → 5.44). Paired with
+    // the lowered FS cap distribution in [GridGenerator.rollMaxMultipliers]
+    // to keep the (count × value) product — and therefore RTP — intact.
     SlotSymbol(
       id: 'multi_2x',
       assetPath: 'lib/images/slot_main_screen/Items/2x_carpan.png',
-      baseWeight: 0.5,
+      baseWeight: 0.30,
       tier: SymbolTier.multiplier,
       multiplierValue: 2,
     ),
     SlotSymbol(
       id: 'multi_3x',
       assetPath: 'lib/images/slot_main_screen/Items/3x_carpan.png',
-      baseWeight: 0.25,
+      baseWeight: 0.20,
       tier: SymbolTier.multiplier,
       multiplierValue: 3,
     ),
     SlotSymbol(
       id: 'multi_5x',
       assetPath: 'lib/images/slot_main_screen/Items/5x_carpan.png',
-      baseWeight: 0.1,
+      baseWeight: 0.13,
       tier: SymbolTier.multiplier,
       multiplierValue: 5,
     ),
     SlotSymbol(
       id: 'multi_10x',
       assetPath: 'lib/images/slot_main_screen/Items/10x_carpan.png',
-      baseWeight: 0.05,
+      baseWeight: 0.07,
       tier: SymbolTier.multiplier,
       multiplierValue: 10,
     ),
     SlotSymbol(
       id: 'multi_25x',
       assetPath: 'lib/images/slot_main_screen/Items/25x_carpan.png',
-      baseWeight: 0.02,
+      baseWeight: 0.025,
       tier: SymbolTier.multiplier,
       multiplierValue: 25,
     ),
     SlotSymbol(
       id: 'multi_50x',
       assetPath: 'lib/images/slot_main_screen/Items/50x_carpan.png',
-      baseWeight: 0.01,
+      baseWeight: 0.012,
       tier: SymbolTier.multiplier,
       multiplierValue: 50,
     ),
     SlotSymbol(
       id: 'multi_100x',
       assetPath: 'lib/images/slot_main_screen/Items/100x_carpan.png',
-      baseWeight: 0.002,
+      baseWeight: 0.0025,
       tier: SymbolTier.multiplier,
       multiplierValue: 100,
     ),

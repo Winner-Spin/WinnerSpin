@@ -108,14 +108,19 @@ class GridGenerator {
   }
 
   /// Per-spin cap on multiplier-symbol count. FS allows 1–6, base 2–6.
+  /// FS cap was rebalanced (avg 3.16 → 2.63) so high-mode FS rounds don't
+  /// crowd 4+ multipliers per spin. Paired with the higher-value baseWeight
+  /// shift in [SymbolRegistry] so each placed multiplier averages a larger
+  /// face value — visual count goes down, individual impact goes up, total
+  /// multiplier sum (and therefore RTP) stays intact.
   static int rollMaxMultipliers({bool isFreeSpins = false}) {
     final r = engineRng.nextDouble();
     if (isFreeSpins) {
-      if (r < 0.08) return 1;
-      if (r < 0.30) return 2;
-      if (r < 0.62) return 3;
-      if (r < 0.87) return 4;
-      if (r < 0.97) return 5;
+      if (r < 0.30) return 1;
+      if (r < 0.65) return 2;
+      if (r < 0.88) return 3;
+      if (r < 0.96) return 4;
+      if (r < 0.99) return 5;
       return 6;
     }
     if (r < 0.90) return 2;
