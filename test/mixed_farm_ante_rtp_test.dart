@@ -20,9 +20,9 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:winner_spin/services/slot_engine.dart';
-import 'package:winner_spin/models/pool_state.dart';
-import 'package:winner_spin/models/game_mode.dart';
+import 'package:winner_spin/features/slot/domain/engine/slot_engine.dart';
+import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
+import 'package:winner_spin/features/slot/domain/enums/game_mode.dart';
 
 void main() {
   test('30M MIXED RTP — 10 farm / 10 ante alternating', () {
