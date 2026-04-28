@@ -9,13 +9,35 @@ import '../repositories/firebase_auth_repository.dart';
 import '../repositories/firestore_pool_repository.dart';
 import '../repositories/pool_repository.dart';
 import '../services/slot_engine.dart';
+import 'controllers/ante_controller.dart';
+import 'controllers/balance_controller.dart';
+import 'controllers/free_spins_controller.dart';
 
+/// Top-level orchestrator for the slot screen. Composes three focused
+/// controllers (balance, ante, free spins) and coordinates the engine,
+/// repositories, and animation lifecycle. The View listens to this single
+/// ChangeNotifier; getters delegate to the underlying controllers.
 class GameViewModel extends ChangeNotifier {
+  GameViewModel({
+    AuthRepository? authRepository,
+    PoolRepository? poolRepository,
+  })  : _authRepository = authRepository ?? FirebaseAuthRepository(),
+        _poolRepository = poolRepository ?? FirestorePoolRepository() {
+    final result = SlotEngine.spin(_pool, 0);
+    _grid = result.initialGrid;
+    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+  }
+
   final AuthRepository _authRepository;
   final PoolRepository _poolRepository;
   StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
-  // ── User data ──
+  // ── Composed controllers ──
+  final BalanceController _balanceCtrl = BalanceController();
+  final AnteController _anteCtrl = AnteController();
+  final FreeSpinsController _fsCtrl = FreeSpinsController();
+
+  // ── User profile ──
 
   String _username = 'Yükleniyor...';
   String get username => _username;
@@ -29,81 +51,73 @@ class GameViewModel extends ChangeNotifier {
   bool _loggedOut = false;
   bool get loggedOut => _loggedOut;
 
-  // ── Grid state (6 cols × 5 rows) ──
+  // ── Grid + animation state ──
 
   static const int columns = SlotEngine.columns;
   static const int rows = SlotEngine.rows;
 
-  /// `grid[col][row]` = asset path of the cell.
   late List<List<String>> _grid;
   List<List<String>> get grid => _grid;
 
-  /// Previous grid snapshot used for drop-out animation.
   List<List<String>> _previousGrid = [];
   List<List<String>> get previousGrid => _previousGrid;
 
-  /// Asset paths whose cells should fade out during a cascade tumble.
   Set<String> _fadingPaths = const {};
   Set<String> get fadingPaths => _fadingPaths;
 
-  /// True while cascade tumbles are playing back (post initial reel drop-in).
   bool _isTumbling = false;
   bool get isTumbling => _isTumbling;
-
-  /// True while any spin or its cascade is still animating. UI disables the
-  /// spin button when this is true.
-  bool get isBusy => _isSpinning || _isTumbling;
-
-  // ── Balance & bet ──
-
-  double _balance = 10000.0;
-  double get balance => _balance;
-
-  double _userBalance = 10000.0;
-  double get userBalance => _userBalance;
-
-  double _betAmount = 100.0;
-  double get betAmount => _betAmount;
-
-  double _lastWin = 0.0;
-  double get lastWin => _lastWin;
-
-  static const double _minBet = 10.0;
-  static const double _maxBet = 5000.0;
 
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
-  /// When true, the player pays 1.25× per base spin and the engine doubles
-  /// the FS trigger rate for that spin. Payout math still uses the 1.0× bet.
-  bool _anteBetActive = false;
-  bool get anteBetActive => _anteBetActive;
+  /// True while any spin or its cascade is still animating.
+  bool get isBusy => _isSpinning || _isTumbling;
 
-  /// Per-base-spin cost (1.25× when ante is active, 1.0× otherwise).
-  double get effectiveBetCost =>
-      _anteBetActive ? _betAmount * 1.25 : _betAmount;
-
-  /// Buy Free Spins price in TL at the current bet level.
-  double get buyFeaturePrice =>
-      _betAmount * SlotEngine.buyFeaturePriceMultiplier;
-
-  /// True only when the buy CTA can fire — not busy, not in FS, balance
-  /// available, and the pool guard greenlights the purchase.
-  bool get canBuyFreeSpins =>
-      !isBusy &&
-      !isInFreeSpins &&
-      _userBalance >= buyFeaturePrice &&
-      SlotEngine.canAffordBuyFs(_pool, _betAmount);
-
-  /// Winning cell positions from the last spin. Encoded as `col * 100 + row`.
   Set<int> _winningPositions = {};
   Set<int> get winningPositions => _winningPositions;
 
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
 
+  // ── Balance & bet (delegated to BalanceController) ──
+
+  double get balance => _balanceCtrl.balance;
+  double get userBalance => _balanceCtrl.userBalance;
+  double get betAmount => _balanceCtrl.betAmount;
+  double get lastWin => _balanceCtrl.lastWin;
+  double get effectiveBetCost => _balanceCtrl.effectiveBetCost;
+  double get buyFeaturePrice => _balanceCtrl.buyFeaturePrice;
+
+  // ── Ante (delegated to AnteController) ──
+
+  bool get anteBetActive => _anteCtrl.active;
+
+  // ── Free spins (delegated to FreeSpinsController) ──
+
+  int get freeSpinsRemaining => _fsCtrl.remaining;
+  bool get isInFreeSpins => _fsCtrl.isActive;
+
+  /// True only when the buy CTA can fire.
+  bool get canBuyFreeSpins =>
+      !isBusy &&
+      !isInFreeSpins &&
+      _balanceCtrl.canAfford(buyFeaturePrice) &&
+      SlotEngine.canAffordBuyFs(_pool, betAmount);
+
+  // ── Pool + pending result ──
+
+  PoolState _pool = PoolState();
+  SpinResult? _pendingResult;
+
+  // ── Tumble animation timing ──
+  static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
+  static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
+
+  // ── User actions ──
+
   void toggleSpeed() {
-    if (_isSpinning || _isTumbling) return;
+    if (isBusy) return;
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
@@ -111,41 +125,20 @@ class GameViewModel extends ChangeNotifier {
   /// Flips Ante Bet on/off. Blocked while spinning, cascading, or in FS.
   void toggleAnteBet() {
     if (isBusy || isInFreeSpins) return;
-    _anteBetActive = !_anteBetActive;
+    _anteCtrl.toggle();
+    _balanceCtrl.anteActiveShadow = _anteCtrl.active;
     notifyListeners();
   }
 
-  // ── Pool state ──
-
-  PoolState _pool = PoolState();
-
-  /// Pre-calculated spin result waiting for the UI animation to play it back.
-  SpinResult? _pendingResult;
-
-  // ── Free Spins state ──
-
-  int _freeSpinsRemaining = 0;
-  int get freeSpinsRemaining => _freeSpinsRemaining;
-  bool get isInFreeSpins => _freeSpinsRemaining > 0;
-
-  /// True for the duration of an ante-triggered FS round so the engine
-  /// applies the ante multiplier scale on every spin (incl. retriggers).
-  bool _currentFsRoundFromAnte = false;
-
-  /// True for the duration of a bought FS round so the engine applies the
-  /// buy multiplier boost on every spin (incl. retriggers).
-  bool _currentFsRoundFromBuy = false;
-
-  GameViewModel({
-    AuthRepository? authRepository,
-    PoolRepository? poolRepository,
-  })  : _authRepository = authRepository ?? FirebaseAuthRepository(),
-        _poolRepository = poolRepository ?? FirestorePoolRepository() {
-    // Bootstrap display grid via a zero-bet spin (engine returns a safe grid).
-    final result = SlotEngine.spin(_pool, 0);
-    _grid = result.initialGrid;
-    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+  void increaseBet() {
+    if (_balanceCtrl.increaseBet()) notifyListeners();
   }
+
+  void decreaseBet() {
+    if (_balanceCtrl.decreaseBet()) notifyListeners();
+  }
+
+  // ── User data lifecycle ──
 
   Future<void> fetchUserData() async {
     try {
@@ -163,9 +156,8 @@ class GameViewModel extends ChangeNotifier {
         if (userData != null) {
           _username = userData['username'] ?? 'Kullanıcı';
           _email = userData['email'] ?? 'Email Yok';
-          _balance = (userData['balance'] ?? 10000.0).toDouble();
-          _userBalance = (userData['userBalance'] ?? 10000.0).toDouble();
-          _freeSpinsRemaining = userData['freeSpinsRemaining'] ?? 0;
+          _balanceCtrl.hydrate(userData);
+          _fsCtrl.hydrate(userData);
 
           if (!userData.containsKey('userBalance')) {
             _savePlayerState();
@@ -189,7 +181,9 @@ class GameViewModel extends ChangeNotifier {
     _userSubscription?.cancel();
     _userSubscription = _authRepository.watchUserData(uid).listen((data) {
       if (data == null || !data.containsKey('userBalance')) return;
-      _userBalance = (data['userBalance'] ?? 10000.0).toDouble();
+      _balanceCtrl.applyRemoteUserBalance(
+        (data['userBalance'] ?? 10000.0).toDouble(),
+      );
       notifyListeners();
     });
   }
@@ -198,41 +192,40 @@ class GameViewModel extends ChangeNotifier {
 
   /// Deducts the bet, runs the engine, and stages the result for animation.
   void spin() {
-    if (_isSpinning || _isTumbling) return;
+    if (isBusy) return;
 
     final bool isFreeSpin = isInFreeSpins;
 
     if (!isFreeSpin) {
-      final cost = effectiveBetCost;
-      if (_userBalance < cost) return;
-      _balance -= cost;
-      _userBalance -= cost;
+      final cost = _balanceCtrl.effectiveBetCost;
+      if (!_balanceCtrl.canAfford(cost)) return;
+      _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
     } else {
-      _freeSpinsRemaining--;
+      _fsCtrl.consumeOne();
     }
 
     _isSpinning = true;
-    _lastWin = 0.0;
+    _balanceCtrl.resetLastWin();
     _fadingPaths = const {};
     _winningPositions = {};
 
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
 
-    // Engine call. anteBet/buyFs flags propagate the round's origin so
-    // multiplier scaling stays consistent across every spin of the round.
-    final bool anteFlag = isFreeSpin ? _currentFsRoundFromAnte : _anteBetActive;
-    final bool buyFlag = isFreeSpin && _currentFsRoundFromBuy;
+    // anteBet/buyFs flags propagate the round's origin so multiplier scaling
+    // stays consistent across every spin (incl. retriggers).
+    final bool anteFlag =
+        isFreeSpin ? _anteCtrl.currentRoundFromAnte : _anteCtrl.active;
+    final bool buyFlag = isFreeSpin && _fsCtrl.currentRoundFromBuy;
     _pendingResult = SlotEngine.spin(
       _pool,
-      _betAmount,
+      betAmount,
       isFreeSpins: isFreeSpin,
       anteBet: anteFlag,
       buyFs: buyFlag,
     );
 
     _grid = _pendingResult!.initialGrid;
-
     notifyListeners();
   }
 
@@ -242,20 +235,12 @@ class GameViewModel extends ChangeNotifier {
     if (!canBuyFreeSpins) return;
 
     final price = buyFeaturePrice;
-    _balance -= price;
-    _userBalance -= price;
+    _balanceCtrl.charge(price);
     _pool.recordBet(price);
-    _freeSpinsRemaining += 10;
-    _currentFsRoundFromBuy = true;
+    _fsCtrl.awardBoughtRound();
 
     notifyListeners();
   }
-
-  /// Fade-out duration for matched cells in a cascade tumble.
-  static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
-
-  /// Settle duration after each tumble — gives drop-in animations room.
-  static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   /// Plays back cascade tumbles, awards the win, and persists state.
   /// Called by SlotReel once the initial drop-in animation completes.
@@ -284,47 +269,32 @@ class GameViewModel extends ChangeNotifier {
       _isTumbling = false;
     }
 
-    _lastWin = result.totalWin;
-    _balance += _lastWin;
-    _userBalance += _lastWin;
+    _balanceCtrl.awardWin(result.totalWin);
     _winningPositions = result.winningPositions;
 
     if (result.freeSpinsTriggered) {
-      _freeSpinsRemaining += result.isRetrigger ? 5 : 10;
-      // Only an initial trigger captures ante state — retriggers inherit
-      // the existing round's flag.
-      if (!result.isRetrigger) {
-        _currentFsRoundFromAnte = _anteBetActive;
+      if (result.isRetrigger) {
+        _fsCtrl.awardRetrigger();
+      } else {
+        _fsCtrl.awardInitial();
+        // Only an initial trigger captures ante state — retriggers inherit
+        // the existing round's flag.
+        _anteCtrl.captureForNewRound();
       }
     }
 
-    if (_freeSpinsRemaining == 0) {
-      if (_currentFsRoundFromAnte) _currentFsRoundFromAnte = false;
-      if (_currentFsRoundFromBuy) _currentFsRoundFromBuy = false;
+    // Round ended? Clear the FS-source flags.
+    if (!isInFreeSpins) {
+      _anteCtrl.clearRoundFlag();
+      _fsCtrl.clearRoundFlag();
     }
 
-    _pool.recordPayout(_lastWin);
+    _pool.recordPayout(result.totalWin);
     _savePoolIfNeeded();
     _savePlayerState();
 
     _pendingResult = null;
     notifyListeners();
-  }
-
-  // ── Bet controls ──
-
-  void increaseBet() {
-    if (_betAmount < _maxBet) {
-      _betAmount = (_betAmount * 2).clamp(_minBet, _maxBet);
-      notifyListeners();
-    }
-  }
-
-  void decreaseBet() {
-    if (_betAmount > _minBet) {
-      _betAmount = (_betAmount / 2).clamp(_minBet, _maxBet);
-      notifyListeners();
-    }
   }
 
   // ── Sign out ──
@@ -338,7 +308,6 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Resets the loggedOut flag once navigation has consumed it.
   void resetLoggedOut() {
     _loggedOut = false;
   }
@@ -350,8 +319,8 @@ class GameViewModel extends ChangeNotifier {
     if (uid != null) {
       _authRepository.savePlayerState(
         uid,
-        userBalance: _userBalance,
-        freeSpinsRemaining: _freeSpinsRemaining,
+        userBalance: userBalance,
+        freeSpinsRemaining: freeSpinsRemaining,
       );
     }
   }
@@ -374,8 +343,8 @@ class GameViewModel extends ChangeNotifier {
       await _poolRepository.save(uid, _pool);
       await _authRepository.savePlayerState(
         uid,
-        userBalance: _userBalance,
-        freeSpinsRemaining: _freeSpinsRemaining,
+        userBalance: userBalance,
+        freeSpinsRemaining: freeSpinsRemaining,
       );
     }
   }
