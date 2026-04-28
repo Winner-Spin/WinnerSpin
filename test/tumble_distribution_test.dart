@@ -8,8 +8,8 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:winner_spin/services/slot_engine.dart';
-import 'package:winner_spin/models/pool_state.dart';
+import 'package:winner_spin/features/slot/domain/engine/slot_engine.dart';
+import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 
 void main() {
   test('10M spin tumble depth distribution', () {
