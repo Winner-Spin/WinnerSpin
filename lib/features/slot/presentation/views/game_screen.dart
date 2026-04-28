@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../viewmodels/game_viewmodel.dart';
+import 'widgets/ante_toggle.dart';
 import 'widgets/bet_controls.dart';
+import 'widgets/buy_fs_button.dart';
 import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
 import 'widgets/speed_button.dart';
@@ -206,9 +208,20 @@ class _GameScreenState extends State<GameScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SpeedButton(
-          multiplier: _viewModel.speedMultiplier,
-          onTap: _viewModel.toggleSpeed,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SpeedButton(
+              multiplier: _viewModel.speedMultiplier,
+              onTap: _viewModel.toggleSpeed,
+            ),
+            const SizedBox(width: 10),
+            AnteToggle(
+              active: _viewModel.anteBetActive,
+              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+              onTap: _viewModel.toggleAnteBet,
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         BetControls(
@@ -217,11 +230,22 @@ class _GameScreenState extends State<GameScreen>
           onDecrease: _viewModel.decreaseBet,
         ),
         const SizedBox(height: 14),
-        SpinButton(
-          busy: _viewModel.isBusy,
-          affordable: _viewModel.balance >= _viewModel.betAmount,
-          width: screenW * 0.55,
-          onPressed: _viewModel.spin,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SpinButton(
+              busy: _viewModel.isBusy,
+              affordable: _viewModel.balance >= _viewModel.betAmount,
+              width: screenW * 0.45,
+              onPressed: _viewModel.spin,
+            ),
+            const SizedBox(width: 10),
+            BuyFsButton(
+              price: _viewModel.buyFeaturePrice,
+              disabled: !_viewModel.canBuyFreeSpins,
+              onTap: _viewModel.buyFreeSpins,
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         if (_viewModel.lastWin > 0)
