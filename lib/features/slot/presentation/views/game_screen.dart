@@ -36,9 +36,17 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      _viewModel.onAppPaused();
+    // Force-save on every "leaving" lifecycle so balance + pool always reach
+    // Firestore — covers background, system task switch, OS hide, and the
+    // app being killed by the user or low-memory pressure.
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _viewModel.onAppLifecycleEvent();
+      case AppLifecycleState.resumed:
+        break;
     }
   }
 

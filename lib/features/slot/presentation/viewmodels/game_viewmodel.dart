@@ -290,8 +290,10 @@ class GameViewModel extends ChangeNotifier {
     }
 
     _pool.recordPayout(result.totalWin);
+    // Player state is persisted on the same cadence as the pool (every 10
+    // base spins). Lifecycle hooks force-save the latest state on background,
+    // app close, and logout to cover edge cases between save intervals.
     _savePoolIfNeeded();
-    _savePlayerState();
 
     _pendingResult = null;
     notifyListeners();
@@ -325,7 +327,8 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Fire-and-forget pool save once the save interval has elapsed.
+  /// Fire-and-forget pool + player save once the save interval has elapsed
+  /// (every [PoolState.saveInterval] base spins).
   void _savePoolIfNeeded() {
     if (_pool.shouldSave) {
       final uid = _authRepository.currentUserId;
@@ -349,7 +352,11 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> onAppPaused() async {
+  /// Force-save hook for app lifecycle transitions (background, hidden,
+  /// detached/killed). Ensures the latest balance + pool state are persisted
+  /// even if fewer than [PoolState.saveInterval] spins have elapsed since
+  /// the last incremental save.
+  Future<void> onAppLifecycleEvent() async {
     await _forceSavePool();
   }
 
