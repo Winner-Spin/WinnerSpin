@@ -223,7 +223,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
           return SizedBox(
             height: viewportH,
             child: Stack(
-              clipBehavior: Clip.hardEdge,
+              // Clip.none lets winning-cell particle bursts spill past the
+              // column border into the gutter between reels — without this,
+              // sparks vanish at the column edge and the burst feels truncated.
+              clipBehavior: Clip.none,
               children: List.generate(items.length, (i) {
                 return Positioned(
                   top: i * itemH,

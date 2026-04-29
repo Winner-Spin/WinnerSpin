@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/ante_toggle.dart';
 import 'widgets/bet_controls.dart';
-import 'widgets/buy_fs_button.dart';
+import 'widgets/buy_feature_button.dart';
 import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
 import 'widgets/speed_button.dart';
@@ -150,6 +150,7 @@ class _GameScreenState extends State<GameScreen>
                   },
                 ),
               ),
+
             ],
           );
         },
@@ -240,10 +241,12 @@ class _GameScreenState extends State<GameScreen>
               onPressed: _viewModel.spin,
             ),
             const SizedBox(width: 10),
-            BuyFsButton(
+            BuyFeatureButton(
               price: _viewModel.buyFeaturePrice,
               disabled: !_viewModel.canBuyFreeSpins,
               onTap: _viewModel.buyFreeSpins,
+              width: screenW * 0.40,
+              height: screenW * 0.20,
             ),
           ],
         ),
