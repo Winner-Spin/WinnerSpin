@@ -11,6 +11,7 @@ import 'widgets/slot_reel.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/spin_button.dart';
 import 'widgets/respin_button.dart';
+import 'widgets/minus_button.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
@@ -175,9 +176,19 @@ class _GameScreenState extends State<GameScreen>
               ),
               Positioned.fill(
                 child: Center(
-                  child: RespinButton(
-                    size: 92,
-                    onTap: () {},
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MinusButton(
+                        size: 60,
+                        onTap: () {},
+                      ),
+                      const SizedBox(width: 12),
+                      RespinButton(
+                        size: 92,
+                        onTap: () {},
+                      ),
+                    ],
                   ),
                 ),
               ),
