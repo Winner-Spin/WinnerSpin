@@ -12,6 +12,7 @@ import '../../domain/engine/slot_engine.dart';
 import 'controllers/ante_controller.dart';
 import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
+import '../../domain/models/cluster_win.dart';
 
 /// Top-level orchestrator for the slot screen. Composes three focused
 /// controllers (balance, ante, free spins) and coordinates the engine,
@@ -64,6 +65,9 @@ class GameViewModel extends ChangeNotifier {
 
   Set<String> _fadingPaths = const {};
   Set<String> get fadingPaths => _fadingPaths;
+
+  List<ClusterWin> _activeExplosions = const [];
+  List<ClusterWin> get activeExplosions => _activeExplosions;
 
   bool _isTumbling = false;
   bool get isTumbling => _isTumbling;
@@ -235,6 +239,7 @@ class GameViewModel extends ChangeNotifier {
     _isSpinning = true;
     _balanceCtrl.resetLastWin();
     _fadingPaths = const {};
+    _activeExplosions = const [];
     _winningPositions = {};
 
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
@@ -285,11 +290,13 @@ class GameViewModel extends ChangeNotifier {
       _isTumbling = true;
       for (final tumble in result.tumbles) {
         _fadingPaths = tumble.winningPaths;
+        _activeExplosions = tumble.clusterWins;
         notifyListeners();
         await Future.delayed(_tumbleFadeDuration);
 
         _grid = tumble.gridAfter;
         _fadingPaths = const {};
+        _activeExplosions = const [];
         notifyListeners();
         await Future.delayed(_tumbleSettleDuration);
       }

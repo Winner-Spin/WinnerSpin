@@ -10,6 +10,7 @@ import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/spin_button.dart';
+import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
 import '../../../auth/presentation/views/login_screen.dart';
@@ -107,9 +108,28 @@ class _GameScreenState extends State<GameScreen>
                 left: screenW * 0.065,
                 right: screenW * 0.065,
                 height: screenH * 0.32,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => _buildSlotGrid(),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: ListenableBuilder(
+                        listenable: _viewModel,
+                        builder: (context, _) => _buildSlotGrid(),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: ListenableBuilder(
+                        listenable: _viewModel,
+                        builder: (context, _) {
+                          return FloatingWinOverlay(
+                            activeExplosions: _viewModel.activeExplosions,
+                            gridWidth: screenW * 0.87,
+                            gridHeight: screenH * 0.32,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Positioned(

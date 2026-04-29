@@ -3,6 +3,7 @@ import 'dart:math';
 import '../models/spin_result.dart';
 import '../models/symbol_registry.dart';
 import '../models/tumble_step.dart';
+import '../models/cluster_win.dart';
 import 'chain_forcer.dart';
 import 'engine_runtime.dart';
 import 'multiplier_collector.dart';
@@ -37,6 +38,7 @@ class TumbleSimulator {
       final counts = _countRegularSymbols(grid);
 
       final winners = <String>[];
+      final clusterWins = <ClusterWin>[];
       double tumbleWin = 0;
 
       for (final entry in counts.entries) {
@@ -44,7 +46,24 @@ class TumbleSimulator {
           final sym = SymbolRegistry.byPath(entry.key);
           if (sym != null && sym.isRegular) {
             winners.add(entry.key);
-            tumbleWin += sym.getPayoutForCount(entry.value) * betAmount;
+            final winForCluster = sym.getPayoutForCount(entry.value) * betAmount;
+            
+            final positions = <int>[];
+            for (int c = 0; c < kEngineColumns; c++) {
+              for (int r = 0; r < kEngineRows; r++) {
+                if (grid[c][r] == entry.key) {
+                  positions.add(c * 100 + r);
+                }
+              }
+            }
+
+            clusterWins.add(ClusterWin(
+              assetPath: entry.key,
+              amount: winForCluster,
+              positions: positions,
+            ));
+            
+            tumbleWin += winForCluster;
           }
         }
       }
@@ -86,6 +105,7 @@ class TumbleSimulator {
         winningPaths: winningPaths,
         gridAfter: _deepCopy(grid),
         winAmount: tumbleWin,
+        clusterWins: clusterWins,
       ));
     }
 
