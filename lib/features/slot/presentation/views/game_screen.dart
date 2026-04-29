@@ -126,6 +126,7 @@ class _GameScreenState extends State<GameScreen>
                             activeExplosions: _viewModel.activeExplosions,
                             gridWidth: screenW * 0.87,
                             gridHeight: screenH * 0.32,
+                            speedMultiplier: _viewModel.speedMultiplier,
                           );
                         },
                       ),

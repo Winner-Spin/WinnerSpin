@@ -7,12 +7,14 @@ class FloatingWinOverlay extends StatefulWidget {
   final List<ClusterWin> activeExplosions;
   final double gridWidth;
   final double gridHeight;
+  final int speedMultiplier;
 
   const FloatingWinOverlay({
     super.key,
     required this.activeExplosions,
     required this.gridWidth,
     required this.gridHeight,
+    this.speedMultiplier = 1,
   });
 
   @override
@@ -28,38 +30,56 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay> {
     
     // Check if new explosions arrived (transition from empty to not empty means a new tumble step fade started)
     if (widget.activeExplosions.isNotEmpty && oldWidget.activeExplosions.isEmpty) {
-      for (final win in widget.activeExplosions) {
-        // Calculate center of the exploding cluster
-        double sumC = 0;
-        double sumR = 0;
-        for (final pos in win.positions) {
-          sumC += pos ~/ 100;
-          sumR += pos % 100;
+      // Delay the explosion so the glow/highlight plays on the symbols first.
+      // TumbleCell fade is 600ms: first 50% is full opacity (glow plays),
+      // actual fade starts at 300ms. We trigger the burst at that midpoint.
+      final int delayMs = 300 ~/ widget.speedMultiplier;
+      
+      // Capture values before the delay (widget may change by then)
+      final explosions = List.of(widget.activeExplosions);
+      final gridW = widget.gridWidth;
+      final gridH = widget.gridHeight;
+      final speed = widget.speedMultiplier;
+      
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (!mounted) return;
+        
+        for (final win in explosions) {
+          // Calculate center of the exploding cluster
+          double sumC = 0;
+          double sumR = 0;
+          for (final pos in win.positions) {
+            sumC += pos ~/ 100;
+            sumR += pos % 100;
+          }
+          double avgC = sumC / win.positions.length;
+          double avgR = sumR / win.positions.length;
+
+          // Convert to absolute coordinates relative to the grid overlay
+          double colWidth = gridW / 6; // 6 columns
+          double rowHeight = gridH / 5; // 5 rows
+
+          double centerX = (avgC * colWidth) + (colWidth / 2);
+          double centerY = (avgR * rowHeight) + (rowHeight / 2);
+
+          _items.add(_FloatingWinItem(
+            winAmount: win.amount,
+            startX: centerX,
+            startY: centerY,
+            speedMultiplier: speed,
+            key: UniqueKey(),
+            onComplete: (item) {
+              if (mounted) {
+                setState(() {
+                  _items.remove(item);
+                });
+              }
+            },
+          ));
         }
-        double avgC = sumC / win.positions.length;
-        double avgR = sumR / win.positions.length;
-
-        // Convert to absolute coordinates relative to the grid overlay
-        double colWidth = widget.gridWidth / 6; // 6 columns
-        double rowHeight = widget.gridHeight / 5; // 5 rows
-
-        double centerX = (avgC * colWidth) + (colWidth / 2);
-        double centerY = (avgR * rowHeight) + (rowHeight / 2);
-
-        _items.add(_FloatingWinItem(
-          winAmount: win.amount,
-          startX: centerX,
-          startY: centerY,
-          key: UniqueKey(),
-          onComplete: (item) {
-            if (mounted) {
-              setState(() {
-                _items.remove(item);
-              });
-            }
-          },
-        ));
-      }
+        
+        if (mounted) setState(() {});
+      });
     }
   }
 
@@ -76,6 +96,7 @@ class _FloatingWinItem {
   final double winAmount;
   final double startX;
   final double startY;
+  final int speedMultiplier;
   final Key key;
   final void Function(_FloatingWinItem) onComplete;
 
@@ -83,6 +104,7 @@ class _FloatingWinItem {
     required this.winAmount,
     required this.startX,
     required this.startY,
+    required this.speedMultiplier,
     required this.key,
     required this.onComplete,
   });
@@ -106,10 +128,12 @@ class _FloatingWinWidgetState extends State<_FloatingWinWidget> with SingleTicke
   @override
   void initState() {
     super.initState();
-    // 1.5 seconds for the entire float-up and fade-out effect
+    // Base duration is 1500ms for 1x. For 2x, it's 750ms. For 3x, it's 500ms.
+    final int durationMs = 1500 ~/ widget.item.speedMultiplier;
+    
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: Duration(milliseconds: durationMs),
     );
 
     _yOffset = Tween<double>(begin: 0, end: -100).animate(
@@ -151,6 +175,7 @@ class _FloatingWinWidgetState extends State<_FloatingWinWidget> with SingleTicke
           child: SymbolExplosionEffect(
             active: true,
             size: 200,
+            speedMultiplier: widget.item.speedMultiplier,
           ),
         ),
         // Floating Win Text
