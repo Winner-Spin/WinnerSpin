@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/ante_toggle.dart';
+import 'widgets/auto_spin_button.dart';
 import 'widgets/bet_controls.dart';
 import 'widgets/buy_fs_button.dart';
 import 'widgets/free_spins_banner.dart';
@@ -218,7 +219,7 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(width: 10),
             AnteToggle(
               active: _viewModel.anteBetActive,
-              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins || _viewModel.isAutoSpinning,
               onTap: _viewModel.toggleAnteBet,
             ),
           ],
@@ -233,16 +234,22 @@ class _GameScreenState extends State<GameScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            AutoSpinButton(
+              isActive: _viewModel.isAutoSpinning,
+              disabled: !_viewModel.isAutoSpinning && _viewModel.isBusy,
+              onPressed: _viewModel.toggleAutoSpin,
+            ),
+            const SizedBox(width: 8),
             SpinButton(
-              busy: _viewModel.isBusy,
+              busy: _viewModel.isBusy || _viewModel.isAutoSpinning,
               affordable: _viewModel.balance >= _viewModel.betAmount,
-              width: screenW * 0.45,
+              width: screenW * 0.35,
               onPressed: _viewModel.spin,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             BuyFsButton(
               price: _viewModel.buyFeaturePrice,
-              disabled: !_viewModel.canBuyFreeSpins,
+              disabled: _viewModel.isBusy || _viewModel.isAutoSpinning,
               onTap: _viewModel.buyFreeSpins,
             ),
           ],

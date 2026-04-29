@@ -71,6 +71,9 @@ class GameViewModel extends ChangeNotifier {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+  bool _isAutoSpinning = false;
+  bool get isAutoSpinning => _isAutoSpinning;
+
   /// True while any spin or its cascade is still animating.
   bool get isBusy => _isSpinning || _isTumbling;
 
@@ -101,6 +104,7 @@ class GameViewModel extends ChangeNotifier {
   /// True only when the buy CTA can fire.
   bool get canBuyFreeSpins =>
       !isBusy &&
+      !_isAutoSpinning &&
       !isInFreeSpins &&
       _balanceCtrl.canAfford(buyFeaturePrice) &&
       SlotEngine.canAffordBuyFs(_pool, betAmount);
@@ -118,25 +122,40 @@ class GameViewModel extends ChangeNotifier {
 
   // ── User actions ──
 
+  void toggleAutoSpin() {
+    if (_isAutoSpinning) {
+      _isAutoSpinning = false;
+      notifyListeners();
+    } else {
+      if (isBusy) return;
+      if (!isInFreeSpins && !_balanceCtrl.canAfford(effectiveBetCost)) return;
+      _isAutoSpinning = true;
+      notifyListeners();
+      spin();
+    }
+  }
+
   void toggleSpeed() {
-    if (isBusy) return;
+    if (isBusy || _isAutoSpinning) return;
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
 
   /// Flips Ante Bet on/off. Blocked while spinning, cascading, or in FS.
   void toggleAnteBet() {
-    if (isBusy || isInFreeSpins) return;
+    if (isBusy || isInFreeSpins || _isAutoSpinning) return;
     _anteCtrl.toggle();
     _balanceCtrl.anteActiveShadow = _anteCtrl.active;
     notifyListeners();
   }
 
   void increaseBet() {
+    if (_isAutoSpinning) return;
     if (_balanceCtrl.increaseBet()) notifyListeners();
   }
 
   void decreaseBet() {
+    if (_isAutoSpinning) return;
     if (_balanceCtrl.decreaseBet()) notifyListeners();
   }
 
@@ -200,7 +219,13 @@ class GameViewModel extends ChangeNotifier {
 
     if (!isFreeSpin) {
       final cost = _balanceCtrl.effectiveBetCost;
-      if (!_balanceCtrl.canAfford(cost)) return;
+      if (!_balanceCtrl.canAfford(cost)) {
+        if (_isAutoSpinning) {
+          _isAutoSpinning = false;
+          notifyListeners();
+        }
+        return;
+      }
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
     } else {
@@ -299,6 +324,14 @@ class GameViewModel extends ChangeNotifier {
 
     _pendingResult = null;
     notifyListeners();
+
+    if (_isAutoSpinning) {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (_isAutoSpinning && !isBusy) {
+          spin();
+        }
+      });
+    }
   }
 
   // ── Sign out ──

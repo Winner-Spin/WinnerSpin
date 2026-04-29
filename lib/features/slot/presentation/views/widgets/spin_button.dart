@@ -46,7 +46,7 @@ class _SpinButtonState extends State<SpinButton>
     super.dispose();
   }
 
-  bool get _disabled => widget.busy || !widget.affordable;
+  bool get _disabled => widget.busy;
 
   @override
   Widget build(BuildContext context) {
