@@ -24,6 +24,7 @@ class _RespinButtonState extends State<RespinButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _press;
   late final Animation<double> _scale;
+  bool _active = false;
 
   @override
   void initState() {
@@ -43,6 +44,11 @@ class _RespinButtonState extends State<RespinButton>
     super.dispose();
   }
 
+  void _handleTap() {
+    setState(() => _active = !_active);
+    widget.onTap?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.size;
@@ -54,7 +60,7 @@ class _RespinButtonState extends State<RespinButton>
       onTapDown: (_) => _press.forward(),
       onTapUp: (_) => _press.reverse(),
       onTapCancel: () => _press.reverse(),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       child: ScaleTransition(
         scale: _scale,
         child: SizedBox(
@@ -135,29 +141,85 @@ class _RespinButtonState extends State<RespinButton>
               SizedBox(
                 width: s * 0.74,
                 height: s * 0.74,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Transform.translate(
-                      offset: const Offset(0, 1.5),
-                      child: CustomPaint(
-                        size: Size(s * 0.74, s * 0.74),
-                        painter: _RespinArrowsPainter(
-                          color: Colors.black.withValues(alpha: 0.36),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: _active
+                      ? _StopIcon(
+                          key: const ValueKey('stop'),
+                          size: s * 0.74,
+                          color: const Color(0xFFDC3D3D),
+                        )
+                      : _ArrowsIcon(
+                          key: const ValueKey('arrows'),
+                          size: s * 0.74,
+                          color: iconClr,
                         ),
-                      ),
-                    ),
-                    CustomPaint(
-                      size: Size(s * 0.74, s * 0.74),
-                      painter: _RespinArrowsPainter(color: iconClr),
-                    ),
-                  ],
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ArrowsIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _ArrowsIcon({super.key, required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Transform.translate(
+          offset: const Offset(0, 1.5),
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: _RespinArrowsPainter(
+              color: Colors.black.withValues(alpha: 0.36),
+            ),
+          ),
+        ),
+        CustomPaint(
+          size: Size(size, size),
+          painter: _RespinArrowsPainter(color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _StopIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _StopIcon({super.key, required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Transform.translate(
+          offset: const Offset(0, 1.5),
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: _StopSquarePainter(
+              color: Colors.black.withValues(alpha: 0.32),
+            ),
+          ),
+        ),
+        CustomPaint(
+          size: Size(size, size),
+          painter: _StopSquarePainter(color: color),
+        ),
+      ],
     );
   }
 }
@@ -241,4 +303,31 @@ class _RespinArrowsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RespinArrowsPainter old) => old.color != color;
+}
+
+class _StopSquarePainter extends CustomPainter {
+  final Color color;
+
+  const _StopSquarePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final stroke = w * 0.05;
+    final inset = w * 0.27;
+
+    final rect = Rect.fromLTRB(inset, inset, w - inset, w - inset);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(w * 0.05));
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(_StopSquarePainter old) => old.color != color;
 }
