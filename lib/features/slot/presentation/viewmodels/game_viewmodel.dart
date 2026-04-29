@@ -111,7 +111,9 @@ class GameViewModel extends ChangeNotifier {
   SpinResult? _pendingResult;
 
   // ── Tumble animation timing ──
-  static const Duration _tumbleFadeDuration = Duration(milliseconds: 350);
+  /// Window for the winning-cell glow + fade. First half is the gold-glow
+  /// celebration, second half is the symbol fade-out — see [TumbleCell].
+  static const Duration _tumbleFadeDuration = Duration(milliseconds: 600);
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   // ── User actions ──
