@@ -238,6 +238,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     path: items[i],
                     isFading: widget.fadingPaths.contains(items[i]),
                     itemH: itemH,
+                    speedMultiplier: widget.speedMultiplier,
                   ),
                 );
               }),

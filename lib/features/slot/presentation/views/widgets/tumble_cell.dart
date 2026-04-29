@@ -15,12 +15,14 @@ class TumbleCell extends StatefulWidget {
   final String path;
   final bool isFading;
   final double itemH;
+  final int speedMultiplier;
 
   const TumbleCell({
     super.key,
     required this.path,
     required this.isFading,
     required this.itemH,
+    this.speedMultiplier = 1,
   });
 
   @override
@@ -32,9 +34,12 @@ class _TumbleCellState extends State<TumbleCell>
   late final AnimationController _fadeController;
   late final AnimationController _dropController;
   late final AnimationController _glowController;
+  late final AnimationController _burstController;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _dropAnimation;
   late final Animation<double> _glowIntensity;
+  late final Animation<double> _burstScale;
+  late final Animation<double> _burstRotation;
 
   @override
   void initState() {
@@ -51,6 +56,10 @@ class _TumbleCellState extends State<TumbleCell>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
+    _burstController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
 
     // Opacity holds full through the first half — the player needs to see
     // the gold glow before the symbol fades.
@@ -64,6 +73,34 @@ class _TumbleCellState extends State<TumbleCell>
     );
     _dropAnimation =
         CurvedAnimation(parent: _dropController, curve: Curves.easeOutCubic);
+
+    // Scale: 1.0 → 1.35 → 1.0 (grow then shrink back)
+    _burstScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0), weight: 50),
+    ]).animate(CurvedAnimation(
+      parent: _burstController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Rotation: slight wobble, -15° → +15° → 0°
+    _burstRotation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: -0.26), // ~-15°
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: -0.26, end: 0.26), // ~+15°
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.26, end: 0.0), // back to 0
+        weight: 25,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _burstController,
+      curve: Curves.easeInOut,
+    ));
 
     _dropController.value = 1.0;
     _fadeController.value = widget.isFading ? 1.0 : 0.0;
@@ -86,10 +123,15 @@ class _TumbleCellState extends State<TumbleCell>
       if (widget.isFading) {
         _fadeController.forward(from: 0.0);
         _glowController.repeat();
+        // Trigger burst effect only at 1x speed
+        if (widget.speedMultiplier == 1) {
+          _burstController.forward(from: 0.0);
+        }
       } else {
         _fadeController.value = 0.0;
         _glowController.stop();
         _glowController.value = 0.0;
+        _burstController.value = 0.0;
       }
     }
   }
@@ -99,6 +141,7 @@ class _TumbleCellState extends State<TumbleCell>
     _fadeController.dispose();
     _dropController.dispose();
     _glowController.dispose();
+    _burstController.dispose();
     super.dispose();
   }
 
@@ -110,30 +153,39 @@ class _TumbleCellState extends State<TumbleCell>
         _dropAnimation,
         _glowIntensity,
         _glowController,
+        _burstController,
       ]),
       builder: (context, child) {
         final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
         final opacity = (1.0 - _fadeAnimation.value).clamp(0.0, 1.0);
         final glow = _glowIntensity.value;
+        final scale = _burstScale.value;
+        final rotation = _burstRotation.value;
 
         return Transform.translate(
           offset: Offset(0, dy),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Glow stays outside the Opacity wrapper so the halo remains
-              // visible while the symbol underneath fades.
-              if (glow > 0)
-                IgnorePointer(
-                  child: CustomPaint(
-                    painter: _WinningGlowPainter(
-                      rotation: _glowController.value,
-                      intensity: glow,
+          child: Transform.scale(
+            scale: scale,
+            child: Transform.rotate(
+              angle: rotation,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Glow stays outside the Opacity wrapper so the halo remains
+                  // visible while the symbol underneath fades.
+                  if (glow > 0)
+                    IgnorePointer(
+                      child: CustomPaint(
+                        painter: _WinningGlowPainter(
+                          rotation: _glowController.value,
+                          intensity: glow,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              Opacity(opacity: opacity, child: child),
-            ],
+                  Opacity(opacity: opacity, child: child),
+                ],
+              ),
+            ),
           ),
         );
       },
