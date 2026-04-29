@@ -26,38 +26,50 @@ class SpeedButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.grey.shade800,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.brown.shade400,
+              Colors.brown.shade700,
+            ],
+          ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.grey.shade400.withValues(alpha: 0.8),
+            color: Colors.amber.shade300.withValues(alpha: 0.5),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.brown.withValues(alpha: 0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              Icons.fast_forward_rounded,
+              color: Colors.amber.shade300,
+              size: multiplier == 1 ? 16 : (multiplier == 2 ? 18 : 20),
+            ),
+            const SizedBox(width: 6),
             Text(
               '${multiplier}x',
               style: GoogleFonts.outfit(
                 color: Colors.amber.shade300,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _arrows,
-              style: GoogleFonts.outfit(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    offset: const Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
               ),
             ),
           ],
