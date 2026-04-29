@@ -31,7 +31,7 @@ class BetControls extends StatelessWidget {
         _BetCircleButton(
           icon: Icons.add,
           onTap: onIncrease,
-          enableLongPress: false,
+          enableLongPress: true,
         ),
       ],
     );
