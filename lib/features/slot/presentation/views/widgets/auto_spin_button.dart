@@ -104,7 +104,7 @@ class _AutoSpinButtonState extends State<AutoSpinButton>
           ),
           child: Center(
             child: Icon(
-              Icons.autorenew, // Döngü simgesi
+              Icons.loop, // Döngü simgesi
               color: Colors.white,
               size: 28,
             ),
