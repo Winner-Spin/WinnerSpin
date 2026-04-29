@@ -78,7 +78,7 @@ class _SpinButtonState extends State<SpinButton>
                       Colors.green.shade800,
                     ],
                   ),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: widget.busy
                   ? Colors.grey.shade400
@@ -132,7 +132,7 @@ class _SpinButtonState extends State<SpinButton>
       );
     }
     return Text(
-      '🎰  SPIN',
+      'SPIN',
       style: GoogleFonts.outfit(
         color: Colors.white,
         fontSize: 24,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -19,26 +20,71 @@ class BetControls extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _BetCircleButton(icon: Icons.remove, onTap: onDecrease),
+        _BetCircleButton(
+          icon: Icons.remove,
+          onTap: onDecrease,
+          enableLongPress: true,
+        ),
         const SizedBox(width: 12),
         _BetDisplay(amount: betAmount),
         const SizedBox(width: 12),
-        _BetCircleButton(icon: Icons.add, onTap: onIncrease),
+        _BetCircleButton(
+          icon: Icons.add,
+          onTap: onIncrease,
+          enableLongPress: false,
+        ),
       ],
     );
   }
 }
 
-class _BetCircleButton extends StatelessWidget {
+class _BetCircleButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final bool enableLongPress;
 
-  const _BetCircleButton({required this.icon, required this.onTap});
+  const _BetCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.enableLongPress = false,
+  });
+
+  @override
+  State<_BetCircleButton> createState() => _BetCircleButtonState();
+}
+
+class _BetCircleButtonState extends State<_BetCircleButton> {
+  Timer? _initialDelayTimer;
+  Timer? _periodicTimer;
+
+  void _startTimer() {
+    widget.onTap(); // Tetiklemeyi anında yap
+    if (!widget.enableLongPress) return;
+
+    _initialDelayTimer = Timer(const Duration(milliseconds: 400), () {
+      _periodicTimer = Timer.periodic(const Duration(milliseconds: 80), (timer) {
+        widget.onTap();
+      });
+    });
+  }
+
+  void _stopTimer() {
+    _initialDelayTimer?.cancel();
+    _periodicTimer?.cancel();
+  }
+
+  @override
+  void dispose() {
+    _stopTimer();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTapDown: (_) => _startTimer(),
+      onTapUp: (_) => _stopTimer(),
+      onTapCancel: () => _stopTimer(),
       child: Container(
         width: 42,
         height: 42,
@@ -47,21 +93,21 @@ class _BetCircleButton extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.amber.shade600, Colors.orange.shade700],
+            colors: [Colors.purple.shade400, Colors.deepPurple.shade600],
           ),
           border: Border.all(
-            color: Colors.amber.shade300.withValues(alpha: 0.5),
+            color: Colors.purple.shade200.withValues(alpha: 0.6),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withValues(alpha: 0.3),
+              color: Colors.purple.withValues(alpha: 0.4),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Icon(icon, color: Colors.white, size: 22),
+        child: Icon(widget.icon, color: Colors.white, size: 22),
       ),
     );
   }
@@ -79,13 +125,13 @@ class _BetDisplay extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.purple.shade900.withValues(alpha: 0.85),
+            Colors.purple.shade600.withValues(alpha: 0.85),
             Colors.deepPurple.shade800.withValues(alpha: 0.85),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.amber.shade300.withValues(alpha: 0.5),
+          color: Colors.purple.shade300.withValues(alpha: 0.5),
           width: 1.5,
         ),
       ),
@@ -94,7 +140,7 @@ class _BetDisplay extends StatelessWidget {
           Text(
             'BAHİS',
             style: GoogleFonts.outfit(
-              color: Colors.amber.shade200.withValues(alpha: 0.8),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 2,
@@ -103,7 +149,7 @@ class _BetDisplay extends StatelessWidget {
           Text(
             '₺${amount.toStringAsFixed(0)}',
             style: GoogleFonts.outfit(
-              color: Colors.amber.shade300,
+              color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
