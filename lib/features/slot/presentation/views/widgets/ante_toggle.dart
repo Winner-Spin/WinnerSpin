@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../../widgets/particle_effect.dart';
 
 /// Pill that toggles Ante Bet ("Çifte Şans"). When ON, the player pays
 /// 1.25× per base spin and the FS trigger rate doubles. Disabled while
@@ -29,23 +30,30 @@ class AnteToggle extends StatelessWidget {
       textColor = Colors.grey.shade400;
       glow = Colors.transparent;
     } else if (active) {
-      gradient = [Colors.pinkAccent.shade400, Colors.deepPurple.shade400];
-      borderColor = Colors.pinkAccent.shade100;
+      gradient = [
+        Colors.pink.shade300,
+        Colors.pink.shade400,
+        Colors.pink.shade500,
+      ];
+      borderColor = Colors.white;
       textColor = Colors.white;
-      glow = Colors.pinkAccent.withValues(alpha: 0.5);
+      glow = Colors.pink.shade300.withValues(alpha: 0.6);
     } else {
       gradient = [
-        Colors.purple.shade900.withValues(alpha: 0.85),
-        Colors.deepPurple.shade800.withValues(alpha: 0.85),
+        Colors.pink.shade300,
+        Colors.pink.shade400,
+        Colors.pink.shade500,
       ];
-      borderColor = Colors.amber.shade300.withValues(alpha: 0.5);
-      textColor = Colors.amber.shade200;
+      borderColor = Colors.white.withValues(alpha: 0.4);
+      textColor = Colors.white.withValues(alpha: 0.9);
       glow = Colors.transparent;
     }
 
     return GestureDetector(
       onTap: disabled ? null : onTap,
-      child: AnimatedContainer(
+      child: ParticleEffect(
+        active: active,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
@@ -82,24 +90,41 @@ class AnteToggle extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
               decoration: BoxDecoration(
                 color: active
-                    ? Colors.white.withValues(alpha: 0.25)
+                    ? Colors.black.withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '2×',
-                style: GoogleFonts.outfit(
-                  color: textColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '2',
+                      style: GoogleFonts.outfit(
+                        color: textColor,
+                        fontSize: 14,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '×',
+                      style: GoogleFonts.outfit(
+                        color: textColor,
+                        fontSize: 14,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }
