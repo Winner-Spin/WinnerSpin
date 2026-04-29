@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'tumble_cell.dart';
@@ -171,6 +172,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       curve: curveType,
     );
 
+    final bool isScatter = assetPath.contains('cupCake');
+
     return AnimatedBuilder(
       animation: _animation!,
       builder: (context, child) {
@@ -195,11 +198,17 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       },
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Image.asset(
-          assetPath,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.medium,
-        ),
+        child: !isDropOut && isScatter
+            ? _ScatterPulse(
+                assetPath: assetPath,
+                animation: _animation!,
+                landThreshold: endFraction,
+              )
+            : Image.asset(
+                assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+              ),
       ),
     );
   }
@@ -291,3 +300,214 @@ class _HeftyBounceCurve extends Curve {
   }
 }
 
+/// Wraps a scatter symbol image and plays a scale-up pulse with
+/// golden glow, radial light burst, and sparkle effects once the
+/// drop-in animation crosses [landThreshold].
+class _ScatterPulse extends StatefulWidget {
+  final String assetPath;
+  final Animation<double> animation;
+  final double landThreshold;
+
+  const _ScatterPulse({
+    required this.assetPath,
+    required this.animation,
+    required this.landThreshold,
+  });
+
+  @override
+  State<_ScatterPulse> createState() => _ScatterPulseState();
+}
+
+class _ScatterPulseState extends State<_ScatterPulse>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final AnimationController _effectController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _glowOpacity;
+  late final Animation<double> _burstExpand;
+  late final Animation<double> _burstOpacity;
+  late final Animation<double> _sparkleProgress;
+  bool _hasTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Scale pulse: 1.0 → 1.5 → 1.0 (very noticeable)
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _pulseScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.5), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.0), weight: 65),
+    ]).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeOut,
+    ));
+
+    // Visual effects: glow + burst + sparkles
+    _effectController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    // Golden glow: fade in fast, hold, fade out
+    _glowOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.8), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 50),
+    ]).animate(_effectController);
+
+    // Radial light burst: expand outward
+    _burstExpand = Tween<double>(begin: 0.3, end: 1.5).animate(
+      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
+    );
+    _burstOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 85),
+    ]).animate(_effectController);
+
+    // Sparkle particles progress
+    _sparkleProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
+    );
+
+    widget.animation.addListener(_checkLanding);
+  }
+
+  void _checkLanding() {
+    if (!_hasTriggered && widget.animation.value >= widget.landThreshold) {
+      _hasTriggered = true;
+      _pulseController.forward();
+      _effectController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeListener(_checkLanding);
+    _pulseController.dispose();
+    _effectController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_pulseController, _effectController]),
+      builder: (context, child) {
+        final scale = _pulseScale.value;
+        final glow = _glowOpacity.value;
+        final burst = _burstExpand.value;
+        final burstAlpha = _burstOpacity.value;
+        final sparkle = _sparkleProgress.value;
+
+        return Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // Layer 1: Radial light burst
+            if (burstAlpha > 0)
+              Positioned.fill(
+                child: Transform.scale(
+                  scale: burst,
+                  child: Opacity(
+                    opacity: burstAlpha,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFFFFD700).withValues(alpha: 0.7),
+                            const Color(0xFFFFD700).withValues(alpha: 0.2),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Layer 2: Sparkle particles
+            if (sparkle > 0 && sparkle < 1)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _ScatterSparklePainter(progress: sparkle),
+                ),
+              ),
+
+            // Layer 3: Golden glow halo behind the symbol
+            if (glow > 0)
+              Positioned.fill(
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: glow * 0.6),
+                        blurRadius: 20,
+                        spreadRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Layer 4: The scatter image itself (with scale)
+            Transform.scale(
+              scale: scale,
+              child: child,
+            ),
+          ],
+        );
+      },
+      child: Image.asset(
+        widget.assetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+      ),
+    );
+  }
+}
+
+/// Paints small sparkle particles radiating outward from the center.
+class _ScatterSparklePainter extends CustomPainter {
+  final double progress;
+  _ScatterSparklePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = size.width * 0.55;
+    final rng = 42; // fixed seed for consistent pattern
+
+    for (int i = 0; i < 12; i++) {
+      final angle = (i * 30.0 + rng) * (3.14159 / 180.0);
+      final dist = maxRadius * progress * (0.6 + (i % 3) * 0.2);
+      final pos = Offset(
+        center.dx + dist * math.cos(angle),
+        center.dy + dist * math.sin(angle),
+      );
+
+      // Sparkle fades out as it travels
+      final alpha = ((1.0 - progress) * 0.9).clamp(0.0, 1.0);
+      final sparkleSize = 2.5 * (1.0 - progress * 0.5);
+
+      final paint = Paint()
+        ..color = Color.lerp(
+          const Color(0xFFFFD700),
+          const Color(0xFFFFFFFF),
+          (i % 2 == 0) ? 0.0 : 0.5,
+        )!.withValues(alpha: alpha);
+
+      canvas.drawCircle(pos, sparkleSize, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScatterSparklePainter old) => old.progress != progress;
+}
