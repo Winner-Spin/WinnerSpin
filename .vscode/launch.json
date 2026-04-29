@@ -2,7 +2,34 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "iPhone 16 Pro",
+            "name": "Flutter (default device)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Chrome",
+            "program": "lib/main.dart",
+            "deviceId": "chrome",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Edge",
+            "program": "lib/main.dart",
+            "deviceId": "edge",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Windows",
+            "program": "lib/main.dart",
+            "deviceId": "windows",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "iPhone 16 Pro (macOS only)",
             "program": "lib/main.dart",
             "deviceId": "EEE00AD2-3024-4EA9-BF1F-A45742A7DBB3",
             "request": "launch",
