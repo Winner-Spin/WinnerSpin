@@ -1,16 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-class Particle {
-  double x;
-  double y;
-  double vx;
-  double vy;
-  double life;
-  Color color;
-  double size;
+class _Particle {
+  double x, y, vx, vy, life;
+  final Color color;
+  final double size;
 
-  Particle({
+  _Particle({
     required this.x,
     required this.y,
     required this.vx,
@@ -21,9 +17,12 @@ class Particle {
   });
 }
 
+/// Golden particle burst effect that plays when symbols explode.
+/// Uses a single AnimationController driving a CustomPainter repaint
+/// instead of calling setState every frame.
 class SymbolExplosionEffect extends StatefulWidget {
   final bool active;
-  final double size; // Bounding box size (e.g. 200x200)
+  final double size;
   final int speedMultiplier;
 
   const SymbolExplosionEffect({
@@ -39,20 +38,23 @@ class SymbolExplosionEffect extends StatefulWidget {
 
 class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  List<Particle> particles = [];
+  late final AnimationController _controller;
+  final List<_Particle> _particles = [];
   final Random _random = Random();
 
   @override
   void initState() {
     super.initState();
+    // Total burst life: ~800ms at 1x, shorter at higher speeds.
+    final int durationMs = (800 ~/ widget.speedMultiplier).clamp(250, 800);
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 16),
-    )..addListener(_updateParticles);
+      duration: Duration(milliseconds: durationMs),
+    );
 
     if (widget.active) {
-      _triggerBurst();
+      _spawnParticles();
+      _controller.forward();
     }
   }
 
@@ -60,70 +62,31 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
   void didUpdateWidget(SymbolExplosionEffect oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.active && !oldWidget.active) {
-      _triggerBurst();
+      _spawnParticles();
+      _controller.forward(from: 0.0);
     }
   }
 
-  void _triggerBurst() {
-    particles.clear();
-    // Generate 40 golden/magical particles
+  void _spawnParticles() {
+    _particles.clear();
     for (int i = 0; i < 40; i++) {
-      // Start near center (0.5, 0.5)
-      double angle = _random.nextDouble() * 2 * pi;
-      double speed = (_random.nextDouble() * 0.08 + 0.02) * widget.speedMultiplier; // outward velocity
+      final angle = _random.nextDouble() * 2 * pi;
+      final speed = (_random.nextDouble() * 3.0 + 1.0) * widget.speedMultiplier;
 
-      double vx = cos(angle) * speed;
-      double vy = sin(angle) * speed;
+      final pColor = _random.nextBool()
+          ? const Color(0xFFFFFF00) // Bright yellow
+          : const Color(0xFFFFAB40); // Orange accent
 
-      // Golden palette
-      Color pColor = _random.nextBool()
-          ? Colors.yellowAccent.shade400
-          : Colors.orangeAccent.shade200;
-
-      particles.add(Particle(
-        x: 0.5, // Center of the 200x200 box
+      _particles.add(_Particle(
+        x: 0.5,
         y: 0.5,
-        vx: vx,
-        vy: vy,
+        vx: cos(angle) * speed,
+        vy: sin(angle) * speed,
         life: 1.0,
         color: pColor.withValues(alpha: _random.nextDouble() * 0.5 + 0.5),
-        size: _random.nextDouble() * 6 + 2, // 2 to 8 px
+        size: _random.nextDouble() * 6 + 2,
       ));
     }
-
-    if (!_controller.isAnimating) {
-      _controller.repeat();
-    }
-  }
-
-  void _updateParticles() {
-    if (!mounted) return;
-
-    bool alive = false;
-    for (int i = particles.length - 1; i >= 0; i--) {
-      final p = particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      
-      // Gravity / Drag
-      p.vy += 0.002 * widget.speedMultiplier; // slight downward gravity
-      p.vx *= 0.95; // drag
-      p.vy *= 0.95; // drag
-      
-      p.life -= 0.02 * widget.speedMultiplier; // 50 frames life (~800ms)
-      
-      if (p.life <= 0) {
-        particles.removeAt(i);
-      } else {
-        alive = true;
-      }
-    }
-
-    if (!alive && _controller.isAnimating) {
-      _controller.stop();
-    }
-
-    setState(() {});
   }
 
   @override
@@ -137,47 +100,68 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
     return SizedBox(
       width: widget.size,
       height: widget.size,
-      child: CustomPaint(
-        painter: _ExplosionPainter(particles),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return CustomPaint(
+            painter: _ExplosionPainter(
+              particles: _particles,
+              progress: _controller.value,
+              speedMultiplier: widget.speedMultiplier,
+            ),
+          );
+        },
       ),
     );
   }
 }
 
+/// Paints the particle burst. Instead of mutating particles each frame via
+/// setState, physics are computed purely from the normalized [progress] value
+/// (0→1). This keeps the widget tree stable and avoids layout-phase assertions.
 class _ExplosionPainter extends CustomPainter {
-  final List<Particle> particles;
+  final List<_Particle> particles;
+  final double progress; // 0 → 1
+  final int speedMultiplier;
 
-  _ExplosionPainter(this.particles);
+  _ExplosionPainter({
+    required this.particles,
+    required this.progress,
+    required this.speedMultiplier,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var p in particles) {
-      if (p.life <= 0) continue;
+    if (progress >= 1.0 || particles.isEmpty) return;
 
+    for (final p in particles) {
+      // Life decays linearly from 1 → 0 over the controller duration.
+      final life = (1.0 - progress).clamp(0.0, 1.0);
+      if (life <= 0) continue;
+
+      // Position: initial center + velocity * progress (with easeOut feel).
+      final t = Curves.easeOutCubic.transform(progress);
+      final px = (p.x + p.vx * t * 0.12) * size.width;
+      final py = (p.y + p.vy * t * 0.12 + t * t * 0.8) * size.height; // gravity
+
+      final alpha = (p.color.a * life).clamp(0.0, 1.0);
+
+      // Core particle
       final paint = Paint()
-        ..color = p.color.withValues(alpha: p.life)
+        ..color = p.color.withValues(alpha: alpha)
         ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(px, py), p.size * life, paint);
 
-      canvas.drawCircle(
-        Offset(p.x * size.width, p.y * size.height),
-        p.size * p.life, // shrink as they die
-        paint,
-      );
-
-      // Glow effect
+      // Glow halo
       final glowPaint = Paint()
-        ..color = p.color.withValues(alpha: p.life * 0.5)
+        ..color = p.color.withValues(alpha: alpha * 0.4)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
         ..style = PaintingStyle.fill;
-
-      canvas.drawCircle(
-        Offset(p.x * size.width, p.y * size.height),
-        p.size * 2.5 * p.life,
-        glowPaint,
-      );
+      canvas.drawCircle(Offset(px, py), p.size * 2.5 * life, glowPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ExplosionPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ExplosionPainter old) =>
+      old.progress != progress;
 }

@@ -21,10 +21,21 @@ class TopBar extends StatelessWidget {
     return SafeArea(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _UserPill(username: isLoading ? '...' : username),
-          _BalancePill(amount: userBalance),
-          _LogoutButton(onTap: onSignOut),
+          Transform.translate(
+            offset: const Offset(0, -37),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _LogoutButton(onTap: onSignOut),
+                const SizedBox(height: 6),
+                _BalancePill(amount: userBalance),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -145,6 +156,7 @@ class _BalancePill extends StatelessWidget {
     );
   }
 }
+
 
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onTap;

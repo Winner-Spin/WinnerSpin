@@ -1,8 +1,11 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../domain/models/cluster_win.dart';
-import 'symbol_explosion_effect.dart';
 
+/// Overlay that renders explosion particles and floating win amounts
+/// entirely via CustomPaint — no Positioned widgets, no layout-phase
+/// assertions. The host widget just needs to be the same size as the grid.
 class FloatingWinOverlay extends StatefulWidget {
   final List<ClusterWin> activeExplosions;
   final double gridWidth;
@@ -21,205 +24,252 @@ class FloatingWinOverlay extends StatefulWidget {
   State<FloatingWinOverlay> createState() => _FloatingWinOverlayState();
 }
 
-class _FloatingWinOverlayState extends State<FloatingWinOverlay> {
-  final List<_FloatingWinItem> _items = [];
-
-  @override
-  void didUpdateWidget(FloatingWinOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    // Check if new explosions arrived (transition from empty to not empty means a new tumble step fade started)
-    if (widget.activeExplosions.isNotEmpty && oldWidget.activeExplosions.isEmpty) {
-      // Delay the explosion so the glow/highlight plays on the symbols first.
-      // TumbleCell fade is 600ms: first 50% is full opacity (glow plays),
-      // actual fade starts at 300ms. We trigger the burst at that midpoint.
-      final int delayMs = 300 ~/ widget.speedMultiplier;
-      
-      // Capture values before the delay (widget may change by then)
-      final explosions = List.of(widget.activeExplosions);
-      final gridW = widget.gridWidth;
-      final gridH = widget.gridHeight;
-      final speed = widget.speedMultiplier;
-      
-      Future.delayed(Duration(milliseconds: delayMs), () {
-        if (!mounted) return;
-        
-        for (final win in explosions) {
-          // Calculate center of the exploding cluster
-          double sumC = 0;
-          double sumR = 0;
-          for (final pos in win.positions) {
-            sumC += pos ~/ 100;
-            sumR += pos % 100;
-          }
-          double avgC = sumC / win.positions.length;
-          double avgR = sumR / win.positions.length;
-
-          // Convert to absolute coordinates relative to the grid overlay
-          double colWidth = gridW / 6; // 6 columns
-          double rowHeight = gridH / 5; // 5 rows
-
-          double centerX = (avgC * colWidth) + (colWidth / 2);
-          double centerY = (avgR * rowHeight) + (rowHeight / 2);
-
-          _items.add(_FloatingWinItem(
-            winAmount: win.amount,
-            startX: centerX,
-            startY: centerY,
-            speedMultiplier: speed,
-            key: UniqueKey(),
-            onComplete: (item) {
-              if (mounted) {
-                setState(() {
-                  _items.remove(item);
-                });
-              }
-            },
-          ));
-        }
-        
-        if (mounted) setState(() {});
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: _items.map((item) => _FloatingWinWidget(item: item, key: item.key)).toList(),
-    );
-  }
-}
-
-class _FloatingWinItem {
-  final double winAmount;
-  final double startX;
-  final double startY;
-  final int speedMultiplier;
-  final Key key;
-  final void Function(_FloatingWinItem) onComplete;
-
-  _FloatingWinItem({
-    required this.winAmount,
-    required this.startX,
-    required this.startY,
-    required this.speedMultiplier,
-    required this.key,
-    required this.onComplete,
-  });
-}
-
-class _FloatingWinWidget extends StatefulWidget {
-  final _FloatingWinItem item;
-
-  const _FloatingWinWidget({super.key, required this.item});
-
-  @override
-  State<_FloatingWinWidget> createState() => _FloatingWinWidgetState();
-}
-
-class _FloatingWinWidgetState extends State<_FloatingWinWidget> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _yOffset;
-  late final Animation<double> _opacity;
-  late final Animation<double> _scale;
+class _FloatingWinOverlayState extends State<FloatingWinOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ticker;
+  final List<_WinEffect> _effects = [];
+  final Random _rng = Random();
 
   @override
   void initState() {
     super.initState();
-    // Base duration is 1500ms for 1x. For 2x, it's 750ms. For 3x, it's 500ms.
-    final int durationMs = 1500 ~/ widget.item.speedMultiplier;
-    
-    _controller = AnimationController(
+    // Continuous ticker that drives all active effects.
+    _ticker = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: durationMs),
-    );
+      duration: const Duration(seconds: 1),
+    )..addListener(_tick);
+  }
 
-    _yOffset = Tween<double>(begin: 0, end: -100).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+  @override
+  void didUpdateWidget(FloatingWinOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-    _opacity = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 10), // Quick fade in
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 50), // Hold
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 40), // Fade out
-    ]).animate(_controller);
+    if (widget.activeExplosions.isNotEmpty &&
+        oldWidget.activeExplosions.isEmpty) {
+      // Delay the spawn so the glow plays on the TumbleCell first.
+      final int delayMs = (300 ~/ widget.speedMultiplier).clamp(80, 300);
+      final explosions = List.of(widget.activeExplosions);
+      final gridW = widget.gridWidth;
+      final gridH = widget.gridHeight;
+      final speed = widget.speedMultiplier;
 
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.5, end: 1.3), weight: 15), // Pop up
-      TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 15), // Settle down
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 70), // Hold scale
-    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (!mounted) return;
+        _spawnEffects(explosions, gridW, gridH, speed);
+      });
+    }
+  }
 
-    _controller.forward().then((_) {
-      widget.item.onComplete(widget.item);
+  void _spawnEffects(
+    List<ClusterWin> wins, double gridW, double gridH, int speed,
+  ) {
+    for (final win in wins) {
+      double sumC = 0, sumR = 0;
+      for (final pos in win.positions) {
+        sumC += pos ~/ 100;
+        sumR += pos % 100;
+      }
+      final avgC = sumC / win.positions.length;
+      final avgR = sumR / win.positions.length;
+
+      final colWidth = gridW / 6;
+      final rowHeight = gridH / 5;
+      final cx = (avgC * colWidth) + (colWidth / 2);
+      final cy = (avgR * rowHeight) + (rowHeight / 2);
+
+      // Spawn particles
+      final particles = <_Particle>[];
+      for (int i = 0; i < 30; i++) {
+        final angle = _rng.nextDouble() * 2 * pi;
+        final v = (_rng.nextDouble() * 2.5 + 0.8) * speed;
+        particles.add(_Particle(
+          vx: cos(angle) * v,
+          vy: sin(angle) * v,
+          size: _rng.nextDouble() * 5 + 2,
+          color: _rng.nextBool()
+              ? const Color(0xFFFFFF00)
+              : const Color(0xFFFFAB40),
+        ));
+      }
+
+      final durationMs = (1200 ~/ speed).clamp(350, 1200);
+      _effects.add(_WinEffect(
+        cx: cx,
+        cy: cy,
+        amount: win.amount,
+        particles: particles,
+        totalMs: durationMs,
+        startTime: DateTime.now(),
+      ));
+    }
+
+    // Ensure ticker is running.
+    if (!_ticker.isAnimating) _ticker.repeat();
+  }
+
+  void _tick() {
+    if (_effects.isEmpty) {
+      _ticker.stop();
+      return;
+    }
+
+    final now = DateTime.now();
+    _effects.removeWhere((e) {
+      final elapsed = now.difference(e.startTime).inMilliseconds;
+      return elapsed > e.totalMs;
     });
+
+    // No setState needed — we just mark the CustomPaint for repaint.
+    // The AnimationController listener already triggers a rebuild of
+    // AnimatedBuilder below.
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ticker.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Particle Explosion Burst
-        Positioned(
-          left: widget.item.startX - 100, // 200x200 explosion bounding box
-          top: widget.item.startY - 100,
-          child: SymbolExplosionEffect(
-            active: true,
-            size: 200,
-            speedMultiplier: widget.item.speedMultiplier,
-          ),
-        ),
-        // Floating Win Text
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Positioned(
-              left: widget.item.startX - 100, // Width 200, center is 100
-              top: widget.item.startY - 30 + _yOffset.value, // Height ~60
-              child: Opacity(
-                opacity: _opacity.value,
-                child: Transform.scale(
-                  scale: _scale.value,
-                  child: SizedBox(
-                    width: 200,
-                    child: Center(
-                      child: Text(
-                        '₺${widget.item.winAmount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}',
-                        style: GoogleFonts.outfit(
-                          color: const Color(0xFFFFD54F), // Gates of Olympus Gold
-                          fontSize: 42,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                          shadows: [
-                            // Thick dark outline
-                            const Shadow(color: Colors.black87, offset: Offset(0, 3), blurRadius: 2),
-                            const Shadow(color: Colors.black87, offset: Offset(0, -3), blurRadius: 2),
-                            const Shadow(color: Colors.black87, offset: Offset(3, 0), blurRadius: 2),
-                            const Shadow(color: Colors.black87, offset: Offset(-3, 0), blurRadius: 2),
-                            const Shadow(color: Colors.black87, offset: Offset(2, 2), blurRadius: 2),
-                            const Shadow(color: Colors.black87, offset: Offset(-2, -2), blurRadius: 2),
-                            // Golden glow
-                            Shadow(color: Colors.orange.shade900, offset: const Offset(0, 6), blurRadius: 16),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+    return AnimatedBuilder(
+      animation: _ticker,
+      builder: (context, _) {
+        if (_effects.isEmpty) return const SizedBox.shrink();
+        return CustomPaint(
+          size: Size(widget.gridWidth, widget.gridHeight),
+          painter: _EffectPainter(effects: _effects, style: _textStyle),
+        );
+      },
     );
   }
+
+  TextStyle get _textStyle => GoogleFonts.outfit(
+        color: const Color(0xFFFFD54F),
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.5,
+      );
+}
+
+class _Particle {
+  final double vx, vy, size;
+  final Color color;
+  const _Particle({
+    required this.vx,
+    required this.vy,
+    required this.size,
+    required this.color,
+  });
+}
+
+class _WinEffect {
+  final double cx, cy, amount;
+  final List<_Particle> particles;
+  final int totalMs;
+  final DateTime startTime;
+
+  const _WinEffect({
+    required this.cx,
+    required this.cy,
+    required this.amount,
+    required this.particles,
+    required this.totalMs,
+    required this.startTime,
+  });
+}
+
+class _EffectPainter extends CustomPainter {
+  final List<_WinEffect> effects;
+  final TextStyle style;
+
+  _EffectPainter({required this.effects, required this.style});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final now = DateTime.now();
+
+    for (final e in effects) {
+      final elapsed = now.difference(e.startTime).inMilliseconds;
+      final t = (elapsed / e.totalMs).clamp(0.0, 1.0);
+      final life = 1.0 - t;
+
+      // ── Particles ──
+      final pt = Curves.easeOutCubic.transform(t);
+      for (final p in e.particles) {
+        final px = e.cx + p.vx * pt * 14;
+        final py = e.cy + p.vy * pt * 14 + pt * pt * 30; // gravity
+
+        final alpha = (life * 0.9).clamp(0.0, 1.0);
+        final paint = Paint()
+          ..color = p.color.withValues(alpha: alpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(px, py), p.size * life, paint);
+
+        // Glow
+        final glow = Paint()
+          ..color = p.color.withValues(alpha: alpha * 0.35)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(px, py), p.size * 2 * life, glow);
+      }
+
+      // ── Floating win text ──
+      final textT = Curves.easeOutCubic.transform(t);
+      final textY = e.cy - 20 - textT * 60; // float upward
+      final textOpacity = life.clamp(0.0, 1.0);
+
+      // Scale pop: 0.5 → 1.2 → 1.0
+      double scale;
+      if (t < 0.1) {
+        scale = 0.5 + (t / 0.1) * 0.7; // 0.5 → 1.2
+      } else if (t < 0.2) {
+        scale = 1.2 - ((t - 0.1) / 0.1) * 0.2; // 1.2 → 1.0
+      } else {
+        scale = 1.0;
+      }
+
+      final text = '₺${e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}';
+
+      // Draw text outline (dark stroke for readability)
+      final strokeStyle = style.copyWith(
+        fontSize: (style.fontSize ?? 28) * scale,
+        foreground: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.0
+          ..strokeJoin = StrokeJoin.round
+          ..color = Colors.black.withValues(alpha: textOpacity * 0.85),
+      );
+
+      final fillStyle = style.copyWith(
+        fontSize: (style.fontSize ?? 28) * scale,
+        color: style.color?.withValues(alpha: textOpacity),
+        shadows: [
+          Shadow(
+            color: Colors.orange.shade900.withValues(alpha: textOpacity * 0.7),
+            offset: const Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      );
+
+      final strokeTp = TextPainter(
+        text: TextSpan(text: text, style: strokeStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final fillTp = TextPainter(
+        text: TextSpan(text: text, style: fillStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final textX = e.cx - strokeTp.width / 2;
+
+      strokeTp.paint(canvas, Offset(textX, textY));
+      fillTp.paint(canvas, Offset(textX, textY));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EffectPainter old) => true;
 }
