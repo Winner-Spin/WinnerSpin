@@ -46,7 +46,7 @@ class _SpinButtonState extends State<SpinButton>
     super.dispose();
   }
 
-  bool get _disabled => widget.busy || !widget.affordable;
+  bool get _disabled => widget.busy;
 
   @override
   Widget build(BuildContext context) {
@@ -67,46 +67,56 @@ class _SpinButtonState extends State<SpinButton>
           decoration: BoxDecoration(
             gradient: _disabled
                 ? LinearGradient(
-                    colors: [Colors.grey.shade600, Colors.grey.shade700],
+                    colors: [Colors.grey.shade600, Colors.grey.shade600, Colors.grey.shade700],
                   )
-                : LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                : const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                     colors: [
-                      Colors.green.shade400,
-                      Colors.green.shade600,
-                      Colors.green.shade800,
+                      Color(0xFFB2FF59), // Bright lime top highlight
+                      Color(0xFF76FF03), // Main lime green
+                      Color(0xFF388E3C), // Darker green bottom
                     ],
+                    stops: [0.0, 0.4, 1.0],
                   ),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: widget.busy
                   ? Colors.grey.shade400
-                  : Colors.greenAccent.shade200.withValues(alpha: 0.6),
-              width: 2,
+                  : const Color(0xFFE8F5E9).withValues(alpha: 0.6), // Inner reflection
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: (widget.busy ? Colors.grey : Colors.green)
-                    .withValues(alpha: 0.4),
+                color: (widget.busy ? Colors.grey : const Color(0xFF76FF03))
+                    .withValues(alpha: 0.5),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
-              BoxShadow(
-                color: (widget.busy ? Colors.grey : Colors.greenAccent)
-                    .withValues(alpha: 0.2),
-                blurRadius: 30,
-                spreadRadius: 2,
-              ),
+              if (!widget.busy)
+                const BoxShadow(
+                  color: Color(0xFF1B5E20), // Outer darker rim shadow
+                  blurRadius: 0,
+                  spreadRadius: 2,
+                  offset: Offset(0, 1),
+                ),
             ],
           ),
-          child: Center(child: _label()),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: _label(),
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _label() {
+    final textColor = widget.busy ? Colors.grey.shade300 : const Color(0xFFFFF8E1); // Creamy yellow
+    final textShadow = widget.busy ? Colors.transparent : const Color(0xFF003300); // Dark green shadow
+
     if (widget.busy) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -115,7 +125,7 @@ class _SpinButtonState extends State<SpinButton>
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-              color: Colors.white.withValues(alpha: 0.8),
+              color: textColor.withValues(alpha: 0.8),
               strokeWidth: 2.5,
             ),
           ),
@@ -123,7 +133,7 @@ class _SpinButtonState extends State<SpinButton>
           Text(
             'Dönüyor...',
             style: GoogleFonts.outfit(
-              color: Colors.white,
+              color: textColor,
               fontSize: 20,
               fontWeight: FontWeight.w700,
             ),
@@ -132,16 +142,20 @@ class _SpinButtonState extends State<SpinButton>
       );
     }
     return Text(
-      '🎰  SPIN',
+      'SPIN',
       style: GoogleFonts.outfit(
-        color: Colors.white,
-        fontSize: 24,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 3,
+        color: textColor,
+        fontSize: 26,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 2,
         shadows: [
+          Shadow(color: textShadow, offset: const Offset(0, 2), blurRadius: 1),
+          Shadow(color: textShadow, offset: const Offset(0, -1), blurRadius: 1),
+          Shadow(color: textShadow, offset: const Offset(1, 0), blurRadius: 1),
+          Shadow(color: textShadow, offset: const Offset(-1, 0), blurRadius: 1),
           Shadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.3),
+            offset: const Offset(0, 4),
             blurRadius: 4,
           ),
         ],

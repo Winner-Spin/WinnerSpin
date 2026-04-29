@@ -20,12 +20,14 @@ class TumbleCell extends StatefulWidget {
   final String path;
   final bool isFading;
   final double itemH;
+  final int speedMultiplier;
 
   const TumbleCell({
     super.key,
     required this.path,
     required this.isFading,
     required this.itemH,
+    this.speedMultiplier = 1,
   });
 
   @override
@@ -37,6 +39,7 @@ class _TumbleCellState extends State<TumbleCell>
   late final AnimationController _fadeController;
   late final AnimationController _dropController;
   late final AnimationController _glowController;
+  late final AnimationController _burstController;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _dropAnimation;
   late final Animation<double> _glowIntensity;
@@ -61,6 +64,10 @@ class _TumbleCellState extends State<TumbleCell>
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
+    );
+    _burstController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
     );
 
     // Opacity holds full through the first half — the player needs to see
@@ -106,10 +113,15 @@ class _TumbleCellState extends State<TumbleCell>
         _particles = _generateParticles();
         _fadeController.forward(from: 0.0);
         _glowController.repeat();
+        // Trigger burst effect only at 1x speed
+        if (widget.speedMultiplier == 1) {
+          _burstController.forward(from: 0.0);
+        }
       } else {
         _fadeController.value = 0.0;
         _glowController.stop();
         _glowController.value = 0.0;
+        _burstController.value = 0.0;
       }
     }
   }
@@ -119,6 +131,7 @@ class _TumbleCellState extends State<TumbleCell>
     _fadeController.dispose();
     _dropController.dispose();
     _glowController.dispose();
+    _burstController.dispose();
     super.dispose();
   }
 
@@ -136,6 +149,7 @@ class _TumbleCellState extends State<TumbleCell>
         _glowIntensity,
         _scalePulse,
         _glowController,
+        _burstController,
       ]),
       builder: (context, child) {
         final dy = (1.0 - _dropAnimation.value) * -widget.itemH;

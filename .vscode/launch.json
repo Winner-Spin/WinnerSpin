@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "iPhone 16 Pro",
+            "program": "lib/main.dart",
+            "deviceId": "EEE00AD2-3024-4EA9-BF1F-A45742A7DBB3",
+            "request": "launch",
+            "type": "dart"
+        }
+    ]
+}

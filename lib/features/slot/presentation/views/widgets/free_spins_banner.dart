@@ -32,24 +32,27 @@ class FreeSpinsBanner extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star, color: Colors.yellow, size: 28),
-              const SizedBox(width: 8),
-              Text(
-                'BEDAVA DÖNÜŞ: $remaining',
-                style: const TextStyle(
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.star, color: Colors.yellow, size: 28),
+                const SizedBox(width: 8),
+                Text(
+                  'BEDAVA DÖNÜŞ: $remaining',
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.star, color: Colors.yellow, size: 28),
-            ],
+                const SizedBox(width: 8),
+                const Icon(Icons.star, color: Colors.yellow, size: 28),
+              ],
+            ),
           ),
         ),
       ),

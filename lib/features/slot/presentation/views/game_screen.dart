@@ -3,12 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/ante_toggle.dart';
+import 'widgets/auto_spin_button.dart';
 import 'widgets/bet_controls.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/spin_button.dart';
+import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
 import '../../../auth/presentation/views/login_screen.dart';
@@ -106,9 +108,28 @@ class _GameScreenState extends State<GameScreen>
                 left: screenW * 0.065,
                 right: screenW * 0.065,
                 height: screenH * 0.32,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => _buildSlotGrid(),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: ListenableBuilder(
+                        listenable: _viewModel,
+                        builder: (context, _) => _buildSlotGrid(),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: ListenableBuilder(
+                        listenable: _viewModel,
+                        builder: (context, _) {
+                          return FloatingWinOverlay(
+                            activeExplosions: _viewModel.activeExplosions,
+                            gridWidth: screenW * 0.87,
+                            gridHeight: screenH * 0.32,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Positioned(
@@ -219,7 +240,7 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(width: 10),
             AnteToggle(
               active: _viewModel.anteBetActive,
-              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins || _viewModel.isAutoSpinning,
               onTap: _viewModel.toggleAnteBet,
             ),
           ],
@@ -234,16 +255,22 @@ class _GameScreenState extends State<GameScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            AutoSpinButton(
+              isActive: _viewModel.isAutoSpinning,
+              disabled: !_viewModel.isAutoSpinning && _viewModel.isBusy,
+              onPressed: _viewModel.toggleAutoSpin,
+            ),
+            const SizedBox(width: 8),
             SpinButton(
-              busy: _viewModel.isBusy,
+              busy: _viewModel.isBusy || _viewModel.isAutoSpinning,
               affordable: _viewModel.balance >= _viewModel.betAmount,
-              width: screenW * 0.45,
+              width: screenW * 0.35,
               onPressed: _viewModel.spin,
             ),
             const SizedBox(width: 10),
             BuyFeatureButton(
               price: _viewModel.buyFeaturePrice,
-              disabled: !_viewModel.canBuyFreeSpins,
+              disabled: _viewModel.isBusy || _viewModel.isAutoSpinning,
               onTap: _viewModel.buyFreeSpins,
               width: screenW * 0.40,
               height: screenW * 0.20,
