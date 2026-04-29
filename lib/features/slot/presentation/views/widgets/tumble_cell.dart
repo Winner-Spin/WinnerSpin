@@ -91,8 +91,17 @@ class _TumbleCellState extends State<TumbleCell>
     _palette = _GlowPalette.forPath(widget.path);
 
     _dropController.value = 1.0;
-    _fadeController.value = widget.isFading ? 1.0 : 0.0;
-    if (widget.isFading) _glowController.repeat();
+
+    // If the cell is created already in fading state (first tumble after spin),
+    // animate the fade instead of snapping to fully transparent — the player
+    // needs to see the symbol + glow before it disappears.
+    if (widget.isFading) {
+      _fadeController.forward(from: 0.0);
+      _glowController.repeat();
+      _burstController.forward(from: 0.0);
+    } else {
+      _fadeController.value = 0.0;
+    }
   }
 
   @override
@@ -113,10 +122,7 @@ class _TumbleCellState extends State<TumbleCell>
         _particles = _generateParticles();
         _fadeController.forward(from: 0.0);
         _glowController.repeat();
-        // Trigger burst effect only at 1x speed
-        if (widget.speedMultiplier == 1) {
-          _burstController.forward(from: 0.0);
-        }
+        _burstController.forward(from: 0.0);
       } else {
         _fadeController.value = 0.0;
         _glowController.stop();

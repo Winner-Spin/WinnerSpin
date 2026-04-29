@@ -24,8 +24,14 @@ class Particle {
 class SymbolExplosionEffect extends StatefulWidget {
   final bool active;
   final double size; // Bounding box size (e.g. 200x200)
+  final int speedMultiplier;
 
-  const SymbolExplosionEffect({super.key, required this.active, required this.size});
+  const SymbolExplosionEffect({
+    super.key,
+    required this.active,
+    required this.size,
+    this.speedMultiplier = 1,
+  });
 
   @override
   State<SymbolExplosionEffect> createState() => _SymbolExplosionEffectState();
@@ -64,7 +70,7 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
     for (int i = 0; i < 40; i++) {
       // Start near center (0.5, 0.5)
       double angle = _random.nextDouble() * 2 * pi;
-      double speed = _random.nextDouble() * 0.08 + 0.02; // outward velocity
+      double speed = (_random.nextDouble() * 0.08 + 0.02) * widget.speedMultiplier; // outward velocity
 
       double vx = cos(angle) * speed;
       double vy = sin(angle) * speed;
@@ -100,11 +106,11 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
       p.y += p.vy;
       
       // Gravity / Drag
-      p.vy += 0.002; // slight downward gravity
+      p.vy += 0.002 * widget.speedMultiplier; // slight downward gravity
       p.vx *= 0.95; // drag
       p.vy *= 0.95; // drag
       
-      p.life -= 0.02; // 50 frames life (~800ms)
+      p.life -= 0.02 * widget.speedMultiplier; // 50 frames life (~800ms)
       
       if (p.life <= 0) {
         particles.removeAt(i);
