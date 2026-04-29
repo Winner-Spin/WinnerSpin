@@ -79,7 +79,7 @@ class _ParticleEffectState extends State<ParticleEffect>
         vx: vx,
         vy: vy,
         life: 1.0,
-        color: Colors.pinkAccent.shade200.withValues(alpha: _random.nextDouble() * 0.5 + 0.5),
+        color: Colors.lightGreenAccent.shade400.withValues(alpha: _random.nextDouble() * 0.5 + 0.5),
         size: _random.nextDouble() * 4 + 2,
       ));
     }

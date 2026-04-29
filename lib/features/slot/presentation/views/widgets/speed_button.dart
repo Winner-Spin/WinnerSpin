@@ -13,11 +13,6 @@ class SpeedButton extends StatelessWidget {
     required this.onTap,
   });
 
-  String get _arrows {
-    if (multiplier == 2) return '>>';
-    if (multiplier == 3) return '>>>';
-    return '>';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,24 +21,32 @@ class SpeedButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
-              Colors.brown.shade400,
-              Colors.brown.shade700,
+              Color(0xFFA1887F), // Light brown highlight
+              Color(0xFF795548), // Main brown
+              Color(0xFF4E342E), // Dark brown
             ],
+            stops: [0.0, 0.4, 1.0],
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.amber.shade300.withValues(alpha: 0.5),
+            color: const Color(0xFFD7CCC8).withValues(alpha: 0.6), // Inner reflection
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.brown.withValues(alpha: 0.35),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: const Color(0xFF795548).withValues(alpha: 0.5),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+            const BoxShadow(
+              color: Color(0xFF3E2723), // Outer darker rim shadow
+              blurRadius: 0,
+              spreadRadius: 2,
+              offset: Offset(0, 1),
             ),
           ],
         ),
@@ -52,23 +55,25 @@ class SpeedButton extends StatelessWidget {
           children: [
             Icon(
               Icons.fast_forward_rounded,
-              color: Colors.amber.shade300,
+              color: const Color(0xFFFFE082), // Amber
               size: multiplier == 1 ? 16 : (multiplier == 2 ? 18 : 20),
+              shadows: const [
+                Shadow(color: Color(0xFF3E2723), offset: Offset(0, 1), blurRadius: 1),
+              ],
             ),
             const SizedBox(width: 6),
             Text(
               '${multiplier}x',
               style: GoogleFonts.outfit(
-                color: Colors.amber.shade300,
+                color: const Color(0xFFFFF8E1), // Creamy yellow
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.5,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
+                shadows: const [
+                  Shadow(color: Color(0xFF3E2723), offset: Offset(0, 1.5), blurRadius: 1),
+                  Shadow(color: Color(0xFF3E2723), offset: Offset(0, -1), blurRadius: 1),
+                  Shadow(color: Color(0xFF3E2723), offset: Offset(1, 0), blurRadius: 1),
+                  Shadow(color: Color(0xFF3E2723), offset: Offset(-1, 0), blurRadius: 1),
                 ],
               ),
             ),

@@ -90,24 +90,37 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
         height: 42,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.purple.shade400, Colors.deepPurple.shade600],
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE1BEE7), // Bright purple highlight
+              Color(0xFFAB47BC), // Main purple
+              Color(0xFF6A1B9A), // Dark purple
+            ],
+            stops: [0.0, 0.4, 1.0],
           ),
           border: Border.all(
-            color: Colors.purple.shade200.withValues(alpha: 0.6),
+            color: const Color(0xFFF3E5F5).withValues(alpha: 0.6), // Inner reflection
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.purple.withValues(alpha: 0.4),
+              color: const Color(0xFFAB47BC).withValues(alpha: 0.5),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 3),
+            ),
+            const BoxShadow(
+              color: Color(0xFF4A148C), // Outer rim shadow
+              blurRadius: 0,
+              spreadRadius: 1,
+              offset: Offset(0, 1),
             ),
           ],
         ),
-        child: Icon(widget.icon, color: Colors.white, size: 22),
+        child: Icon(widget.icon, color: Colors.white, size: 22, shadows: const [
+          Shadow(color: Color(0xFF311B92), offset: Offset(0, 1), blurRadius: 1),
+        ]),
       ),
     );
   }
@@ -123,27 +136,47 @@ class _BetDisplay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            Colors.purple.shade600.withValues(alpha: 0.85),
-            Colors.deepPurple.shade800.withValues(alpha: 0.85),
+            Color(0xFFCE93D8), // Bright purple highlight
+            Color(0xFF8E24AA), // Main purple
+            Color(0xFF4A148C), // Dark purple
           ],
+          stops: [0.0, 0.4, 1.0],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.purple.shade300.withValues(alpha: 0.5),
+          color: const Color(0xFFE1BEE7).withValues(alpha: 0.6), // Inner reflection
           width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8E24AA).withValues(alpha: 0.5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+          const BoxShadow(
+            color: Color(0xFF311B92), // Outer rim shadow
+            blurRadius: 0,
+            spreadRadius: 2,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Text(
             'BAHİS',
             style: GoogleFonts.outfit(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: const Color(0xFFF3E5F5),
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               letterSpacing: 2,
+              shadows: const [
+                Shadow(color: Color(0xFF311B92), offset: Offset(0, 1), blurRadius: 1),
+              ],
             ),
           ),
           Text(
@@ -151,7 +184,13 @@ class _BetDisplay extends StatelessWidget {
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontSize: 22,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
+              shadows: const [
+                Shadow(color: Color(0xFF311B92), offset: Offset(0, 1.5), blurRadius: 1),
+                Shadow(color: Color(0xFF311B92), offset: Offset(0, -1), blurRadius: 1),
+                Shadow(color: Color(0xFF311B92), offset: Offset(1, 0), blurRadius: 1),
+                Shadow(color: Color(0xFF311B92), offset: Offset(-1, 0), blurRadius: 1),
+              ],
             ),
           ),
         ],
