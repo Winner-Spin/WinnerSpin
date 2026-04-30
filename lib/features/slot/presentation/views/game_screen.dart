@@ -12,6 +12,7 @@ import 'widgets/speed_button.dart';
 import 'widgets/spin_button.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
+import 'widgets/plus_button.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
@@ -186,6 +187,11 @@ class _GameScreenState extends State<GameScreen>
                       const SizedBox(width: 12),
                       RespinButton(
                         size: 92,
+                        onTap: () {},
+                      ),
+                      const SizedBox(width: 12),
+                      PlusButton(
+                        size: 60,
                         onTap: () {},
                       ),
                     ],
