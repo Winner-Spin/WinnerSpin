@@ -150,7 +150,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     int reverseIndex = (rowCount - 1) - index;
 
-    double totalDuration = isDropOut ? (500.0 / speedMult) : (900.0 / speedMult);
+    double totalDuration = isDropOut
+        ? (500.0 / speedMult)
+        : (900.0 / speedMult);
     double staggerMs = speedMult > 1 ? 0.0 : (isDropOut ? 28.0 : 30.0);
     double durationVal = totalDuration - (reverseIndex * staggerMs);
 
@@ -162,8 +164,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       1.0,
     );
 
-    final Curve curveType = isDropOut 
-        ? Curves.easeInCubic 
+    final Curve curveType = isDropOut
+        ? Curves.easeInCubic
         : (speedMult > 1 ? _heftyBounceCurve : Curves.easeOutQuad);
 
     final Curve itemCurve = Interval(
@@ -341,13 +343,12 @@ class _ScatterPulseState extends State<_ScatterPulse>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _pulseScale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.5), weight: 35),
-      TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.0), weight: 65),
-    ]).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeOut,
-    ));
+    _pulseScale = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.5), weight: 35),
+        TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.0), weight: 65),
+      ],
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
 
     // Visual effects: glow + burst + sparkles
     _effectController = AnimationController(
@@ -397,81 +398,87 @@ class _ScatterPulseState extends State<_ScatterPulse>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulseController, _effectController]),
-      builder: (context, child) {
-        final scale = _pulseScale.value;
-        final glow = _glowOpacity.value;
-        final burst = _burstExpand.value;
-        final burstAlpha = _burstOpacity.value;
-        final sparkle = _sparkleProgress.value;
+    // Multiple scatters can land in one spin; isolating each pulse as its
+    // own layer keeps the burst+glow+sparkle stack from re-rasterizing the
+    // surrounding reel cells when only this scatter is animating.
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_pulseController, _effectController]),
+        builder: (context, child) {
+          final scale = _pulseScale.value;
+          final glow = _glowOpacity.value;
+          final burst = _burstExpand.value;
+          final burstAlpha = _burstOpacity.value;
+          final sparkle = _sparkleProgress.value;
 
-        return Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            // Layer 1: Radial light burst
-            if (burstAlpha > 0)
-              Positioned.fill(
-                child: Transform.scale(
-                  scale: burst,
-                  child: Opacity(
-                    opacity: burstAlpha,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFFFFD700).withValues(alpha: 0.7),
-                            const Color(0xFFFFD700).withValues(alpha: 0.2),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Layer 1: Radial light burst
+              if (burstAlpha > 0)
+                Positioned.fill(
+                  child: Transform.scale(
+                    scale: burst,
+                    child: Opacity(
+                      opacity: burstAlpha,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFFFD700).withValues(alpha: 0.7),
+                              const Color(0xFFFFD700).withValues(alpha: 0.2),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-            // Layer 2: Sparkle particles
-            if (sparkle > 0 && sparkle < 1)
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _ScatterSparklePainter(progress: sparkle),
-                ),
-              ),
-
-            // Layer 3: Golden glow halo behind the symbol
-            if (glow > 0)
-              Positioned.fill(
-                child: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFFD700).withValues(alpha: glow * 0.6),
-                        blurRadius: 20,
-                        spreadRadius: 8,
-                      ),
-                    ],
+              // Layer 2: Sparkle particles
+              if (sparkle > 0 && sparkle < 1)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ScatterSparklePainter(progress: sparkle),
                   ),
                 ),
-              ),
 
-            // Layer 4: The scatter image itself (with scale)
-            Transform.scale(
-              scale: scale,
-              child: child,
-            ),
-          ],
-        );
-      },
-      child: Image.asset(
-        widget.assetPath,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.medium,
+              // Layer 3: Golden glow halo behind the symbol. Blur radius
+              // capped at 8 (was 20) — the BoxShadow blur is GPU-expensive
+              // and multiple scatter pulses overlap during FS triggers.
+              if (glow > 0)
+                Positioned.fill(
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFFFFD700,
+                          ).withValues(alpha: glow * 0.6),
+                          blurRadius: 8,
+                          spreadRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Layer 4: The scatter image itself (with scale)
+              Transform.scale(scale: scale, child: child),
+            ],
+          );
+        },
+        child: Image.asset(
+          widget.assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+        ),
       ),
     );
   }

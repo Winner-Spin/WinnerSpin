@@ -25,8 +25,7 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen>
-    with WidgetsBindingObserver {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
 
   @override
@@ -124,11 +123,13 @@ class _GameScreenState extends State<GameScreen>
                       child: ListenableBuilder(
                         listenable: _viewModel,
                         builder: (context, _) {
-                          return FloatingWinOverlay(
-                            activeExplosions: _viewModel.activeExplosions,
-                            gridWidth: screenW * 0.87,
-                            gridHeight: screenH * 0.32,
-                            speedMultiplier: _viewModel.speedMultiplier,
+                          return RepaintBoundary(
+                            child: FloatingWinOverlay(
+                              activeExplosions: _viewModel.activeExplosions,
+                              gridWidth: screenW * 0.87,
+                              gridHeight: screenH * 0.32,
+                              speedMultiplier: _viewModel.speedMultiplier,
+                            ),
                           );
                         },
                       ),
@@ -169,7 +170,9 @@ class _GameScreenState extends State<GameScreen>
                   listenable: _viewModel,
                   builder: (context, _) {
                     if (_viewModel.lastWin > 0 && !_viewModel.isSpinning) {
-                      return WinBanner(winAmount: _viewModel.lastWin);
+                      return RepaintBoundary(
+                        child: WinBanner(winAmount: _viewModel.lastWin),
+                      );
                     }
                     return const SizedBox.shrink();
                   },
@@ -180,25 +183,15 @@ class _GameScreenState extends State<GameScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      MinusButton(
-                        size: 60,
-                        onTap: () {},
-                      ),
+                      MinusButton(size: 60, onTap: () {}),
                       const SizedBox(width: 12),
-                      RespinButton(
-                        size: 92,
-                        onTap: () {},
-                      ),
+                      RespinButton(size: 92, onTap: () {}),
                       const SizedBox(width: 12),
-                      PlusButton(
-                        size: 60,
-                        onTap: () {},
-                      ),
+                      PlusButton(size: 60, onTap: () {}),
                     ],
                   ),
                 ),
               ),
-
             ],
           );
         },
@@ -254,53 +247,71 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildBottomPanel(double screenW) {
+    // Each control gets its own RepaintBoundary so a press-scale on one
+    // button (or a notify-driven rebuild) doesn't re-rasterize neighbour
+    // buttons' shadow blur + gradients.
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SpeedButton(
-              multiplier: _viewModel.speedMultiplier,
-              onTap: _viewModel.toggleSpeed,
+            RepaintBoundary(
+              child: SpeedButton(
+                multiplier: _viewModel.speedMultiplier,
+                onTap: _viewModel.toggleSpeed,
+              ),
             ),
             const SizedBox(width: 10),
-            AnteToggle(
-              active: _viewModel.anteBetActive,
-              disabled: _viewModel.isBusy || _viewModel.isInFreeSpins || _viewModel.isAutoSpinning,
-              onTap: _viewModel.toggleAnteBet,
+            RepaintBoundary(
+              child: AnteToggle(
+                active: _viewModel.anteBetActive,
+                disabled:
+                    _viewModel.isBusy ||
+                    _viewModel.isInFreeSpins ||
+                    _viewModel.isAutoSpinning,
+                onTap: _viewModel.toggleAnteBet,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        BetControls(
-          betAmount: _viewModel.betAmount,
-          onIncrease: _viewModel.increaseBet,
-          onDecrease: _viewModel.decreaseBet,
+        RepaintBoundary(
+          child: BetControls(
+            betAmount: _viewModel.betAmount,
+            onIncrease: _viewModel.increaseBet,
+            onDecrease: _viewModel.decreaseBet,
+          ),
         ),
         const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AutoSpinButton(
-              isActive: _viewModel.isAutoSpinning,
-              disabled: !_viewModel.isAutoSpinning && _viewModel.isBusy,
-              onPressed: _viewModel.toggleAutoSpin,
+            RepaintBoundary(
+              child: AutoSpinButton(
+                isActive: _viewModel.isAutoSpinning,
+                disabled: !_viewModel.isAutoSpinning && _viewModel.isBusy,
+                onPressed: _viewModel.toggleAutoSpin,
+              ),
             ),
             const SizedBox(width: 6),
-            SpinButton(
-              busy: _viewModel.isBusy || _viewModel.isAutoSpinning,
-              affordable: _viewModel.balance >= _viewModel.betAmount,
-              width: screenW * 0.32,
-              onPressed: _viewModel.spin,
+            RepaintBoundary(
+              child: SpinButton(
+                busy: _viewModel.isBusy || _viewModel.isAutoSpinning,
+                affordable: _viewModel.balance >= _viewModel.betAmount,
+                width: screenW * 0.32,
+                onPressed: _viewModel.spin,
+              ),
             ),
             const SizedBox(width: 6),
-            BuyFeatureButton(
-              price: _viewModel.buyFeaturePrice,
-              disabled: _viewModel.isBusy || _viewModel.isAutoSpinning,
-              onTap: _viewModel.buyFreeSpins,
-              width: screenW * 0.34,
-              height: screenW * 0.17,
+            RepaintBoundary(
+              child: BuyFeatureButton(
+                price: _viewModel.buyFeaturePrice,
+                disabled: _viewModel.isBusy || _viewModel.isAutoSpinning,
+                onTap: _viewModel.buyFreeSpins,
+                width: screenW * 0.34,
+                height: screenW * 0.17,
+              ),
             ),
           ],
         ),
