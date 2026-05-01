@@ -34,8 +34,10 @@ class _RespinButtonState extends State<RespinButton>
       duration: const Duration(milliseconds: 90),
       reverseDuration: const Duration(milliseconds: 140),
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.95)
-        .animate(CurvedAnimation(parent: _press, curve: Curves.easeOut));
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _press, curve: Curves.easeOut));
   }
 
   @override
@@ -63,102 +65,107 @@ class _RespinButtonState extends State<RespinButton>
       onTap: _handleTap,
       child: ScaleTransition(
         scale: _scale,
-        child: SizedBox(
-          width: s,
-          height: s,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: s,
-                height: s,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x661A1310),
-                      blurRadius: 18,
-                      spreadRadius: 1,
-                      offset: Offset(0, 7),
+        // Layer-cache the heavy decoration (shadow blur + 3 radial gradients
+        // + custom-paint icons) so neighbor repaints in the parent Stack
+        // — slot-grid cascades, reel drop-ins — don't re-rasterize this tree.
+        child: RepaintBoundary(
+          child: SizedBox(
+            width: s,
+            height: s,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: s,
+                  height: s,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x661A1310),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                        offset: Offset(0, 7),
+                      ),
+                    ],
+                  ),
+                ),
+                // Outer and inner share a warm taupe hue; lower alpha on
+                // the outer layer lets the background bleed through to read
+                // as a halo ring.
+                Container(
+                  width: s,
+                  height: s,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment(-0.3, -0.4),
+                      radius: 1.0,
+                      colors: [
+                        Color(0x737A6450),
+                        Color(0x805C4A3D),
+                        Color(0x8C42342A),
+                      ],
+                      stops: [0.0, 0.65, 1.0],
                     ),
-                  ],
-                ),
-              ),
-              // Outer and inner share a warm taupe hue; lower alpha on
-              // the outer layer lets the background bleed through to read
-              // as a halo ring.
-              Container(
-                width: s,
-                height: s,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: Alignment(-0.3, -0.4),
-                    radius: 1.0,
-                    colors: [
-                      Color(0x737A6450),
-                      Color(0x805C4A3D),
-                      Color(0x8C42342A),
-                    ],
-                    stops: [0.0, 0.65, 1.0],
                   ),
                 ),
-              ),
-              Container(
-                width: s * 0.87,
-                height: s * 0.87,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: const Alignment(-0.15, -0.25),
-                    radius: 1.0,
-                    colors: [
-                      const Color(0xFF5A4A3F).withValues(alpha: op - 0.05),
-                      const Color(0xFF3D2F26).withValues(alpha: op + 0.06),
-                    ],
+                Container(
+                  width: s * 0.87,
+                  height: s * 0.87,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.15, -0.25),
+                      radius: 1.0,
+                      colors: [
+                        const Color(0xFF5A4A3F).withValues(alpha: op - 0.05),
+                        const Color(0xFF3D2F26).withValues(alpha: op + 0.06),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: s * 0.20,
-                top: s * 0.16,
-                child: IgnorePointer(
-                  child: Container(
-                    width: s * 0.38,
-                    height: s * 0.28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0.18),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
+                Positioned(
+                  left: s * 0.20,
+                  top: s * 0.16,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: s * 0.38,
+                      height: s * 0.28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.18),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: s * 0.74,
-                height: s * 0.74,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: _active
-                      ? _StopIcon(
-                          key: const ValueKey('stop'),
-                          size: s * 0.74,
-                          color: const Color(0xFFDC3D3D),
-                        )
-                      : _ArrowsIcon(
-                          key: const ValueKey('arrows'),
-                          size: s * 0.74,
-                          color: iconClr,
-                        ),
+                SizedBox(
+                  width: s * 0.74,
+                  height: s * 0.74,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: _active
+                        ? _StopIcon(
+                            key: const ValueKey('stop'),
+                            size: s * 0.74,
+                            color: const Color(0xFFDC3D3D),
+                          )
+                        : _ArrowsIcon(
+                            key: const ValueKey('arrows'),
+                            size: s * 0.74,
+                            color: iconClr,
+                          ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -254,10 +261,28 @@ class _RespinArrowsPainter extends CustomPainter {
     const topStart = math.pi * 41 / 36;
     const botStart = math.pi * 77 / 36;
 
-    _drawArrow(canvas, strokePaint, fillPaint, rect, center, radius, stroke,
-        topStart, sweep);
-    _drawArrow(canvas, strokePaint, fillPaint, rect, center, radius, stroke,
-        botStart, sweep);
+    _drawArrow(
+      canvas,
+      strokePaint,
+      fillPaint,
+      rect,
+      center,
+      radius,
+      stroke,
+      topStart,
+      sweep,
+    );
+    _drawArrow(
+      canvas,
+      strokePaint,
+      fillPaint,
+      rect,
+      center,
+      radius,
+      stroke,
+      botStart,
+      sweep,
+    );
   }
 
   void _drawArrow(
