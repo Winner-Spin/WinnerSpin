@@ -34,8 +34,7 @@ class TumbleCell extends StatefulWidget {
   State<TumbleCell> createState() => _TumbleCellState();
 }
 
-class _TumbleCellState extends State<TumbleCell>
-    with TickerProviderStateMixin {
+class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final AnimationController _fadeController;
   late final AnimationController _dropController;
   late final AnimationController _glowController;
@@ -84,13 +83,20 @@ class _TumbleCellState extends State<TumbleCell>
       parent: _fadeController,
       curve: const _ScalePulseCurve(),
     );
-    _dropAnimation =
-        CurvedAnimation(parent: _dropController, curve: Curves.easeOutCubic);
+    _dropAnimation = CurvedAnimation(
+      parent: _dropController,
+      curve: Curves.easeOutCubic,
+    );
 
     _particles = _generateParticles();
     _palette = _GlowPalette.forPath(widget.path);
 
     _dropController.value = 1.0;
+
+    // Stop the rotating glow once the fade completes; otherwise the
+    // controller keeps repeating at 60 Hz forever, ticking AnimatedBuilder
+    // even though the cell is fully transparent and the painter early-exits.
+    _fadeController.addStatusListener(_handleFadeStatus);
 
     // If the cell is created already in fading state (first tumble after spin),
     // animate the fade instead of snapping to fully transparent — the player
@@ -101,6 +107,13 @@ class _TumbleCellState extends State<TumbleCell>
       _burstController.forward(from: 0.0);
     } else {
       _fadeController.value = 0.0;
+    }
+  }
+
+  void _handleFadeStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && _glowController.isAnimating) {
+      _glowController.stop();
+      _glowController.value = 0.0;
     }
   }
 
@@ -134,6 +147,7 @@ class _TumbleCellState extends State<TumbleCell>
 
   @override
   void dispose() {
+    _fadeController.removeStatusListener(_handleFadeStatus);
     _fadeController.dispose();
     _dropController.dispose();
     _glowController.dispose();
@@ -164,8 +178,10 @@ class _TumbleCellState extends State<TumbleCell>
         final scale = 1.0 + _scalePulse.value * 0.15;
         // Particles run in the second half (after the impact peak), in sync
         // with the symbol fade-out so the burst trails the celebration.
-        final particleProgress =
-            ((_fadeController.value - 0.4) / 0.6).clamp(0.0, 1.0);
+        final particleProgress = ((_fadeController.value - 0.4) / 0.6).clamp(
+          0.0,
+          1.0,
+        );
 
         return Transform.translate(
           offset: Offset(0, dy),
@@ -394,9 +410,12 @@ class _WinningGlowPainter extends CustomPainter {
     const radius = Radius.circular(8);
     final cellRRect = RRect.fromRectAndRadius(cellRect, radius);
 
+    // Halo blur radius is the dominant per-cell GPU cost — saveLayer +
+    // Gaussian. Capped at 4 so a cluster-win cascade stays within the
+    // frame budget; visual difference vs. 10 is a slightly tighter halo.
     final haloPaint = Paint()
       ..color = palette.halo.withValues(alpha: 0.55 * intensity)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 * intensity);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 * intensity);
     canvas.drawRRect(cellRRect, haloPaint);
 
     final sweep = SweepGradient(
@@ -459,11 +478,17 @@ class _ParticleBurstPainter extends CustomPainter {
       final alpha = (1.0 - localT).clamp(0.0, 1.0);
       final radius = p.size * (1.0 - localT * 0.5);
 
-      // Bright outer halo + solid white-hot core makes each spark legible
-      // against busy symbol backgrounds even at small radii.
+      // Soft falloff via a radial gradient shader instead of MaskFilter.blur:
+      // shaders run at fragment level (no saveLayer), whereas a per-particle
+      // Gaussian blur on 11 particles × multiple fading cells dominated the
+      // GPU budget during a cluster-win cascade.
       final haloPaint = Paint()
-        ..color = palette.particle.withValues(alpha: alpha)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+        ..shader = RadialGradient(
+          colors: [
+            palette.particle.withValues(alpha: alpha),
+            palette.particle.withValues(alpha: 0),
+          ],
+        ).createShader(Rect.fromCircle(center: pos, radius: radius * 1.6));
       canvas.drawCircle(pos, radius * 1.6, haloPaint);
 
       final corePaint = Paint()
