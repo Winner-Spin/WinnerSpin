@@ -10,24 +10,34 @@ import '../../data/repositories/firestore_pool_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
 import '../../domain/engine/spin_task.dart';
+import '../../domain/models/cluster_win.dart';
 import 'controllers/ante_controller.dart';
 import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
-import '../../domain/models/cluster_win.dart';
+import 'controllers/grid_controller.dart';
 
-/// Top-level orchestrator for the slot screen. Composes three focused
-/// controllers (balance, ante, free spins) and coordinates the engine,
-/// repositories, and animation lifecycle. The View listens to this single
-/// ChangeNotifier; getters delegate to the underlying controllers.
+/// Top-level orchestrator for the slot screen. Composes four focused
+/// sub-controllers (balance, ante, free spins, grid) and coordinates the
+/// engine, repositories, and animation lifecycle. Each sub-controller is
+/// itself a ChangeNotifier; this ViewModel forwards their notifications
+/// up to its own listeners so a single-listener setup on `this` receives
+/// updates from any controller.
 class GameViewModel extends ChangeNotifier {
   GameViewModel({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
-  })  : _authRepository = authRepository ?? FirebaseAuthRepository(),
-        _poolRepository = poolRepository ?? FirestorePoolRepository() {
+  }) : _authRepository = authRepository ?? FirebaseAuthRepository(),
+       _poolRepository = poolRepository ?? FirestorePoolRepository() {
     final result = SlotEngine.spin(_pool, 0);
-    _grid = result.initialGrid;
-    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+    _gridCtrl = GridController(result.initialGrid);
+
+    // Forward each sub-controller's notifications through this ViewModel's
+    // own notifier so listeners on `this` receive controller-owned state
+    // changes (balance/ante/fs/grid). Listeners are removed in [dispose].
+    _balanceCtrl.addListener(notifyListeners);
+    _anteCtrl.addListener(notifyListeners);
+    _fsCtrl.addListener(notifyListeners);
+    _gridCtrl.addListener(notifyListeners);
   }
 
   final AuthRepository _authRepository;
@@ -38,6 +48,7 @@ class GameViewModel extends ChangeNotifier {
   final BalanceController _balanceCtrl = BalanceController();
   final AnteController _anteCtrl = AnteController();
   final FreeSpinsController _fsCtrl = FreeSpinsController();
+  late final GridController _gridCtrl;
 
   // ── User profile ──
 
@@ -58,17 +69,12 @@ class GameViewModel extends ChangeNotifier {
   static const int columns = SlotEngine.columns;
   static const int rows = SlotEngine.rows;
 
-  late List<List<String>> _grid;
-  List<List<String>> get grid => _grid;
-
-  List<List<String>> _previousGrid = [];
-  List<List<String>> get previousGrid => _previousGrid;
-
-  Set<String> _fadingPaths = const {};
-  Set<String> get fadingPaths => _fadingPaths;
-
-  List<ClusterWin> _activeExplosions = const [];
-  List<ClusterWin> get activeExplosions => _activeExplosions;
+  /// Grid state (delegated to [GridController]).
+  List<List<String>> get grid => _gridCtrl.grid;
+  List<List<String>> get previousGrid => _gridCtrl.previousGrid;
+  Set<String> get fadingPaths => _gridCtrl.fadingPaths;
+  List<ClusterWin> get activeExplosions => _gridCtrl.activeExplosions;
+  Set<int> get winningPositions => _gridCtrl.winningPositions;
 
   bool _isTumbling = false;
   bool get isTumbling => _isTumbling;
@@ -81,9 +87,6 @@ class GameViewModel extends ChangeNotifier {
 
   /// True while any spin or its cascade is still animating.
   bool get isBusy => _isSpinning || _isTumbling;
-
-  Set<int> _winningPositions = {};
-  Set<int> get winningPositions => _winningPositions;
 
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
@@ -151,17 +154,16 @@ class GameViewModel extends ChangeNotifier {
     if (isBusy || isInFreeSpins || _isAutoSpinning) return;
     _anteCtrl.toggle();
     _balanceCtrl.anteActiveShadow = _anteCtrl.active;
-    notifyListeners();
   }
 
   void increaseBet() {
     if (_isAutoSpinning) return;
-    if (_balanceCtrl.increaseBet()) notifyListeners();
+    _balanceCtrl.increaseBet();
   }
 
   void decreaseBet() {
     if (_isAutoSpinning) return;
-    if (_balanceCtrl.decreaseBet()) notifyListeners();
+    _balanceCtrl.decreaseBet();
   }
 
   // ── User data lifecycle ──
@@ -210,7 +212,6 @@ class GameViewModel extends ChangeNotifier {
       _balanceCtrl.applyRemoteUserBalance(
         (data['userBalance'] ?? 10000.0).toDouble(),
       );
-      notifyListeners();
     });
   }
 
@@ -239,17 +240,15 @@ class GameViewModel extends ChangeNotifier {
 
     _isSpinning = true;
     _balanceCtrl.resetLastWin();
-    _fadingPaths = const {};
-    _activeExplosions = const [];
-    _winningPositions = {};
-
-    _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+    _gridCtrl.capturePreviousGrid();
+    _gridCtrl.resetForNewSpin();
     notifyListeners();
 
     // anteBet/buyFs flags propagate the round's origin so multiplier scaling
     // stays consistent across every spin (incl. retriggers).
-    final bool anteFlag =
-        isFreeSpin ? _anteCtrl.currentRoundFromAnte : _anteCtrl.active;
+    final bool anteFlag = isFreeSpin
+        ? _anteCtrl.currentRoundFromAnte
+        : _anteCtrl.active;
     final bool buyFlag = isFreeSpin && _fsCtrl.currentRoundFromBuy;
 
     // Engine runs on a background isolate so the rejection-sampling loop
@@ -271,8 +270,7 @@ class GameViewModel extends ChangeNotifier {
     _pool = taskOutput.pool;
     _pendingResult = taskOutput.result;
 
-    _grid = _pendingResult!.initialGrid;
-    notifyListeners();
+    _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
   /// Buys an FS round at 100× bet. Charges the fee, queues 10 free spins,
@@ -284,8 +282,6 @@ class GameViewModel extends ChangeNotifier {
     _balanceCtrl.charge(price);
     _pool.recordBet(price);
     _fsCtrl.awardBoughtRound();
-
-    notifyListeners();
   }
 
   /// Plays back cascade tumbles, awards the win, and persists state.
@@ -302,23 +298,23 @@ class GameViewModel extends ChangeNotifier {
 
     if (result.tumbles.isNotEmpty) {
       _isTumbling = true;
+      notifyListeners();
       for (final tumble in result.tumbles) {
-        _fadingPaths = tumble.winningPaths;
-        _activeExplosions = tumble.clusterWins;
-        notifyListeners();
+        _gridCtrl.startTumble(
+          fadingPaths: tumble.winningPaths,
+          activeExplosions: tumble.clusterWins,
+        );
         await Future.delayed(_tumbleFadeDuration);
 
-        _grid = tumble.gridAfter;
-        _fadingPaths = const {};
-        _activeExplosions = const [];
-        notifyListeners();
+        _gridCtrl.endTumble(newGrid: tumble.gridAfter);
         await Future.delayed(_tumbleSettleDuration);
       }
       _isTumbling = false;
+      notifyListeners();
     }
 
     _balanceCtrl.awardWin(result.totalWin);
-    _winningPositions = result.winningPositions;
+    _gridCtrl.setWinningPositions(result.winningPositions);
 
     if (result.freeSpinsTriggered) {
       if (result.isRetrigger) {
@@ -344,7 +340,6 @@ class GameViewModel extends ChangeNotifier {
     _savePoolIfNeeded();
 
     _pendingResult = null;
-    notifyListeners();
 
     if (_isAutoSpinning) {
       Future.delayed(const Duration(milliseconds: 600), () {
@@ -419,6 +414,14 @@ class GameViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _userSubscription?.cancel();
+    _balanceCtrl.removeListener(notifyListeners);
+    _anteCtrl.removeListener(notifyListeners);
+    _fsCtrl.removeListener(notifyListeners);
+    _gridCtrl.removeListener(notifyListeners);
+    _balanceCtrl.dispose();
+    _anteCtrl.dispose();
+    _fsCtrl.dispose();
+    _gridCtrl.dispose();
     super.dispose();
   }
 }

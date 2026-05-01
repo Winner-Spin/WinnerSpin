@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 /// Tracks Ante Bet state — both the player's toggle and the per-round
 /// flag that propagates the ante economics across an FS round.
-class AnteController {
+class AnteController extends ChangeNotifier {
   bool _active = false;
   bool _currentRoundFromAnte = false;
 
@@ -15,16 +17,21 @@ class AnteController {
   /// Flips the toggle. Callers should guard against busy/in-FS states.
   void toggle() {
     _active = !_active;
+    notifyListeners();
   }
 
   /// Captures the toggle state when a base spin triggers FS so the round
   /// stays flagged as ante-triggered for its entire duration.
   void captureForNewRound() {
+    if (_currentRoundFromAnte == _active) return;
     _currentRoundFromAnte = _active;
+    notifyListeners();
   }
 
   /// Clears the round flag. Called when the FS round ends.
   void clearRoundFlag() {
+    if (!_currentRoundFromAnte) return;
     _currentRoundFromAnte = false;
+    notifyListeners();
   }
 }
