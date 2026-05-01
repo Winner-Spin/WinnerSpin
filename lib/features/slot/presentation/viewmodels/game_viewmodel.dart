@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
@@ -9,6 +9,7 @@ import '../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../../data/repositories/firestore_pool_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
+import '../../domain/engine/spin_task.dart';
 import 'controllers/ante_controller.dart';
 import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
@@ -216,7 +217,7 @@ class GameViewModel extends ChangeNotifier {
   // ── Spin ──
 
   /// Deducts the bet, runs the engine, and stages the result for animation.
-  void spin() {
+  Future<void> spin() async {
     if (isBusy) return;
 
     final bool isFreeSpin = isInFreeSpins;
@@ -243,19 +244,32 @@ class GameViewModel extends ChangeNotifier {
     _winningPositions = {};
 
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
+    notifyListeners();
 
     // anteBet/buyFs flags propagate the round's origin so multiplier scaling
     // stays consistent across every spin (incl. retriggers).
     final bool anteFlag =
         isFreeSpin ? _anteCtrl.currentRoundFromAnte : _anteCtrl.active;
     final bool buyFlag = isFreeSpin && _fsCtrl.currentRoundFromBuy;
-    _pendingResult = SlotEngine.spin(
-      _pool,
-      betAmount,
-      isFreeSpins: isFreeSpin,
-      anteBet: anteFlag,
-      buyFs: buyFlag,
+
+    // Engine runs on a background isolate so the rejection-sampling loop
+    // (up to 150 simulated cascades on jackpot/FS spins) doesn't block the
+    // tap-down ripple or any in-flight cascade animation.
+    final taskOutput = await compute(
+      runSlotSpinTask,
+      SpinTaskInput(
+        pool: _pool,
+        betAmount: betAmount,
+        isFreeSpins: isFreeSpin,
+        anteBet: anteFlag,
+        buyFs: buyFlag,
+      ),
     );
+
+    // Replace the pool reference so the isolate-side session-mode mutation
+    // survives the boundary.
+    _pool = taskOutput.pool;
+    _pendingResult = taskOutput.result;
 
     _grid = _pendingResult!.initialGrid;
     notifyListeners();
