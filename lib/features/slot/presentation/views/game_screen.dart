@@ -96,7 +96,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: screenW * 0.04,
                 right: screenW * 0.04,
                 child: ListenableBuilder(
-                  listenable: _viewModel,
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.balanceCtrl,
+                  ]),
                   builder: (context, _) => TopBar(
                     username: _viewModel.username,
                     userBalance: _viewModel.userBalance,
@@ -115,13 +118,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   children: [
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: _viewModel,
+                        listenable: Listenable.merge([
+                          _viewModel,
+                          _viewModel.gridCtrl,
+                        ]),
                         builder: (context, _) => _buildSlotGrid(),
                       ),
                     ),
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: _viewModel,
+                        listenable: Listenable.merge([
+                          _viewModel,
+                          _viewModel.gridCtrl,
+                        ]),
                         builder: (context, _) {
                           return RepaintBoundary(
                             child: FloatingWinOverlay(
@@ -142,7 +151,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: screenW * 0.04,
                 right: screenW * 0.04,
                 child: ListenableBuilder(
-                  listenable: _viewModel,
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.balanceCtrl,
+                    _viewModel.anteCtrl,
+                    _viewModel.fsCtrl,
+                  ]),
                   builder: (context, _) => _buildBottomPanel(screenW),
                 ),
               ),
@@ -151,7 +165,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: screenW * 0.1,
                 right: screenW * 0.1,
                 child: ListenableBuilder(
-                  listenable: _viewModel,
+                  listenable: _viewModel.fsCtrl,
                   builder: (context, _) {
                     if (_viewModel.isInFreeSpins) {
                       return FreeSpinsBanner(
@@ -167,7 +181,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: screenW * 0.15,
                 right: screenW * 0.15,
                 child: ListenableBuilder(
-                  listenable: _viewModel,
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.balanceCtrl,
+                  ]),
                   builder: (context, _) {
                     if (_viewModel.lastWin > 0 && !_viewModel.isSpinning) {
                       return RepaintBoundary(

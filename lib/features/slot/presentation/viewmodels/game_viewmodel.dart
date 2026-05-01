@@ -19,9 +19,10 @@ import 'controllers/grid_controller.dart';
 /// Top-level orchestrator for the slot screen. Composes four focused
 /// sub-controllers (balance, ante, free spins, grid) and coordinates the
 /// engine, repositories, and animation lifecycle. Each sub-controller is
-/// itself a ChangeNotifier; this ViewModel forwards their notifications
-/// up to its own listeners so a single-listener setup on `this` receives
-/// updates from any controller.
+/// itself a ChangeNotifier and is exposed via a public getter so views
+/// can subscribe only to the slice of state they care about. This
+/// ViewModel notifies for state it owns directly: spinning/tumbling
+/// flags, auto-spin, speed, and user-profile fields.
 class GameViewModel extends ChangeNotifier {
   GameViewModel({
     AuthRepository? authRepository,
@@ -30,14 +31,6 @@ class GameViewModel extends ChangeNotifier {
        _poolRepository = poolRepository ?? FirestorePoolRepository() {
     final result = SlotEngine.spin(_pool, 0);
     _gridCtrl = GridController(result.initialGrid);
-
-    // Forward each sub-controller's notifications through this ViewModel's
-    // own notifier so listeners on `this` receive controller-owned state
-    // changes (balance/ante/fs/grid). Listeners are removed in [dispose].
-    _balanceCtrl.addListener(notifyListeners);
-    _anteCtrl.addListener(notifyListeners);
-    _fsCtrl.addListener(notifyListeners);
-    _gridCtrl.addListener(notifyListeners);
   }
 
   final AuthRepository _authRepository;
@@ -49,6 +42,11 @@ class GameViewModel extends ChangeNotifier {
   final AnteController _anteCtrl = AnteController();
   final FreeSpinsController _fsCtrl = FreeSpinsController();
   late final GridController _gridCtrl;
+
+  BalanceController get balanceCtrl => _balanceCtrl;
+  AnteController get anteCtrl => _anteCtrl;
+  FreeSpinsController get fsCtrl => _fsCtrl;
+  GridController get gridCtrl => _gridCtrl;
 
   // ── User profile ──
 
@@ -414,10 +412,6 @@ class GameViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _userSubscription?.cancel();
-    _balanceCtrl.removeListener(notifyListeners);
-    _anteCtrl.removeListener(notifyListeners);
-    _fsCtrl.removeListener(notifyListeners);
-    _gridCtrl.removeListener(notifyListeners);
     _balanceCtrl.dispose();
     _anteCtrl.dispose();
     _fsCtrl.dispose();
