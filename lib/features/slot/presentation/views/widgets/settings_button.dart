@@ -1,13 +1,14 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-class InfoButton extends StatefulWidget {
+class SettingsButton extends StatefulWidget {
   final VoidCallback? onTap;
   final double width;
   final double height;
 
-  const InfoButton({
+  const SettingsButton({
     super.key,
     this.onTap,
     this.width = 70,
@@ -15,10 +16,10 @@ class InfoButton extends StatefulWidget {
   });
 
   @override
-  State<InfoButton> createState() => _InfoButtonState();
+  State<SettingsButton> createState() => _SettingsButtonState();
 }
 
-class _InfoButtonState extends State<InfoButton> {
+class _SettingsButtonState extends State<SettingsButton> {
   bool _pressed = false;
 
   void _setPressed(bool value) {
@@ -33,8 +34,8 @@ class _InfoButtonState extends State<InfoButton> {
     final h = widget.height;
     final cornerRadius = Radius.circular(h / 2);
     final borderRadius = BorderRadius.only(
-      topRight: cornerRadius,
-      bottomRight: cornerRadius,
+      topLeft: cornerRadius,
+      bottomLeft: cornerRadius,
     );
 
     return GestureDetector(
@@ -80,8 +81,8 @@ class _InfoButtonState extends State<InfoButton> {
                 ),
                 child: Center(
                   child: CustomPaint(
-                    size: const Size(17, 22),
-                    painter: InfoIconPainter(
+                    size: const Size(22, 22),
+                    painter: GearIconPainter(
                       color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
@@ -95,43 +96,63 @@ class _InfoButtonState extends State<InfoButton> {
   }
 }
 
-class InfoIconPainter extends CustomPainter {
+class GearIconPainter extends CustomPainter {
   final Color color;
 
-  const InfoIconPainter({required this.color});
+  const GearIconPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     final cx = w / 2;
+    final cy = h / 2;
 
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    final dotRadius = w * 0.18;
-    final dotCY = h * 0.13;
-    canvas.drawCircle(Offset(cx, dotCY), dotRadius, paint);
+    final bodyR = w * 0.30;
+    final tipR = w * 0.46;
+    final toothW = w * 0.17;
+    final toothH = tipR - bodyR + w * 0.05;
+    final holeR = w * 0.13;
 
-    final stemTop = h * 0.34;
-    final stemBot = h * 0.92;
-    final stemWidth = w * 0.30;
-    final stemRect = RRect.fromRectAndRadius(
-      Rect.fromLTRB(
-        cx - stemWidth / 2,
-        stemTop,
-        cx + stemWidth / 2,
-        stemBot,
-      ),
-      Radius.circular(stemWidth / 2),
+    canvas.saveLayer(Rect.fromLTWH(0, 0, w, h), Paint());
+
+    canvas.drawCircle(Offset(cx, cy), bodyR, paint);
+
+    for (var i = 0; i < 8; i++) {
+      final angle = i * math.pi / 4;
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.rotate(angle);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(0, -tipR + toothH / 2),
+            width: toothW,
+            height: toothH,
+          ),
+          Radius.circular(toothW * 0.28),
+        ),
+        paint,
+      );
+      canvas.restore();
+    }
+
+    canvas.drawCircle(
+      Offset(cx, cy),
+      holeR,
+      Paint()..blendMode = BlendMode.clear,
     );
-    canvas.drawRRect(stemRect, paint);
+
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant InfoIconPainter oldDelegate) {
+  bool shouldRepaint(covariant GearIconPainter oldDelegate) {
     return oldDelegate.color != color;
   }
 }

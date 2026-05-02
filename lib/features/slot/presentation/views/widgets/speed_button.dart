@@ -11,8 +11,8 @@ class SpeedButton extends StatefulWidget {
     super.key,
     required this.level,
     this.onTap,
-    this.width = 60,
-    this.height = 35,
+    this.width = 75,
+    this.height = 42,
   });
 
   @override
@@ -75,7 +75,7 @@ class _SpeedButtonState extends State<SpeedButton> {
                 ),
                 child: Center(
                   child: CustomPaint(
-                    size: const Size(24, 13),
+                    size: const Size(32, 22),
                     painter: SpeedIconPainter(level: widget.level),
                   ),
                 ),
@@ -95,42 +95,44 @@ class SpeedIconPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    final cy = size.height / 2;
+
     final activeColor = Colors.white.withValues(alpha: 0.92);
     final inactiveColor = Colors.white.withValues(alpha: 0.45);
 
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.30)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.20
+      ..strokeWidth = 3.20 * scale
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
 
-    void drawChevron(double x, int chevIndex) {
-      const double topY = 2.0;
-      const double centerY = 6.5;
-      const double bottomY = 11.0;
+    void drawChevron(double xRef, int chevIndex) {
+      final x = xRef * scale;
+      final halfH = 4.5 * scale;
+      final tipDx = 5.2 * scale;
 
-      final Offset topStart = Offset(x, topY);
-      final Offset tip = Offset(x + 5.2, centerY);
-      final Offset bottomStart = Offset(x, bottomY);
+      final path = Path()
+        ..moveTo(x, cy - halfH)
+        ..lineTo(x + tipDx, cy)
+        ..lineTo(x, cy + halfH);
 
       final paint = Paint()
         ..color = chevIndex <= level ? activeColor : inactiveColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.10
+        ..strokeWidth = 3.10 * scale
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..isAntiAlias = true;
 
       canvas.save();
-      canvas.translate(0.45, 0.55);
-      canvas.drawLine(topStart, tip, shadowPaint);
-      canvas.drawLine(bottomStart, tip, shadowPaint);
+      canvas.translate(0.45 * scale, 0.55 * scale);
+      canvas.drawPath(path, shadowPaint);
       canvas.restore();
 
-      canvas.drawLine(topStart, tip, paint);
-      canvas.drawLine(bottomStart, tip, paint);
+      canvas.drawPath(path, paint);
     }
 
     drawChevron(2.5, 1);

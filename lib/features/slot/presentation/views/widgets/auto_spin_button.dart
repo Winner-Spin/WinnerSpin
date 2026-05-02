@@ -11,8 +11,8 @@ class AutoSpinButton extends StatefulWidget {
   const AutoSpinButton({
     super.key,
     this.onTap,
-    this.width = 60,
-    this.height = 35,
+    this.width = 75,
+    this.height = 42,
   });
 
   @override
@@ -75,7 +75,7 @@ class _AutoSpinButtonState extends State<AutoSpinButton> {
                 ),
                 child: Center(
                   child: CustomPaint(
-                    size: const Size(24, 13),
+                    size: const Size(22, 22),
                     painter: AutoSpinIconPainter(
                       color: Colors.white.withValues(alpha: 0.85),
                     ),
@@ -101,8 +101,8 @@ class AutoSpinIconPainter extends CustomPainter {
     final h = size.height;
     final cx = w / 2;
     final cy = h / 2;
-    final ringRadius = w * 0.30;
-    final stroke = w * 0.09;
+    final ringRadius = w * 0.40;
+    final stroke = w * 0.12;
 
     final strokePaint = Paint()
       ..color = color
@@ -128,8 +128,8 @@ class AutoSpinIconPainter extends CustomPainter {
     _drawArrow(canvas, strokePaint, fillPaint, ringRect,
         Offset(cx, cy), ringRadius, stroke, botStart, sweep);
 
-    final triangleW = w * 0.21;
-    final triangleH = w * 0.24;
+    final triangleW = w * 0.27;
+    final triangleH = w * 0.30;
     final tLeftX = cx - triangleW / 3;
     final tRightX = cx + 2 * triangleW / 3;
     final tTopY = cy - triangleH / 2;
