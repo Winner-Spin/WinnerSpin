@@ -11,8 +11,8 @@ class SpeedButton extends StatefulWidget {
     super.key,
     required this.level,
     this.onTap,
-    this.width = 46,
-    this.height = 28,
+    this.width = 60,
+    this.height = 35,
   });
 
   @override
@@ -101,24 +101,24 @@ class SpeedIconPainter extends CustomPainter {
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.30)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.45
+      ..strokeWidth = 3.20
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
 
     void drawChevron(double x, int chevIndex) {
-      const double topY = 2.5;
+      const double topY = 2.0;
       const double centerY = 6.5;
-      const double bottomY = 10.5;
+      const double bottomY = 11.0;
 
       final Offset topStart = Offset(x, topY);
-      final Offset tip = Offset(x + 4.7, centerY);
+      final Offset tip = Offset(x + 5.2, centerY);
       final Offset bottomStart = Offset(x, bottomY);
 
       final paint = Paint()
         ..color = chevIndex <= level ? activeColor : inactiveColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.35
+        ..strokeWidth = 3.10
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..isAntiAlias = true;

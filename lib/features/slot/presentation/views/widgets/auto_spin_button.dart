@@ -1,138 +1,192 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
-/// A button that toggles auto-spin mode. It enlarges when held down
-/// and has a loop design to indicate infinite spins.
 class AutoSpinButton extends StatefulWidget {
-  final bool isActive;
-  final bool disabled;
-  final VoidCallback onPressed;
+  final VoidCallback? onTap;
+  final double width;
+  final double height;
 
   const AutoSpinButton({
     super.key,
-    required this.isActive,
-    required this.disabled,
-    required this.onPressed,
+    this.onTap,
+    this.width = 60,
+    this.height = 35,
   });
 
   @override
   State<AutoSpinButton> createState() => _AutoSpinButtonState();
 }
 
-class _AutoSpinButtonState extends State<AutoSpinButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
+class _AutoSpinButtonState extends State<AutoSpinButton> {
+  bool _pressed = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-      reverseDuration: const Duration(milliseconds: 120),
-    );
-    // Büyüme animasyonu: 1.0'dan 1.1'e
-    _scale = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void _setPressed(bool value) {
+    if (_pressed != value) {
+      setState(() => _pressed = value);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isAuto = widget.isActive;
-    final bool disabled = widget.disabled;
+    final radius = widget.height / 2;
 
     return GestureDetector(
-      onTapDown: (_) {
-        if (!disabled || isAuto) _controller.forward();
-      },
-      onTapUp: (_) {
-        if (!disabled || isAuto) {
-          _controller.reverse();
-          widget.onPressed();
-        }
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: AnimatedBuilder(
-        animation: _scale,
-        builder: (context, child) =>
-            Transform.scale(scale: _scale.value, child: child),
-        child: Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: disabled && !isAuto
-                ? LinearGradient(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: RepaintBoundary(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
+              child: Container(
+                width: widget.width,
+                height: widget.height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.grey.shade600, Colors.grey.shade600, Colors.grey.shade700],
-                    stops: const [0.0, 0.4, 1.0],
-                  )
-                : isAuto
-                    ? const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFFFFCC80), // Bright orange top highlight
-                          Color(0xFFFF9800), // Main orange
-                          Color(0xFFE65100), // Darker orange bottom
-                        ],
-                        stops: [0.0, 0.4, 1.0],
-                      )
-                    : const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFFFF8A80), // Bright red top highlight
-                          Color(0xFFE53935), // Main red
-                          Color(0xFFB71C1C), // Darker red bottom
-                        ],
-                        stops: [0.0, 0.4, 1.0],
-                      ),
-            border: Border.all(
-              color: disabled && !isAuto
-                  ? Colors.grey.shade400
-                  : isAuto
-                      ? const Color(0xFFFFE0B2).withValues(alpha: 0.6)
-                      : const Color(0xFFFFCDD2).withValues(alpha: 0.6), // Inner red reflection
-              width: 1.5,
-            ),
-            boxShadow: disabled && !isAuto
-                ? []
-                : [
+                    colors: [
+                      const Color(0xFF2B211B).withValues(alpha: 0.58),
+                      const Color(0xFF120C09).withValues(alpha: 0.62),
+                      Colors.black.withValues(alpha: 0.46),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    width: 1,
+                  ),
+                  boxShadow: [
                     BoxShadow(
-                      color: isAuto
-                          ? const Color(0xFFFF9800).withValues(alpha: 0.5)
-                          : const Color(0xFFE53935).withValues(alpha: 0.5),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: isAuto
-                          ? const Color(0xFFBF360C)
-                          : const Color(0xFF880E4F), // Outer darker rim shadow
-                      blurRadius: 0,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
                     ),
                   ],
-          ),
-          child: Center(
-            child: Icon(
-              Icons.loop, // Döngü simgesi
-              color: Colors.white,
-              size: 28,
+                ),
+                child: Center(
+                  child: CustomPaint(
+                    size: const Size(24, 13),
+                    painter: AutoSpinIconPainter(
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+class AutoSpinIconPainter extends CustomPainter {
+  final Color color;
+
+  const AutoSpinIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final cx = w / 2;
+    final cy = h / 2;
+    final ringRadius = w * 0.30;
+    final stroke = w * 0.09;
+
+    final strokePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final ringRect = Rect.fromCircle(
+      center: Offset(cx, cy),
+      radius: ringRadius,
+    );
+
+    const sweep = math.pi * 13 / 18;
+    const topStart = math.pi * 41 / 36;
+    const botStart = math.pi * 77 / 36;
+
+    _drawArrow(canvas, strokePaint, fillPaint, ringRect,
+        Offset(cx, cy), ringRadius, stroke, topStart, sweep);
+    _drawArrow(canvas, strokePaint, fillPaint, ringRect,
+        Offset(cx, cy), ringRadius, stroke, botStart, sweep);
+
+    final triangleW = w * 0.21;
+    final triangleH = w * 0.24;
+    final tLeftX = cx - triangleW / 3;
+    final tRightX = cx + 2 * triangleW / 3;
+    final tTopY = cy - triangleH / 2;
+    final tBotY = cy + triangleH / 2;
+
+    final triangle = Path()
+      ..moveTo(tLeftX, tTopY)
+      ..lineTo(tRightX, cy)
+      ..lineTo(tLeftX, tBotY)
+      ..close();
+
+    canvas.drawPath(triangle, fillPaint);
+  }
+
+  void _drawArrow(
+    Canvas canvas,
+    Paint stroke,
+    Paint fill,
+    Rect rect,
+    Offset center,
+    double radius,
+    double strokeW,
+    double startAngle,
+    double sweepAngle,
+  ) {
+    canvas.drawArc(rect, startAngle, sweepAngle, false, stroke);
+
+    final tail = Offset(
+      center.dx + math.cos(startAngle) * radius,
+      center.dy + math.sin(startAngle) * radius,
+    );
+    canvas.drawCircle(tail, strokeW / 2, fill);
+
+    final endAngle = startAngle + sweepAngle;
+    final arcEnd = Offset(
+      center.dx + math.cos(endAngle) * radius,
+      center.dy + math.sin(endAngle) * radius,
+    );
+    final dir = Offset(-math.sin(endAngle), math.cos(endAngle));
+    final perp = Offset(-dir.dy, dir.dx);
+
+    final tipPt = arcEnd + dir * strokeW * 1.4;
+    final baseL = arcEnd - perp * strokeW * 0.95;
+    final baseR = arcEnd + perp * strokeW * 0.95;
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(tipPt.dx, tipPt.dy)
+        ..lineTo(baseL.dx, baseL.dy)
+        ..lineTo(baseR.dx, baseR.dy)
+        ..close(),
+      fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant AutoSpinIconPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

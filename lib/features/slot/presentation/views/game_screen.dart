@@ -9,6 +9,7 @@ import 'widgets/slot_reel.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
 import 'widgets/plus_button.dart';
+import 'widgets/auto_spin_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
@@ -259,8 +260,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.86,
+                top: screenH * 0.93,
                 left: screenW * 0.30,
+                child: const AutoSpinButton(),
+              ),
+              Positioned(
+                top: screenH * 0.93,
+                left: screenW * 0.57,
                 child: ListenableBuilder(
                   listenable: _viewModel,
                   builder: (context, _) => SpeedButton(
