@@ -14,7 +14,6 @@ import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
-import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 
@@ -89,23 +88,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   'lib/images/slot_main_screen/nihai arka plan.png',
                   fit: BoxFit.cover,
                   filterQuality: FilterQuality.high,
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.045,
-                left: screenW * 0.04,
-                right: screenW * 0.04,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                  ]),
-                  builder: (context, _) => TopBar(
-                    username: _viewModel.username,
-                    userBalance: _viewModel.userBalance,
-                    isLoading: _viewModel.isLoading,
-                    onSignOut: _viewModel.signOut,
-                  ),
                 ),
               ),
               Positioned(
@@ -213,7 +195,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.56,
+                top: screenH * 0.55,
                 right: screenW * 0.08,
                 child: ListenableBuilder(
                   listenable: Listenable.merge([

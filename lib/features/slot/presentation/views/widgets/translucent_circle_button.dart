@@ -101,12 +101,13 @@ class _TranslucentCircleButtonState extends State<TranslucentCircleButton>
                   height: s,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.15, -0.25),
-                      radius: 1.0,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                       colors: [
-                        const Color(0xFF5A4A3F).withValues(alpha: op - 0.05),
-                        const Color(0xFF3D2F26).withValues(alpha: op + 0.06),
+                        const Color(0xFF2B211B).withValues(alpha: op - 0.17),
+                        const Color(0xFF120C09).withValues(alpha: op - 0.13),
+                        Colors.black.withValues(alpha: op - 0.29),
                       ],
                     ),
                   ),

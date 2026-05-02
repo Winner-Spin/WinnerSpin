@@ -20,8 +20,8 @@ class DoubleChanceButton extends StatefulWidget {
     required this.isOn,
     required this.disabled,
     required this.onTap,
-    this.width = 200,
-    this.height = 120,
+    this.width = 235,
+    this.height = 112,
   });
 
   @override
@@ -56,7 +56,7 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
   @override
   Widget build(BuildContext context) {
     final disabled = widget.disabled;
-    final radius = widget.height * 0.20;
+    final radius = widget.height * 0.32;
     final w = widget.width;
     final h = widget.height;
 
@@ -239,44 +239,70 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                   Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: w * 0.06,
-                      vertical: h * 0.07,
+                      vertical: h * 0.04,
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _EmbossedText(
-                            text:
-                                'BET ₺${widget.betAmount.toStringAsFixed(2)}',
-                            fontSize: h * 0.18,
-                            strokeWidth: 2.6,
-                            letterSpacing: 0.6,
-                            fillColor: const Color(0xFFFFF1D6),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: w * 0.85,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(top: h * 0.03),
+                                  child: _EmbossedText(
+                                    text: 'BET',
+                                    fontSize: h * 0.16,
+                                    strokeWidth: 2.6,
+                                    letterSpacing: 0.5,
+                                    fillColor: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: h * 0.04),
+                                _EmbossedText(
+                                  text:
+                                      '₺${widget.betAmount.toStringAsFixed(2)}',
+                                  fontSize: h * 0.20,
+                                  strokeWidth: 2.6,
+                                  letterSpacing: 0.5,
+                                  fillColor: const Color(0xFFFFC93C),
+                                ),
+                              ],
+                            ),
                           ),
-                          SizedBox(height: h * 0.04),
-                          _EmbossedText(
-                            text: 'DOUBLE CHANCE',
-                            fontSize: h * 0.13,
-                            strokeWidth: 2.3,
-                            letterSpacing: 0.6,
-                            fillColor: Colors.white,
-                          ),
-                          _EmbossedText(
-                            text: 'TO WIN FEATURE',
-                            fontSize: h * 0.13,
-                            strokeWidth: 2.3,
-                            letterSpacing: 0.6,
-                            fillColor: Colors.white,
-                          ),
-                          SizedBox(height: h * 0.04),
-                          _OnOffCapsule(
-                            isOn: widget.isOn,
-                            height: h * 0.21,
-                          ),
-                        ],
-                      ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _EmbossedText(
+                              text: 'DOUBLE CHANCE',
+                              fontSize: h * 0.13,
+                              strokeWidth: 2.3,
+                              letterSpacing: 0.6,
+                              fillColor: Colors.white,
+                            ),
+                            _EmbossedText(
+                              text: 'TO WIN FEATURE',
+                              fontSize: h * 0.13,
+                              strokeWidth: 2.3,
+                              letterSpacing: 0.6,
+                              fillColor: Colors.white,
+                            ),
+                            SizedBox(height: h * 0.04),
+                            _OnOffCapsule(
+                              isOn: widget.isOn,
+                              height: h * 0.31,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -289,9 +315,9 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
   }
 }
 
-/// Frosted-glass capsule (BackdropFilter blur over the green panel) with a
-/// green knob that slides between the two ends. ON: knob on the left,
-/// "ON" text on the right. OFF: knob on the right, "OFF" text on the left.
+/// Frosted-glass capsule with a slightly pill-shaped green knob that
+/// slides between left (OFF) and right (ON), with the label sitting on
+/// the opposite side. Knob sits flush against the capsule edge.
 class _OnOffCapsule extends StatelessWidget {
   final bool isOn;
   final double height;
@@ -300,9 +326,10 @@ class _OnOffCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final w = height * 3.6;
-    final knobSize = height * 0.86;
-    final pad = height * 0.07;
+    final w = height * 2.7;
+    final knobH = height * 0.92;
+    final knobW = height * 1.05;
+    final pad = height * 0.02;
     const animDuration = Duration(milliseconds: 220);
     const animCurve = Curves.easeInOut;
 
@@ -322,19 +349,16 @@ class _OnOffCapsule extends StatelessWidget {
             ),
           ),
           child: Stack(
+            alignment: Alignment.center,
             children: [
-              // Label sits on the side opposite the knob so it's never
-              // overlapped while the knob slides.
-              AnimatedAlign(
+              AnimatedPositioned(
                 duration: animDuration,
                 curve: animCurve,
-                alignment: isOn
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: knobSize * 0.5 + pad * 2,
-                  ),
+                left: isOn ? 0 : knobW,
+                right: isOn ? knobW : 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
                   child: AnimatedSwitcher(
                     duration: animDuration,
                     child: Text(
@@ -363,31 +387,41 @@ class _OnOffCapsule extends StatelessWidget {
                 duration: animDuration,
                 curve: animCurve,
                 alignment: isOn
-                    ? Alignment.centerLeft
-                    : Alignment.centerRight,
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: pad),
                   child: Container(
-                    width: knobSize,
-                    height: knobSize,
+                    width: knobW,
+                    height: knobH,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(knobH / 2),
                       gradient: const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0xFF6FE35A), Color(0xFF2FA73C)],
+                        colors: [
+                          Color(0xFF89E875),
+                          Color(0xFF3DB836),
+                          Color(0xFF166D24),
+                        ],
+                        stops: [0.0, 0.55, 1.0],
                       ),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.30),
-                        width: 1,
+                        color: const Color(0xFF0E5320),
+                        width: 1.2,
                       ),
                     ),
-                    child: Icon(
-                      isOn
-                          ? Icons.arrow_forward_rounded
-                          : Icons.arrow_back_rounded,
-                      color: Colors.white,
-                      size: knobSize * 0.62,
+                    child: Center(
+                      child: SizedBox(
+                        width: knobH * 0.55,
+                        height: knobH * 0.55,
+                        child: CustomPaint(
+                          painter: _SolidArrowPainter(
+                            color: Colors.white,
+                            reversed: isOn,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -463,4 +497,57 @@ class _EmbossedText extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Chunky filled right-pointing arrow — shaft (rectangle body) plus a
+/// triangular arrowhead, drawn as a single closed path. Set [reversed]
+/// to flip horizontally for a left-pointing arrow.
+class _SolidArrowPainter extends CustomPainter {
+  final Color color;
+  final bool reversed;
+
+  const _SolidArrowPainter({
+    required this.color,
+    this.reversed = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final cy = h / 2;
+
+    final shaftEnd = w * 0.55;
+    final shaftHalf = h * 0.18;
+    final headHalf = h * 0.45;
+
+    final path = Path()
+      ..moveTo(0, cy - shaftHalf)
+      ..lineTo(shaftEnd, cy - shaftHalf)
+      ..lineTo(shaftEnd, cy - headHalf)
+      ..lineTo(w, cy)
+      ..lineTo(shaftEnd, cy + headHalf)
+      ..lineTo(shaftEnd, cy + shaftHalf)
+      ..lineTo(0, cy + shaftHalf)
+      ..close();
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    if (reversed) {
+      canvas.save();
+      canvas.translate(w, 0);
+      canvas.scale(-1, 1);
+      canvas.drawPath(path, paint);
+      canvas.restore();
+    } else {
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SolidArrowPainter old) =>
+      old.color != color || old.reversed != reversed;
 }
