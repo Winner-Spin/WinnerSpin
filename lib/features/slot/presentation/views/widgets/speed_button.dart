@@ -1,85 +1,145 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// Small pill that toggles the spin speed multiplier (1× → 2× → 3× → 1×).
-/// Shows the current multiplier and a chevron count that mirrors the level.
-class SpeedButton extends StatelessWidget {
-  final int multiplier;
-  final VoidCallback onTap;
+class SpeedButton extends StatefulWidget {
+  final int level;
+  final VoidCallback? onTap;
+  final double width;
+  final double height;
 
   const SpeedButton({
     super.key,
-    required this.multiplier,
-    required this.onTap,
+    required this.level,
+    this.onTap,
+    this.width = 46,
+    this.height = 28,
   });
 
+  @override
+  State<SpeedButton> createState() => _SpeedButtonState();
+}
+
+class _SpeedButtonState extends State<SpeedButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) {
+      setState(() => _pressed = value);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final radius = widget.height / 2;
+
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFA1887F), // Light brown highlight
-              Color(0xFF795548), // Main brown
-              Color(0xFF4E342E), // Dark brown
-            ],
-            stops: [0.0, 0.4, 1.0],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFD7CCC8).withValues(alpha: 0.6), // Inner reflection
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF795548).withValues(alpha: 0.5),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-            const BoxShadow(
-              color: Color(0xFF3E2723), // Outer darker rim shadow
-              blurRadius: 0,
-              spreadRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.fast_forward_rounded,
-              color: const Color(0xFFFFE082), // Amber
-              size: multiplier == 1 ? 16 : (multiplier == 2 ? 18 : 20),
-              shadows: const [
-                Shadow(color: Color(0xFF3E2723), offset: Offset(0, 1), blurRadius: 1),
-              ],
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '${multiplier}x',
-              style: GoogleFonts.outfit(
-                color: const Color(0xFFFFF8E1), // Creamy yellow
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-                shadows: const [
-                  Shadow(color: Color(0xFF3E2723), offset: Offset(0, 1.5), blurRadius: 1),
-                  Shadow(color: Color(0xFF3E2723), offset: Offset(0, -1), blurRadius: 1),
-                  Shadow(color: Color(0xFF3E2723), offset: Offset(1, 0), blurRadius: 1),
-                  Shadow(color: Color(0xFF3E2723), offset: Offset(-1, 0), blurRadius: 1),
-                ],
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: RepaintBoundary(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
+              child: Container(
+                width: widget.width,
+                height: widget.height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF2B211B).withValues(alpha: 0.58),
+                      const Color(0xFF120C09).withValues(alpha: 0.62),
+                      Colors.black.withValues(alpha: 0.46),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: CustomPaint(
+                    size: const Size(24, 13),
+                    painter: SpeedIconPainter(level: widget.level),
+                  ),
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class SpeedIconPainter extends CustomPainter {
+  final int level;
+
+  const SpeedIconPainter({required this.level});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final activeColor = Colors.white.withValues(alpha: 0.92);
+    final inactiveColor = Colors.white.withValues(alpha: 0.45);
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.30)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.45
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    void drawChevron(double x, int chevIndex) {
+      const double topY = 2.5;
+      const double centerY = 6.5;
+      const double bottomY = 10.5;
+
+      final Offset topStart = Offset(x, topY);
+      final Offset tip = Offset(x + 4.7, centerY);
+      final Offset bottomStart = Offset(x, bottomY);
+
+      final paint = Paint()
+        ..color = chevIndex <= level ? activeColor : inactiveColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.35
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..isAntiAlias = true;
+
+      canvas.save();
+      canvas.translate(0.45, 0.55);
+      canvas.drawLine(topStart, tip, shadowPaint);
+      canvas.drawLine(bottomStart, tip, shadowPaint);
+      canvas.restore();
+
+      canvas.drawLine(topStart, tip, paint);
+      canvas.drawLine(bottomStart, tip, paint);
+    }
+
+    drawChevron(2.5, 1);
+    drawChevron(8.5, 2);
+    drawChevron(14.5, 3);
+  }
+
+  @override
+  bool shouldRepaint(covariant SpeedIconPainter oldDelegate) {
+    return oldDelegate.level != level;
   }
 }

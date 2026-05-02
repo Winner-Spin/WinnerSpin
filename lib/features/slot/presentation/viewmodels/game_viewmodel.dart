@@ -96,6 +96,7 @@ class GameViewModel extends ChangeNotifier {
   double get betAmount => _balanceCtrl.betAmount;
   double get lastWin => _balanceCtrl.lastWin;
   double get effectiveBetCost => _balanceCtrl.effectiveBetCost;
+  double get anteCost => _balanceCtrl.anteCost;
   double get buyFeaturePrice => _balanceCtrl.buyFeaturePrice;
 
   // ── Ante (delegated to AnteController) ──

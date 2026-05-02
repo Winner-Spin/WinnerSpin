@@ -15,7 +15,7 @@ class RespinButton extends StatefulWidget {
     this.size = 92,
     this.onTap,
     this.iconColor,
-    this.opacity = 0.5,
+    this.opacity = 0.75,
   });
 
   @override

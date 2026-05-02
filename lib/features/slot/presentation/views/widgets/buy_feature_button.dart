@@ -292,20 +292,26 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _EmbossedText(
-                                text: widget.title,
-                                fontSize: h * 0.21,
-                                strokeWidth: 3.5,
-                                letterSpacing: 1.4,
-                                fillColor: const Color(0xFFFFF1D6),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: _EmbossedText(
+                                  text: widget.title,
+                                  fontSize: h * 0.20,
+                                  strokeWidth: 2.8,
+                                  letterSpacing: 0.8,
+                                  fillColor: const Color(0xFFFFF1D6),
+                                ),
                               ),
-                              SizedBox(height: h * 0.04),
-                              _EmbossedText(
-                                text: widget._formattedPrice,
-                                fontSize: h * 0.34,
-                                strokeWidth: 4.2,
-                                letterSpacing: 0.8,
-                                fillColor: const Color(0xFFFFEBC8),
+                              SizedBox(height: h * 0.03),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: _EmbossedText(
+                                  text: widget._formattedPrice,
+                                  fontSize: h * 0.30,
+                                  strokeWidth: 4.2,
+                                  letterSpacing: 0.8,
+                                  fillColor: const Color(0xFFFFEBC8),
+                                ),
                               ),
                             ],
                           ),

@@ -28,6 +28,10 @@ class BalanceController extends ChangeNotifier {
   double get effectiveBetCost =>
       _anteBetActive ? _betAmount * 1.25 : _betAmount;
 
+  /// What the per-spin cost would be with ante enabled — used by the
+  /// AnteToggle to preview the cost regardless of the current toggle state.
+  double get anteCost => _betAmount * 1.25;
+
   /// Buy Free Spins price in TL at the current bet level.
   double get buyFeaturePrice =>
       _betAmount * SlotEngine.buyFeaturePriceMultiplier;

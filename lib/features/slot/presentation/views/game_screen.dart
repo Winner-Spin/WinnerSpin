@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../viewmodels/game_viewmodel.dart';
-import 'widgets/ante_toggle.dart';
-import 'widgets/auto_spin_button.dart';
-import 'widgets/bet_controls.dart';
 import 'widgets/buy_feature_button.dart';
+import 'widgets/double_chance_button.dart';
 import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
-import 'widgets/speed_button.dart';
-import 'widgets/spin_button.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
 import 'widgets/plus_button.dart';
+import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/win_banner.dart';
@@ -154,8 +151,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   listenable: Listenable.merge([
                     _viewModel,
                     _viewModel.balanceCtrl,
-                    _viewModel.anteCtrl,
-                    _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) => _buildBottomPanel(screenW),
                 ),
@@ -195,17 +190,82 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   },
                 ),
               ),
-              Positioned.fill(
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      MinusButton(size: 60, onTap: () {}),
-                      const SizedBox(width: 12),
-                      RespinButton(size: 92, onTap: () {}),
-                      const SizedBox(width: 12),
-                      PlusButton(size: 60, onTap: () {}),
-                    ],
+              Positioned(
+                top: screenH * 0.55,
+                left: screenW * 0.08,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.balanceCtrl,
+                  ]),
+                  builder: (context, _) => RepaintBoundary(
+                    child: BuyFeatureButton(
+                      price: _viewModel.buyFeaturePrice,
+                      disabled: _viewModel.isBusy,
+                      onTap: _viewModel.buyFreeSpins,
+                      width: screenW * 0.39,
+                      height: screenW * 0.22,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: screenH * 0.56,
+                right: screenW * 0.08,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.anteCtrl,
+                    _viewModel.balanceCtrl,
+                  ]),
+                  builder: (context, _) => RepaintBoundary(
+                    child: DoubleChanceButton(
+                      betAmount: _viewModel.anteCost,
+                      isOn: _viewModel.anteBetActive,
+                      disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+                      onTap: _viewModel.toggleAnteBet,
+                      width: screenW * 0.39,
+                      height: screenW * 0.22,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: screenH * 0.72,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    RepaintBoundary(
+                      child: MinusButton(
+                        size: 42,
+                        onTap: _viewModel.decreaseBet,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    RepaintBoundary(
+                      child: RespinButton(size: 84, onTap: _viewModel.spin),
+                    ),
+                    const SizedBox(width: 16),
+                    RepaintBoundary(
+                      child: PlusButton(
+                        size: 42,
+                        onTap: _viewModel.increaseBet,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: screenH * 0.86,
+                left: screenW * 0.30,
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, _) => SpeedButton(
+                    level: _viewModel.speedMultiplier,
+                    onTap: _viewModel.toggleSpeed,
                   ),
                 ),
               ),
@@ -264,76 +324,27 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBottomPanel(double screenW) {
-    // Each control gets its own RepaintBoundary so a press-scale on one
-    // button (or a notify-driven rebuild) doesn't re-rasterize neighbour
-    // buttons' shadow blur + gradients.
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            RepaintBoundary(
-              child: SpeedButton(
-                multiplier: _viewModel.speedMultiplier,
-                onTap: _viewModel.toggleSpeed,
+        Text(
+          'BET ₺${_viewModel.betAmount.toStringAsFixed(2)}',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.6),
+                offset: const Offset(0, 2),
+                blurRadius: 4,
               ),
-            ),
-            const SizedBox(width: 10),
-            RepaintBoundary(
-              child: AnteToggle(
-                active: _viewModel.anteBetActive,
-                disabled:
-                    _viewModel.isBusy ||
-                    _viewModel.isInFreeSpins ||
-                    _viewModel.isAutoSpinning,
-                onTap: _viewModel.toggleAnteBet,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        RepaintBoundary(
-          child: BetControls(
-            betAmount: _viewModel.betAmount,
-            onIncrease: _viewModel.increaseBet,
-            onDecrease: _viewModel.decreaseBet,
+            ],
           ),
         ),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            RepaintBoundary(
-              child: AutoSpinButton(
-                isActive: _viewModel.isAutoSpinning,
-                disabled: !_viewModel.isAutoSpinning && _viewModel.isBusy,
-                onPressed: _viewModel.toggleAutoSpin,
-              ),
-            ),
-            const SizedBox(width: 6),
-            RepaintBoundary(
-              child: SpinButton(
-                busy: _viewModel.isBusy || _viewModel.isAutoSpinning,
-                affordable: _viewModel.balance >= _viewModel.betAmount,
-                width: screenW * 0.32,
-                onPressed: _viewModel.spin,
-              ),
-            ),
-            const SizedBox(width: 6),
-            RepaintBoundary(
-              child: BuyFeatureButton(
-                price: _viewModel.buyFeaturePrice,
-                disabled: _viewModel.isBusy || _viewModel.isAutoSpinning,
-                onTap: _viewModel.buyFreeSpins,
-                width: screenW * 0.34,
-                height: screenW * 0.17,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_viewModel.lastWin > 0)
+        if (_viewModel.lastWin > 0) ...[
+          const SizedBox(height: 4),
           Text(
             'Son Kazanç: ₺${_viewModel.lastWin.toStringAsFixed(0)}',
             style: GoogleFonts.outfit(
@@ -349,6 +360,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
+        ],
       ],
     );
   }

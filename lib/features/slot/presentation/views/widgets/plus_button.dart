@@ -13,13 +13,13 @@ class PlusButton extends StatelessWidget {
     this.size = 60,
     this.onTap,
     this.iconColor,
-    this.opacity = 0.5,
+    this.opacity = 0.75,
   });
 
   @override
   Widget build(BuildContext context) {
     final iconClr = iconColor ?? const Color(0xFFFAF6EE);
-    final iconSize = size * 0.74;
+    final iconSize = size * 0.70;
     return TranslucentCircleButton(
       size: size,
       onTap: onTap,
