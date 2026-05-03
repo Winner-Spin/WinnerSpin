@@ -16,7 +16,6 @@ import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
-import 'widgets/win_banner.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -147,22 +146,38 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.55,
-                left: screenW * 0.15,
-                right: screenW * 0.15,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                  ]),
-                  builder: (context, _) {
-                    if (_viewModel.lastWin > 0 && !_viewModel.isSpinning) {
-                      return RepaintBoundary(
-                        child: WinBanner(winAmount: _viewModel.lastWin),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
+                top: screenH * 0.5185,
+                left: 0,
+                right: 0,
+                height: 31,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.58),
+                              Colors.black.withValues(alpha: 0.58),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.22, 0.78, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    ListenableBuilder(
+                      listenable: Listenable.merge([
+                        _viewModel,
+                        _viewModel.balanceCtrl,
+                      ]),
+                      builder: (context, _) => _buildStatusText(),
+                    ),
+                  ],
                 ),
               ),
               Positioned(
@@ -341,6 +356,54 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildStatusText() {
+    final baseStyle = GoogleFonts.anton(
+      color: Colors.white.withValues(alpha: 0.97),
+      fontSize: 20,
+      letterSpacing: 0.8,
+      height: 1.0,
+      shadows: [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.70),
+          offset: const Offset(0, 1),
+          blurRadius: 1.6,
+        ),
+      ],
+    );
+
+    final lastWin = _viewModel.lastWin;
+    final isBusy = _viewModel.isBusy;
+
+    if (lastWin > 0 && !isBusy) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            'KAZANÇ',
+            style: baseStyle.copyWith(color: const Color(0xFFFFD13B)),
+          ),
+          const SizedBox(width: 6),
+          TweenAnimationBuilder<double>(
+            key: ValueKey<double>(lastWin),
+            tween: Tween<double>(begin: 0, end: lastWin),
+            duration: const Duration(seconds: 1),
+            curve: Curves.easeOut,
+            builder: (context, value, _) =>
+                Text('₺${value.toStringAsFixed(2)}', style: baseStyle),
+          ),
+        ],
+      );
+    }
+
+    if (isBusy) {
+      return Text('GOOD LUCK!', style: baseStyle);
+    }
+
+    return Text('PLACE YOUR BETS!', style: baseStyle);
+  }
+
   Widget _buildBottomPanel(double screenW) {
     final softShadow = [
       Shadow(
@@ -352,7 +415,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     final labelStyle = GoogleFonts.barlowCondensed(
       color: const Color(0xFFFFD13B),
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: FontWeight.w800,
       letterSpacing: 0.4,
       height: 1.0,
@@ -361,7 +424,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     final valueStyle = GoogleFonts.barlowCondensed(
       color: Colors.white.withValues(alpha: 0.98),
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: FontWeight.w800,
       letterSpacing: 0.1,
       height: 1.0,

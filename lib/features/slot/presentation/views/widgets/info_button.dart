@@ -45,6 +45,7 @@ class _InfoButtonState extends State<InfoButton> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
+        alignment: Alignment.centerLeft,
         duration: const Duration(milliseconds: 90),
         curve: Curves.easeOut,
         child: RepaintBoundary(

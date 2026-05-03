@@ -46,6 +46,7 @@ class _SettingsButtonState extends State<SettingsButton> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
+        alignment: Alignment.centerRight,
         duration: const Duration(milliseconds: 90),
         curve: Curves.easeOut,
         child: RepaintBoundary(
