@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -129,18 +131,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                bottom: screenH * 0.02,
-                left: screenW * 0.04,
-                right: screenW * 0.04,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                  ]),
-                  builder: (context, _) => _buildBottomPanel(screenW),
-                ),
-              ),
-              Positioned(
                 top: screenH * 0.15,
                 left: screenW * 0.1,
                 right: screenW * 0.1,
@@ -244,28 +234,56 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.93,
+                top: screenH * 0.90,
                 left: 0,
                 child: const InfoButton(),
               ),
               Positioned(
-                top: screenH * 0.93,
+                top: screenH * 0.90,
                 right: 0,
                 child: const SettingsButton(),
               ),
               Positioned(
-                top: screenH * 0.93,
+                top: screenH * 0.90,
                 left: screenW * 0.30,
                 child: const AutoSpinButton(),
               ),
               Positioned(
-                top: screenH * 0.93,
+                top: screenH * 0.90,
                 left: screenW * 0.5 + 42,
                 child: ListenableBuilder(
                   listenable: _viewModel,
                   builder: (context, _) => SpeedButton(
                     level: _viewModel.speedMultiplier,
                     onTap: _viewModel.toggleSpeed,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 12,
+                left: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.45),
+                        Colors.black.withValues(alpha: 0.45),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.22, 0.78, 1.0],
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([
+                      _viewModel,
+                      _viewModel.balanceCtrl,
+                    ]),
+                    builder: (context, _) => _buildBottomPanel(screenW),
                   ),
                 ),
               ),
@@ -324,44 +342,98 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBottomPanel(double screenW) {
+    final softShadow = [
+      Shadow(
+        color: Colors.black.withValues(alpha: 0.60),
+        offset: const Offset(0, 1),
+        blurRadius: 1.2,
+      ),
+    ];
+
+    final labelStyle = GoogleFonts.barlowCondensed(
+      color: const Color(0xFFFFD13B),
+      fontSize: 16,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.4,
+      height: 1.0,
+      shadows: softShadow,
+    );
+
+    final valueStyle = GoogleFonts.barlowCondensed(
+      color: Colors.white.withValues(alpha: 0.98),
+      fontSize: 16,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.1,
+      height: 1.0,
+      shadows: softShadow,
+    );
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'BET ₺${_viewModel.betAmount.toStringAsFixed(2)}',
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-            shadows: [
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.6),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('CREDIT', style: labelStyle),
+              const SizedBox(width: 4),
+              Text(
+                '₺${_viewModel.balance.toStringAsFixed(2)}',
+                style: valueStyle,
+              ),
+              const SizedBox(width: 16),
+              Text('BET', style: labelStyle),
+              const SizedBox(width: 4),
+              Text(
+                '₺${_viewModel.betAmount.toStringAsFixed(2)}',
+                style: valueStyle,
               ),
             ],
           ),
         ),
-        if (_viewModel.lastWin > 0) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Son Kazanç: ₺${_viewModel.lastWin.toStringAsFixed(0)}',
-            style: GoogleFonts.outfit(
-              color: Colors.amber.shade300,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  offset: const Offset(0, 1),
-                  blurRadius: 4,
-                ),
-              ],
-            ),
+        const SizedBox(height: 1),
+        _ClockText(
+          style: GoogleFonts.barlowCondensed(
+            color: Colors.white.withValues(alpha: 0.62),
+            fontSize: 9.2,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.3,
+            height: 1.0,
           ),
-        ],
+        ),
       ],
+    );
+  }
+}
+
+class _ClockText extends StatelessWidget {
+  final TextStyle style;
+
+  const _ClockText({required this.style});
+
+  static final Stream<DateTime> _ticker = Stream<DateTime>.periodic(
+    const Duration(seconds: 10),
+    (_) => DateTime.now().toUtc().add(const Duration(hours: 3)),
+  ).asBroadcastStream();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DateTime>(
+      stream: _ticker,
+      initialData: DateTime.now().toUtc().add(const Duration(hours: 3)),
+      builder: (context, snapshot) {
+        final now = snapshot.data!;
+        final timeString =
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        return Text(
+          'WINNER SPIN · $timeString',
+          textAlign: TextAlign.center,
+          style: style,
+        );
+      },
     );
   }
 }
