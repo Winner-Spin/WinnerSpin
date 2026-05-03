@@ -83,7 +83,10 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
       ignoring: isDisabled,
       child: Opacity(
         opacity: isDisabled ? 0.55 : 1.0,
-        child: GestureDetector(
+        // Cache the gradient stack so the disabled-state saveLayer
+        // reads the raster instead of re-rasterising it.
+        child: RepaintBoundary(
+          child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (_) => _pressCtrl.forward(),
           onTapUp: (_) {
@@ -330,6 +333,7 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
               },
             ),
           ),
+        ),
         ),
       ),
     );

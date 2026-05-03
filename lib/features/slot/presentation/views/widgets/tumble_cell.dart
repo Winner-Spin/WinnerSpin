@@ -40,6 +40,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final AnimationController _glowController;
   late final AnimationController _burstController;
   late final Animation<double> _fadeAnimation;
+  late final Animation<double> _imageOpacity;
   late final Animation<double> _dropAnimation;
   late final Animation<double> _glowIntensity;
   late final Animation<double> _scalePulse;
@@ -75,6 +76,12 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       parent: _fadeController,
       curve: const Interval(0.5, 1.0, curve: Curves.easeIn),
     );
+    // Drive the fade via Image.opacity so it goes through the image
+    // shader's alpha channel — no per-cell saveLayer during a cascade.
+    _imageOpacity = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(_fadeAnimation);
     _glowIntensity = CurvedAnimation(
       parent: _fadeController,
       curve: const _GlowCurve(),
@@ -162,20 +169,20 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        _fadeAnimation,
-        _dropAnimation,
-        _glowIntensity,
-        _scalePulse,
-        _glowController,
-        _burstController,
-      ]),
-      builder: (context, child) {
-        final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
-        final opacity = (1.0 - _fadeAnimation.value).clamp(0.0, 1.0);
-        final glow = _glowIntensity.value;
-        final scale = 1.0 + _scalePulse.value * 0.15;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          _fadeController,
+          _dropAnimation,
+          _glowIntensity,
+          _scalePulse,
+          _glowController,
+          _burstController,
+        ]),
+        builder: (context, child) {
+          final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
+          final glow = _glowIntensity.value;
+          final scale = 1.0 + _scalePulse.value * 0.15;
         // Particles run in the second half (after the impact peak), in sync
         // with the symbol fade-out so the burst trails the celebration.
         final particleProgress = ((_fadeController.value - 0.4) / 0.6).clamp(
@@ -214,22 +221,21 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              Opacity(
-                opacity: opacity,
-                child: Transform.scale(scale: scale, child: child),
-              ),
+              Transform.scale(scale: scale, child: child),
             ],
           ),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.all(2),
-        child: Image.asset(
-          widget.path,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.low,
-          gaplessPlayback: true,
-          cacheWidth: 256,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Image.asset(
+            widget.path,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.low,
+            gaplessPlayback: true,
+            cacheWidth: 256,
+            opacity: _imageOpacity,
+          ),
         ),
       ),
     );

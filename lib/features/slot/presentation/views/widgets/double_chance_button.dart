@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -76,7 +74,10 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
         scale: _scale,
         child: Opacity(
           opacity: disabled ? 0.55 : 1.0,
-          child: Container(
+          // Cache the multi-layer button raster so the press scale and
+          // toggle slide don't re-paint every gradient on each frame.
+          child: RepaintBoundary(
+            child: Container(
             width: w,
             height: h,
             decoration: BoxDecoration(
@@ -313,6 +314,7 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
               ),
             ),
           ),
+          ),
         ),
       ),
     );
@@ -337,21 +339,31 @@ class _OnOffCapsule extends StatelessWidget {
     const animDuration = Duration(milliseconds: 220);
     const animCurve = Curves.easeInOut;
 
-    return ClipRRect(
+    // RepaintBoundary so the toggle slide stays in its own layer and
+    // doesn't pull the parent button's gradient tree into its repaint.
+    return RepaintBoundary(
+      child: ClipRRect(
       borderRadius: BorderRadius.circular(height / 2),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-        child: Container(
-          width: w,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(height / 2),
-            color: Colors.black.withValues(alpha: 0.18),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.30),
-              width: 1.2,
-            ),
+      // Static gradient instead of a live blur — the blur re-sampled
+      // the parent every frame while the capsule slid.
+      child: Container(
+        width: w,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(height / 2),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.32),
+              Colors.black.withValues(alpha: 0.22),
+            ],
           ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.30),
+            width: 1.2,
+          ),
+        ),
           child: Stack(
             alignment: Alignment.center,
             children: [

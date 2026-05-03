@@ -361,33 +361,37 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         child: Row(
           children: List.generate(GameViewModel.columns, (col) {
             return Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: col < GameViewModel.columns - 1
-                      ? Border(
-                          right: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            width: 1,
-                          ),
-                        )
-                      : null,
-                ),
-                child: SlotReel(
-                  columnIndex: col,
-                  previousItems: List.generate(
-                    GameViewModel.rows,
-                    (row) => _viewModel.previousGrid[col][row],
+              // Per-column RepaintBoundary so a reel's drop animation
+              // doesn't invalidate sibling columns or the grid frame.
+              child: RepaintBoundary(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: col < GameViewModel.columns - 1
+                        ? Border(
+                            right: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              width: 1,
+                            ),
+                          )
+                        : null,
                   ),
-                  targetItems: List.generate(
-                    GameViewModel.rows,
-                    (row) => _viewModel.grid[col][row],
+                  child: SlotReel(
+                    columnIndex: col,
+                    previousItems: List.generate(
+                      GameViewModel.rows,
+                      (row) => _viewModel.previousGrid[col][row],
+                    ),
+                    targetItems: List.generate(
+                      GameViewModel.rows,
+                      (row) => _viewModel.grid[col][row],
+                    ),
+                    spinning: _viewModel.isSpinning,
+                    fadingPaths: _viewModel.fadingPaths,
+                    speedMultiplier: _viewModel.speedMultiplier,
+                    onComplete: col == GameViewModel.columns - 1
+                        ? () => _viewModel.onSpinComplete()
+                        : null,
                   ),
-                  spinning: _viewModel.isSpinning,
-                  fadingPaths: _viewModel.fadingPaths,
-                  speedMultiplier: _viewModel.speedMultiplier,
-                  onComplete: col == GameViewModel.columns - 1
-                      ? () => _viewModel.onSpinComplete()
-                      : null,
                 ),
               ),
             );
