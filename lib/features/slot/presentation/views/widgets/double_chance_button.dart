@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/format/money_format.dart';
+
 /// Glossy candy-style "DOUBLE CHANCE" button. Same multi-layer construction
 /// as [BuyFeatureButton] but in a green-and-gold palette and with an
 /// ON/OFF capsule replacing the price line.
@@ -245,35 +247,37 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        SizedBox(
-                          width: w * 0.85,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.only(top: h * 0.03),
-                                  child: _EmbossedText(
-                                    text: 'BET',
-                                    fontSize: h * 0.16,
-                                    strokeWidth: 2.6,
-                                    letterSpacing: 0.5,
-                                    fillColor: Colors.white,
+                        Padding(
+                          padding: EdgeInsets.only(top: h * 0.04),
+                          child: SizedBox(
+                            width: w * 0.85,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.only(top: h * 0.03),
+                                    child: _EmbossedText(
+                                      text: 'BET',
+                                      fontSize: h * 0.16,
+                                      strokeWidth: 2.6,
+                                      letterSpacing: 0.5,
+                                      fillColor: Colors.white,
+                                    ),
                                   ),
-                                ),
                                 SizedBox(width: h * 0.04),
                                 _EmbossedText(
-                                  text:
-                                      '₺${widget.betAmount.toStringAsFixed(2)}',
+                                  text: '₺${formatMoney(widget.betAmount)}',
                                   fontSize: h * 0.20,
                                   strokeWidth: 2.6,
                                   letterSpacing: 0.5,
                                   fillColor: const Color(0xFFFFC93C),
                                 ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),

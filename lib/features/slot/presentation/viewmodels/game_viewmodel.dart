@@ -89,6 +89,10 @@ class GameViewModel extends ChangeNotifier {
   int _speedMultiplier = 1;
   int get speedMultiplier => _speedMultiplier;
 
+  bool _showInsufficientFundsHint = false;
+  bool get showInsufficientFundsHint => _showInsufficientFundsHint;
+  Timer? _insufficientHintTimer;
+
   // ── Balance & bet (delegated to BalanceController) ──
 
   double get balance => _balanceCtrl.balance;
@@ -98,6 +102,8 @@ class GameViewModel extends ChangeNotifier {
   double get effectiveBetCost => _balanceCtrl.effectiveBetCost;
   double get anteCost => _balanceCtrl.anteCost;
   double get buyFeaturePrice => _balanceCtrl.buyFeaturePrice;
+  bool get canDecreaseBet => _balanceCtrl.canDecreaseBet;
+  bool get canIncreaseBet => _balanceCtrl.canIncreaseBet;
 
   // ── Ante (delegated to AnteController) ──
 
@@ -116,6 +122,28 @@ class GameViewModel extends ChangeNotifier {
       _balanceCtrl.canAfford(buyFeaturePrice) &&
       SlotEngine.canAffordBuyFs(_pool, betAmount);
 
+  /// User-facing buy availability. Mirrors the displayed credit (not
+  /// the canonical balance) so the button doesn't go grey while the
+  /// player still sees enough credit to cover the buy. Skips the
+  /// engine pool guard for the same reason — the actual buyFreeSpins()
+  /// call still re-runs the full canBuyFreeSpins check before charging.
+  bool get canBuyFreeSpinsForUi =>
+      !isBusy &&
+      !_isAutoSpinning &&
+      !isInFreeSpins &&
+      _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
+
+  /// User-facing spin availability. Same rationale as
+  /// [canBuyFreeSpinsForUi] — uses the displayed balance.
+  bool get canSpinForUi =>
+      isInFreeSpins ||
+      _balanceCtrl.canAffordDisplayed(effectiveBetCost);
+
+  /// True when the spin CTA can fire — free spins always allow it
+  /// (cost-free), otherwise the player must cover the per-spin cost.
+  bool get canSpin =>
+      isInFreeSpins || _balanceCtrl.canAfford(effectiveBetCost);
+
   // ── Pool + pending result ──
 
   PoolState _pool = PoolState();
@@ -128,6 +156,20 @@ class GameViewModel extends ChangeNotifier {
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   // ── User actions ──
+
+  /// Flashes a transient "deposit funds" hint in the status bar for a
+  /// couple of seconds. Used when the player taps spin without enough
+  /// credit — the spin button stays visually enabled so the tap can
+  /// surface this guidance instead of silently no-op'ing.
+  void _flashInsufficientFundsHint() {
+    _showInsufficientFundsHint = true;
+    notifyListeners();
+    _insufficientHintTimer?.cancel();
+    _insufficientHintTimer = Timer(const Duration(seconds: 2), () {
+      _showInsufficientFundsHint = false;
+      notifyListeners();
+    });
+  }
 
   void toggleAutoSpin() {
     if (_isAutoSpinning) {
@@ -227,8 +269,8 @@ class GameViewModel extends ChangeNotifier {
       if (!_balanceCtrl.canAfford(cost)) {
         if (_isAutoSpinning) {
           _isAutoSpinning = false;
-          notifyListeners();
         }
+        _flashInsufficientFundsHint();
         return;
       }
       _balanceCtrl.charge(cost);
@@ -413,6 +455,7 @@ class GameViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _userSubscription?.cancel();
+    _insufficientHintTimer?.cancel();
     _balanceCtrl.dispose();
     _anteCtrl.dispose();
     _fsCtrl.dispose();

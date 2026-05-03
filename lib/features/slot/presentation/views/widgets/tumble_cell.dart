@@ -223,7 +223,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         );
       },
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(2),
         child: Image.asset(
           widget.path,
           fit: BoxFit.contain,

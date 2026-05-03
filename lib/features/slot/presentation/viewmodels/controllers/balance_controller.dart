@@ -5,8 +5,10 @@ import '../../../domain/engine/slot_engine.dart';
 /// Holds balance + bet state. Each mutator notifies listeners after the
 /// write; setters short-circuit when the value is unchanged.
 class BalanceController extends ChangeNotifier {
-  static const double _minBet = 10.0;
-  static const double _maxBet = 5000.0;
+  static const List<double> _betTiers = [
+    10, 20, 30, 40, 50, 75, 100, 200, 500, 750,
+    1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000,
+  ];
   static const double _defaultBalance = 10000.0;
 
   double _balance = _defaultBalance;
@@ -23,6 +25,9 @@ class BalanceController extends ChangeNotifier {
 
   double get betAmount => _betAmount;
   double get lastWin => _lastWin;
+
+  bool get canDecreaseBet => _betAmount > _betTiers.first;
+  bool get canIncreaseBet => _betAmount < _betTiers.last;
 
   /// Per-base-spin cost: 1.25× when ante is active, 1.0× otherwise.
   double get effectiveBetCost =>
@@ -47,16 +52,23 @@ class BalanceController extends ChangeNotifier {
   }
 
   /// Hydrates from a Firestore user document, falling back to defaults.
+  /// Both balances seed from `userBalance` — the legacy `balance` field is
+  /// frozen at signup and would otherwise leave the displayed credit
+  /// stale on app restart.
   void hydrate(Map<String, dynamic> userData) {
-    _balance = (userData['balance'] ?? _defaultBalance).toDouble();
-    _userBalance = (userData['userBalance'] ?? _defaultBalance).toDouble();
+    final seed = (userData['userBalance'] ?? _defaultBalance).toDouble();
+    _balance = seed;
+    _userBalance = seed;
     notifyListeners();
   }
 
-  /// Updates [userBalance] from a remote stream snapshot.
+  /// Updates [userBalance] from a remote stream snapshot. Mirrors the
+  /// remote value into the displayed balance too so they don't diverge
+  /// after an out-of-band server-side adjustment.
   void applyRemoteUserBalance(double remoteValue) {
     if (_userBalance == remoteValue) return;
     _userBalance = remoteValue;
+    _balance = remoteValue;
     notifyListeners();
   }
 
@@ -67,13 +79,23 @@ class BalanceController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// True when the player has enough credit to pay [cost].
+  /// True when the player has enough canonical credit to pay [cost].
+  /// Used by transaction-time guards (e.g. spin/buy) so a stale local
+  /// state can't outspend the source-of-truth Firestore balance.
   bool canAfford(double cost) => _userBalance >= cost;
 
-  /// Charges [amount] to both local and canonical balances.
+  /// True when the displayed balance covers [cost]. Used by UI
+  /// disabled-state checks so the button mirrors what the player sees
+  /// in the credit readout, rather than the canonical balance which
+  /// may briefly lag during Firestore sync.
+  bool canAffordDisplayed(double cost) => _balance >= cost;
+
+  /// Charges [amount] to both local and canonical balances. Clamped to a
+  /// non-negative floor so the displayed credit never dips below zero
+  /// even if a stale check slips through.
   void charge(double amount) {
-    _balance -= amount;
-    _userBalance -= amount;
+    _balance = (_balance - amount).clamp(0.0, double.infinity);
+    _userBalance = (_userBalance - amount).clamp(0.0, double.infinity);
     notifyListeners();
   }
 
@@ -87,16 +109,28 @@ class BalanceController extends ChangeNotifier {
   }
 
   bool increaseBet() {
-    if (_betAmount >= _maxBet) return false;
-    _betAmount = (_betAmount * 2).clamp(_minBet, _maxBet);
+    final idx = _currentTierIndex();
+    if (idx >= _betTiers.length - 1) return false;
+    _betAmount = _betTiers[idx + 1];
     notifyListeners();
     return true;
   }
 
   bool decreaseBet() {
-    if (_betAmount <= _minBet) return false;
-    _betAmount = (_betAmount / 2).clamp(_minBet, _maxBet);
+    final idx = _currentTierIndex();
+    if (idx <= 0) return false;
+    _betAmount = _betTiers[idx - 1];
     notifyListeners();
     return true;
+  }
+
+  /// Snaps current bet to its tier index. If the bet sits between two
+  /// tiers (e.g. legacy persisted value), returns the index of the
+  /// nearest tier at or above current.
+  int _currentTierIndex() {
+    for (var i = 0; i < _betTiers.length; i++) {
+      if (_betTiers[i] >= _betAmount) return i;
+    }
+    return _betTiers.length - 1;
   }
 }

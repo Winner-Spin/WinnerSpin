@@ -63,11 +63,13 @@ class _TranslucentCircleButtonState extends State<TranslucentCircleButton>
     final s = widget.size;
     final op = widget.opacity.clamp(0.0, 1.0);
 
+    final bool enabled = widget.onTap != null;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _press.forward(),
-      onTapUp: (_) => _press.reverse(),
-      onTapCancel: () => _press.reverse(),
+      onTapDown: enabled ? (_) => _press.forward() : null,
+      onTapUp: enabled ? (_) => _press.reverse() : null,
+      onTapCancel: enabled ? () => _press.reverse() : null,
       onTap: widget.onTap,
       child: ScaleTransition(
         scale: _scale,

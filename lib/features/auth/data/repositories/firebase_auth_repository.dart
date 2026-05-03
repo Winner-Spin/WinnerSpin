@@ -100,7 +100,11 @@ class FirebaseAuthRepository implements AuthRepository {
     int? freeSpinsRemaining,
   }) async {
     final patch = <String, dynamic>{};
-    if (userBalance != null) patch['userBalance'] = userBalance;
+    if (userBalance != null) {
+      // Round to 2 decimal places (cents) so accumulated float-precision
+      // drift from engine math doesn't leak into the persisted balance.
+      patch['userBalance'] = (userBalance * 100).round() / 100;
+    }
     if (freeSpinsRemaining != null) {
       patch['freeSpinsRemaining'] = freeSpinsRemaining;
     }

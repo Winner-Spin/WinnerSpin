@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/format/money_format.dart';
+
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
@@ -187,11 +189,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   listenable: Listenable.merge([
                     _viewModel,
                     _viewModel.balanceCtrl,
+                    _viewModel.anteCtrl,
+                    _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) => RepaintBoundary(
                     child: BuyFeatureButton(
                       price: _viewModel.buyFeaturePrice,
-                      disabled: _viewModel.isBusy,
+                      disabled: !_viewModel.canBuyFreeSpinsForUi ||
+                          _viewModel.anteBetActive,
                       onTap: _viewModel.buyFreeSpins,
                       width: screenW * 0.39,
                       height: screenW * 0.22,
@@ -228,21 +233,40 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    RepaintBoundary(
-                      child: MinusButton(
-                        size: 42,
-                        onTap: _viewModel.decreaseBet,
+                    ListenableBuilder(
+                      listenable: _viewModel.balanceCtrl,
+                      builder: (context, _) => RepaintBoundary(
+                        child: MinusButton(
+                          size: 42,
+                          onTap: _viewModel.decreaseBet,
+                          disabled: !_viewModel.canDecreaseBet,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
-                    RepaintBoundary(
-                      child: RespinButton(size: 84, onTap: _viewModel.spin),
+                    ListenableBuilder(
+                      listenable: Listenable.merge([
+                        _viewModel,
+                        _viewModel.balanceCtrl,
+                        _viewModel.fsCtrl,
+                      ]),
+                      builder: (context, _) => RepaintBoundary(
+                        child: RespinButton(
+                          size: 84,
+                          onTap: _viewModel.spin,
+                          spinning: _viewModel.isBusy,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 16),
-                    RepaintBoundary(
-                      child: PlusButton(
-                        size: 42,
-                        onTap: _viewModel.increaseBet,
+                    ListenableBuilder(
+                      listenable: _viewModel.balanceCtrl,
+                      builder: (context, _) => RepaintBoundary(
+                        child: PlusButton(
+                          size: 42,
+                          onTap: _viewModel.increaseBet,
+                          disabled: !_viewModel.canIncreaseBet,
+                        ),
                       ),
                     ),
                   ],
@@ -374,6 +398,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final lastWin = _viewModel.lastWin;
     final isBusy = _viewModel.isBusy;
 
+    if (_viewModel.showInsufficientFundsHint) {
+      return Text(
+        'PLEASE DEPOSIT MONEY!',
+        style: baseStyle.copyWith(color: const Color(0xFFFF6A6A)),
+      );
+    }
+
     if (lastWin > 0 && !isBusy) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -391,7 +422,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             duration: const Duration(seconds: 1),
             curve: Curves.easeOut,
             builder: (context, value, _) =>
-                Text('₺${value.toStringAsFixed(2)}', style: baseStyle),
+                Text('₺${formatMoney(value)}', style: baseStyle),
           ),
         ],
       );
@@ -444,14 +475,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               Text('CREDIT', style: labelStyle),
               const SizedBox(width: 4),
               Text(
-                '₺${_viewModel.balance.toStringAsFixed(2)}',
+                '₺${formatMoney(_viewModel.balance)}',
                 style: valueStyle,
               ),
               const SizedBox(width: 16),
               Text('BET', style: labelStyle),
               const SizedBox(width: 4),
               Text(
-                '₺${_viewModel.betAmount.toStringAsFixed(2)}',
+                '₺${formatMoney(_viewModel.betAmount)}',
                 style: valueStyle,
               ),
             ],

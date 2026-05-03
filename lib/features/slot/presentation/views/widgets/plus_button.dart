@@ -7,6 +7,7 @@ class PlusButton extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? iconColor;
   final double opacity;
+  final bool disabled;
 
   const PlusButton({
     super.key,
@@ -14,15 +15,16 @@ class PlusButton extends StatelessWidget {
     this.onTap,
     this.iconColor,
     this.opacity = 0.75,
+    this.disabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final iconClr = iconColor ?? const Color(0xFFFAF6EE);
     final iconSize = size * 0.70;
-    return TranslucentCircleButton(
+    final button = TranslucentCircleButton(
       size: size,
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       opacity: opacity,
       child: Stack(
         alignment: Alignment.center,
@@ -43,6 +45,7 @@ class PlusButton extends StatelessWidget {
         ],
       ),
     );
+    return Opacity(opacity: disabled ? 0.65 : 1.0, child: button);
   }
 }
 

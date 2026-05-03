@@ -77,21 +77,26 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     final radius = widget.height * 0.32;
     final w = widget.width;
     final h = widget.height;
+    final isDisabled = widget.disabled;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _pressCtrl.forward(),
-      onTapUp: (_) {
-        _pressCtrl.reverse();
-        _toggleGlass();
-        widget.onTap?.call();
-      },
-      onTapCancel: () => _pressCtrl.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: AnimatedBuilder(
-          animation: _glassCtrl,
-          builder: (context, _) {
+    return IgnorePointer(
+      ignoring: isDisabled,
+      child: Opacity(
+        opacity: isDisabled ? 0.55 : 1.0,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _pressCtrl.forward(),
+          onTapUp: (_) {
+            _pressCtrl.reverse();
+            _toggleGlass();
+            widget.onTap?.call();
+          },
+          onTapCancel: () => _pressCtrl.reverse(),
+          child: ScaleTransition(
+            scale: _scale,
+            child: AnimatedBuilder(
+              animation: _glassCtrl,
+              builder: (context, _) {
             final g = Curves.easeInOut.transform(_glassCtrl.value);
             // Lerp helper: opaque value at g=0, glass value at g=1.
             double mix(double opaque, double glass) =>
@@ -322,7 +327,9 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                 ),
               ),
             );
-          },
+              },
+            ),
+          ),
         ),
       ),
     );

@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 import 'translucent_circle_button.dart';
 
-class RespinButton extends StatefulWidget {
+class RespinButton extends StatelessWidget {
   final double size;
   final VoidCallback? onTap;
   final Color? iconColor;
   final double opacity;
+  final bool disabled;
+  final bool spinning;
 
   const RespinButton({
     super.key,
@@ -16,35 +18,24 @@ class RespinButton extends StatefulWidget {
     this.onTap,
     this.iconColor,
     this.opacity = 0.75,
+    this.disabled = false,
+    this.spinning = false,
   });
 
   @override
-  State<RespinButton> createState() => _RespinButtonState();
-}
-
-class _RespinButtonState extends State<RespinButton> {
-  bool _active = false;
-
-  void _handleTap() {
-    setState(() => _active = !_active);
-    widget.onTap?.call();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final s = widget.size;
-    final iconClr = widget.iconColor ?? const Color(0xFFFAF6EE);
-    final iconSize = s * 0.74;
+    final iconClr = iconColor ?? const Color(0xFFFAF6EE);
+    final iconSize = size * 0.74;
 
-    return TranslucentCircleButton(
-      size: s,
-      onTap: _handleTap,
-      opacity: widget.opacity,
+    final button = TranslucentCircleButton(
+      size: size,
+      onTap: (disabled || spinning) ? null : onTap,
+      opacity: opacity,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 160),
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
-        child: _active
+        child: spinning
             ? _StopIcon(
                 key: const ValueKey('stop'),
                 size: iconSize,
@@ -57,6 +48,7 @@ class _RespinButtonState extends State<RespinButton> {
               ),
       ),
     );
+    return Opacity(opacity: disabled ? 0.65 : 1.0, child: button);
   }
 }
 
