@@ -8,6 +8,20 @@
             "type": "dart"
         },
         {
+            "name": "Flutter (profile)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "Flutter (release)",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
             "name": "Chrome",
             "program": "lib/main.dart",
             "deviceId": "chrome",

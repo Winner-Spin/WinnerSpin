@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
 
+import '../../domain/models/symbol_registry.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
@@ -36,6 +37,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _viewModel.addListener(_onViewModelChange);
     _viewModel.fetchUserData();
+
+    // Pre-decode symbol assets at the cell-sized cache width so the
+    // first appearance of each symbol doesn't block the main thread.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final sym in SymbolRegistry.all) {
+        precacheImage(
+          ResizeImage(AssetImage(sym.assetPath), width: 256),
+          context,
+        );
+      }
+    });
   }
 
   void _onViewModelChange() {
@@ -87,10 +100,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           return Stack(
             children: [
               Positioned.fill(
-                child: Image.asset(
-                  'lib/images/slot_main_screen/nihai arka plan.png',
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
+                // RepaintBoundary keeps the static backdrop out of grid
+                // and button repaint passes.
+                child: RepaintBoundary(
+                  child: Image.asset(
+                    'lib/images/slot_main_screen/nihai arka plan.png',
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.low,
+                  ),
                 ),
               ),
               Positioned(

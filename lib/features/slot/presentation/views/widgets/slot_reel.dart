@@ -209,7 +209,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
             : Image.asset(
                 assetPath,
                 fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
+                filterQuality: FilterQuality.low,
+                gaplessPlayback: true,
+                // Source PNGs are ~2000px wide; cells render far smaller.
+                cacheWidth: 256,
               ),
       ),
     );
@@ -477,7 +480,9 @@ class _ScatterPulseState extends State<_ScatterPulse>
         child: Image.asset(
           widget.assetPath,
           fit: BoxFit.contain,
-          filterQuality: FilterQuality.medium,
+          filterQuality: FilterQuality.low,
+          gaplessPlayback: true,
+          cacheWidth: 256,
         ),
       ),
     );

@@ -227,7 +227,9 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         child: Image.asset(
           widget.path,
           fit: BoxFit.contain,
-          filterQuality: FilterQuality.medium,
+          filterQuality: FilterQuality.low,
+          gaplessPlayback: true,
+          cacheWidth: 256,
         ),
       ),
     );
