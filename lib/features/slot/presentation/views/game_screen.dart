@@ -31,6 +31,15 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
 
+  // Hot-path text styles resolved once — Google Fonts lookups inside
+  // the status text and bottom panel rebuilds were repeating per spin.
+  late final TextStyle _statusBaseStyle;
+  late final TextStyle _statusKazancStyle;
+  late final TextStyle _statusInsufficientStyle;
+  late final TextStyle _bottomLabelStyle;
+  late final TextStyle _bottomValueStyle;
+  late final TextStyle _bottomClockStyle;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +58,58 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         );
       }
     });
+
+    final softShadow = [
+      Shadow(
+        color: Colors.black.withValues(alpha: 0.60),
+        offset: const Offset(0, 1),
+        blurRadius: 1.2,
+      ),
+    ];
+
+    _statusBaseStyle = GoogleFonts.anton(
+      color: Colors.white.withValues(alpha: 0.97),
+      fontSize: 20,
+      letterSpacing: 0.8,
+      height: 1.0,
+      shadows: [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.70),
+          offset: const Offset(0, 1),
+          blurRadius: 1.6,
+        ),
+      ],
+    );
+    _statusKazancStyle = _statusBaseStyle.copyWith(
+      color: const Color(0xFFFFD13B),
+    );
+    _statusInsufficientStyle = _statusBaseStyle.copyWith(
+      color: const Color(0xFFFF6A6A),
+    );
+
+    _bottomLabelStyle = GoogleFonts.barlowCondensed(
+      color: const Color(0xFFFFD13B),
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.4,
+      height: 1.0,
+      shadows: softShadow,
+    );
+    _bottomValueStyle = GoogleFonts.barlowCondensed(
+      color: Colors.white.withValues(alpha: 0.98),
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.1,
+      height: 1.0,
+      shadows: softShadow,
+    );
+    _bottomClockStyle = GoogleFonts.barlowCondensed(
+      color: Colors.white.withValues(alpha: 0.62),
+      fontSize: 9.2,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0.3,
+      height: 1.0,
+    );
   }
 
   void _onViewModelChange() {
@@ -334,11 +395,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 4),
+                  // Bottom panel only reads balance + bet — no need to
+                  // rebuild on unrelated _viewModel notifications.
                   child: ListenableBuilder(
-                    listenable: Listenable.merge([
-                      _viewModel,
-                      _viewModel.balanceCtrl,
-                    ]),
+                    listenable: _viewModel.balanceCtrl,
                     builder: (context, _) => _buildBottomPanel(screenW),
                   ),
                 ),
@@ -377,14 +437,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   ),
                   child: SlotReel(
                     columnIndex: col,
-                    previousItems: List.generate(
-                      GameViewModel.rows,
-                      (row) => _viewModel.previousGrid[col][row],
-                    ),
-                    targetItems: List.generate(
-                      GameViewModel.rows,
-                      (row) => _viewModel.grid[col][row],
-                    ),
+                    // Pass column lists by reference; List.generate
+                    // here was producing fresh refs every rebuild.
+                    previousItems: _viewModel.previousGrid[col],
+                    targetItems: _viewModel.grid[col],
                     spinning: _viewModel.isSpinning,
                     fadingPaths: _viewModel.fadingPaths,
                     speedMultiplier: _viewModel.speedMultiplier,
@@ -402,28 +458,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildStatusText() {
-    final baseStyle = GoogleFonts.anton(
-      color: Colors.white.withValues(alpha: 0.97),
-      fontSize: 20,
-      letterSpacing: 0.8,
-      height: 1.0,
-      shadows: [
-        Shadow(
-          color: Colors.black.withValues(alpha: 0.70),
-          offset: const Offset(0, 1),
-          blurRadius: 1.6,
-        ),
-      ],
-    );
-
     final lastWin = _viewModel.lastWin;
     final isBusy = _viewModel.isBusy;
 
     if (_viewModel.showInsufficientFundsHint) {
-      return Text(
-        'PLEASE DEPOSIT MONEY!',
-        style: baseStyle.copyWith(color: const Color(0xFFFF6A6A)),
-      );
+      return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
     }
 
     if (lastWin > 0 && !isBusy) {
@@ -432,10 +471,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Text(
-            'KAZANÇ',
-            style: baseStyle.copyWith(color: const Color(0xFFFFD13B)),
-          ),
+          Text('KAZANÇ', style: _statusKazancStyle),
           const SizedBox(width: 6),
           TweenAnimationBuilder<double>(
             key: ValueKey<double>(lastWin),
@@ -443,46 +479,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             duration: const Duration(seconds: 1),
             curve: Curves.easeOut,
             builder: (context, value, _) =>
-                Text('₺${formatMoney(value)}', style: baseStyle),
+                Text('₺${formatMoney(value)}', style: _statusBaseStyle),
           ),
         ],
       );
     }
 
     if (isBusy) {
-      return Text('GOOD LUCK!', style: baseStyle);
+      return Text('GOOD LUCK!', style: _statusBaseStyle);
     }
 
-    return Text('PLACE YOUR BETS!', style: baseStyle);
+    return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
   }
 
   Widget _buildBottomPanel(double screenW) {
-    final softShadow = [
-      Shadow(
-        color: Colors.black.withValues(alpha: 0.60),
-        offset: const Offset(0, 1),
-        blurRadius: 1.2,
-      ),
-    ];
-
-    final labelStyle = GoogleFonts.barlowCondensed(
-      color: const Color(0xFFFFD13B),
-      fontSize: 18,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.4,
-      height: 1.0,
-      shadows: softShadow,
-    );
-
-    final valueStyle = GoogleFonts.barlowCondensed(
-      color: Colors.white.withValues(alpha: 0.98),
-      fontSize: 18,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.1,
-      height: 1.0,
-      shadows: softShadow,
-    );
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -493,32 +503,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text('CREDIT', style: labelStyle),
+              Text('CREDIT', style: _bottomLabelStyle),
               const SizedBox(width: 4),
               Text(
                 '₺${formatMoney(_viewModel.balance)}',
-                style: valueStyle,
+                style: _bottomValueStyle,
               ),
               const SizedBox(width: 16),
-              Text('BET', style: labelStyle),
+              Text('BET', style: _bottomLabelStyle),
               const SizedBox(width: 4),
               Text(
                 '₺${formatMoney(_viewModel.betAmount)}',
-                style: valueStyle,
+                style: _bottomValueStyle,
               ),
             ],
           ),
         ),
         const SizedBox(height: 1),
-        _ClockText(
-          style: GoogleFonts.barlowCondensed(
-            color: Colors.white.withValues(alpha: 0.62),
-            fontSize: 9.2,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.3,
-            height: 1.0,
-          ),
-        ),
+        _ClockText(style: _bottomClockStyle),
       ],
     );
   }

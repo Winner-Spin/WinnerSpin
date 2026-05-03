@@ -30,6 +30,15 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   final List<_WinEffect> _effects = [];
   final Random _rng = Random();
 
+  // Resolved once — the painter pulls this every frame and Google
+  // Fonts lookups are non-trivial under that cadence.
+  static final TextStyle _baseTextStyle = GoogleFonts.outfit(
+    color: const Color(0xFFFFD54F),
+    fontSize: 28,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 1.5,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -138,18 +147,11 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
         if (_effects.isEmpty) return const SizedBox.shrink();
         return CustomPaint(
           size: Size(widget.gridWidth, widget.gridHeight),
-          painter: _EffectPainter(effects: _effects, style: _textStyle),
+          painter: _EffectPainter(effects: _effects, style: _baseTextStyle),
         );
       },
     );
   }
-
-  TextStyle get _textStyle => GoogleFonts.outfit(
-        color: const Color(0xFFFFD54F),
-        fontSize: 28,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 1.5,
-      );
 }
 
 class _Particle {
