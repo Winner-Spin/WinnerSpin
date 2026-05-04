@@ -14,6 +14,7 @@ class SymbolRegistry {
       baseWeight: 35,
       tier: SymbolTier.low,
       payouts: {8: 0.25, 10: 0.75, 12: 2.0},
+      displayScale: 1.12,
     ),
     SlotSymbol(
       id: 'uzum',
@@ -28,6 +29,7 @@ class SymbolRegistry {
       baseWeight: 28,
       tier: SymbolTier.low,
       payouts: {8: 0.50, 10: 1.00, 12: 5.0},
+      displayScale: 1.12,
     ),
 
     // Mid tier
@@ -44,6 +46,7 @@ class SymbolRegistry {
       baseWeight: 18,
       tier: SymbolTier.mid,
       payouts: {8: 1.00, 10: 1.50, 12: 10.0},
+      displayScale: 1.12,
     ),
 
     // High tier

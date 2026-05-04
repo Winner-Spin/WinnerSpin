@@ -169,6 +169,9 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final symbol = SymbolRegistry.byPath(widget.path);
+    final perSymbolScale = symbol?.displayScale ?? 1.0;
+
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: Listenable.merge([
@@ -182,7 +185,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         builder: (context, child) {
           final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
           final glow = _glowIntensity.value;
-          final scale = 1.0 + _scalePulse.value * 0.15;
+          final scale = (1.0 + _scalePulse.value * 0.15) * perSymbolScale;
         // Particles run in the second half (after the impact peak), in sync
         // with the symbol fade-out so the burst trails the celebration.
         final particleProgress = ((_fadeController.value - 0.4) / 0.6).clamp(
@@ -228,13 +231,15 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       },
         child: Padding(
           padding: const EdgeInsets.all(2),
-          child: Image.asset(
-            widget.path,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.low,
-            gaplessPlayback: true,
-            cacheWidth: 256,
-            opacity: _imageOpacity,
+          child: Center(
+            child: Image.asset(
+              widget.path,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.low,
+              gaplessPlayback: true,
+              cacheWidth: 256,
+              opacity: _imageOpacity,
+            ),
           ),
         ),
       ),

@@ -158,6 +158,30 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           final double screenH = constraints.maxHeight;
           final double screenW = constraints.maxWidth;
 
+          // The backdrop is BoxFit.cover'd — when the screen aspect
+          // doesn't match the source aspect, the image gets horizontally
+          // cropped/extended. Compute the inner grid frame's actual
+          // on-screen position so the slot grid lands on the bg's own
+          // cell boundaries regardless of device aspect.
+          const double bgAspect = 1408 / 3040;
+          const double bgInnerLeftRatio = 88 / 1408; // bg's inner-frame left edge
+          const double bgInnerRightRatio = 1319 / 1408; // bg's inner-frame right edge
+
+          final double screenAspect = screenW / screenH;
+          final double bgDisplayW;
+          final double bgLeftOnScreen;
+          if (screenAspect >= bgAspect) {
+            bgDisplayW = screenW;
+            bgLeftOnScreen = 0;
+          } else {
+            bgDisplayW = screenH * bgAspect;
+            bgLeftOnScreen = (screenW - bgDisplayW) / 2;
+          }
+          final double gridLeftPx =
+              bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
+          final double gridRightPx =
+              screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
+
           return Stack(
             children: [
               Positioned.fill(
@@ -173,8 +197,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
               Positioned(
                 top: screenH * 0.195,
-                left: screenW * 0.065,
-                right: screenW * 0.065,
+                left: gridLeftPx,
+                right: gridRightPx,
                 height: screenH * 0.32,
                 child: Stack(
                   clipBehavior: Clip.none,
@@ -424,30 +448,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               // Per-column RepaintBoundary so a reel's drop animation
               // doesn't invalidate sibling columns or the grid frame.
               child: RepaintBoundary(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: col < GameViewModel.columns - 1
-                        ? Border(
-                            right: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              width: 1,
-                            ),
-                          )
-                        : null,
-                  ),
-                  child: SlotReel(
-                    columnIndex: col,
-                    // Pass column lists by reference; List.generate
-                    // here was producing fresh refs every rebuild.
-                    previousItems: _viewModel.previousGrid[col],
-                    targetItems: _viewModel.grid[col],
-                    spinning: _viewModel.isSpinning,
-                    fadingPaths: _viewModel.fadingPaths,
-                    speedMultiplier: _viewModel.speedMultiplier,
-                    onComplete: col == GameViewModel.columns - 1
-                        ? () => _viewModel.onSpinComplete()
-                        : null,
-                  ),
+                child: SlotReel(
+                  columnIndex: col,
+                  // Pass column lists by reference; List.generate
+                  // here was producing fresh refs every rebuild.
+                  previousItems: _viewModel.previousGrid[col],
+                  targetItems: _viewModel.grid[col],
+                  spinning: _viewModel.isSpinning,
+                  fadingPaths: _viewModel.fadingPaths,
+                  speedMultiplier: _viewModel.speedMultiplier,
+                  onComplete: col == GameViewModel.columns - 1
+                      ? () => _viewModel.onSpinComplete()
+                      : null,
                 ),
               ),
             );

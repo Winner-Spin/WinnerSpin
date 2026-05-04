@@ -17,6 +17,11 @@ class SlotSymbol {
   /// Scatter-payout schedule, same key shape as [payouts].
   final Map<int, double> scatterPayouts;
 
+  /// Visual scale applied at render time only — does not affect engine
+  /// math, hit-test, or cluster detection. Useful for nudging individual
+  /// assets that look small/large relative to the rest of the set.
+  final double displayScale;
+
   const SlotSymbol({
     required this.id,
     required this.assetPath,
@@ -25,6 +30,7 @@ class SlotSymbol {
     this.payouts = const {},
     this.multiplierValue = 0,
     this.scatterPayouts = const {},
+    this.displayScale = 1.0,
   });
 
   bool get isMultiplier => tier == SymbolTier.multiplier;

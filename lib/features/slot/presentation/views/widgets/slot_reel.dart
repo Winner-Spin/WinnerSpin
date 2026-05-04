@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'tumble_cell.dart';
 
@@ -200,20 +201,25 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       },
       child: Padding(
         padding: const EdgeInsets.all(2),
-        child: !isDropOut && isScatter
-            ? _ScatterPulse(
-                assetPath: assetPath,
-                animation: _animation!,
-                landThreshold: endFraction,
-              )
-            : Image.asset(
-                assetPath,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.low,
-                gaplessPlayback: true,
-                // Source PNGs are ~2000px wide; cells render far smaller.
-                cacheWidth: 256,
-              ),
+        child: Center(
+          child: Transform.scale(
+            scale: SymbolRegistry.byPath(assetPath)?.displayScale ?? 1.0,
+            child: !isDropOut && isScatter
+                ? _ScatterPulse(
+                    assetPath: assetPath,
+                    animation: _animation!,
+                    landThreshold: endFraction,
+                  )
+                : Image.asset(
+                    assetPath,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.low,
+                    gaplessPlayback: true,
+                    // Source PNGs are ~2000px wide; cells render far smaller.
+                    cacheWidth: 256,
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -235,6 +241,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
               ? widget.targetItems
               : widget.previousItems;
           return SizedBox(
+            width: viewportW,
             height: viewportH,
             child: Stack(
               // Clip.none lets winning-cell particle bursts spill past the
@@ -269,6 +276,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
         final bool isOut = (_state == ReelState.droppingOut);
 
         return SizedBox(
+          width: viewportW,
           height: viewportH,
           child: Stack(
             clipBehavior: Clip.none,
