@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
@@ -273,9 +272,9 @@ class _ScalePulseCurve extends Curve {
   }
 }
 
-/// Per-tier colour palette. Picked so each tier reads instantly on the
-/// grid — low symbols stay yellow-gold, high symbols push toward amber-red
-/// for a premium feel, multipliers go purple, scatters go cyan.
+/// Per-symbol glow palette. Each symbol's halo, sweep, sparkle, and spark
+/// colours mirror its dominant on-asset hue so the win effect reads as
+/// "this symbol popped" rather than as a generic tier-coloured flash.
 class _GlowPalette {
   final Color halo;
   final List<Color> sweep;
@@ -289,87 +288,140 @@ class _GlowPalette {
     required this.particle,
   });
 
+  static const _yellow = _GlowPalette(
+    halo: Color(0xFFFFC107),
+    sweep: [
+      Color(0xFFFFB300),
+      Color(0xFFFFE082),
+      Color(0xFFFFFFFF),
+      Color(0xFFFFE082),
+      Color(0xFFFFB300),
+    ],
+    sparkle: Color(0xFFFFF8E1),
+    particle: Color(0xFFFFD54F),
+  );
+
+  static const _purple = _GlowPalette(
+    halo: Color(0xFFAB47BC),
+    sweep: [
+      Color(0xFF6A1B9A),
+      Color(0xFFCE93D8),
+      Color(0xFFFFFFFF),
+      Color(0xFFCE93D8),
+      Color(0xFF6A1B9A),
+    ],
+    sparkle: Color(0xFFE1BEE7),
+    particle: Color(0xFFBA68C8),
+  );
+
+  static const _green = _GlowPalette(
+    halo: Color(0xFF4CAF50),
+    sweep: [
+      Color(0xFF2E7D32),
+      Color(0xFFA5D6A7),
+      Color(0xFFFFFFFF),
+      Color(0xFFA5D6A7),
+      Color(0xFF2E7D32),
+    ],
+    sparkle: Color(0xFFC8E6C9),
+    particle: Color(0xFF66BB6A),
+  );
+
+  static const _orange = _GlowPalette(
+    halo: Color(0xFFFF9800),
+    sweep: [
+      Color(0xFFEF6C00),
+      Color(0xFFFFB74D),
+      Color(0xFFFFFFFF),
+      Color(0xFFFFB74D),
+      Color(0xFFEF6C00),
+    ],
+    sparkle: Color(0xFFFFE0B2),
+    particle: Color(0xFFFFA726),
+  );
+
+  static const _red = _GlowPalette(
+    halo: Color(0xFFE53935),
+    sweep: [
+      Color(0xFFB71C1C),
+      Color(0xFFEF9A9A),
+      Color(0xFFFFFFFF),
+      Color(0xFFEF9A9A),
+      Color(0xFFB71C1C),
+    ],
+    sparkle: Color(0xFFFFCDD2),
+    particle: Color(0xFFEF5350),
+  );
+
+  static const _pink = _GlowPalette(
+    halo: Color(0xFFEC407A),
+    sweep: [
+      Color(0xFFAD1457),
+      Color(0xFFF48FB1),
+      Color(0xFFFFFFFF),
+      Color(0xFFF48FB1),
+      Color(0xFFAD1457),
+    ],
+    sparkle: Color(0xFFFCE4EC),
+    particle: Color(0xFFF06292),
+  );
+
+  static const _cyan = _GlowPalette(
+    halo: Color(0xFF00BCD4),
+    sweep: [
+      Color(0xFF006064),
+      Color(0xFF80DEEA),
+      Color(0xFFFFFFFF),
+      Color(0xFF80DEEA),
+      Color(0xFF006064),
+    ],
+    sparkle: Color(0xFFB2EBF2),
+    particle: Color(0xFF4DD0E1),
+  );
+
+  static const _gold = _GlowPalette(
+    halo: Color(0xFFFFB300),
+    sweep: [
+      Color(0xFFFF6F00),
+      Color(0xFFFFCA28),
+      Color(0xFFFFFFFF),
+      Color(0xFFFFCA28),
+      Color(0xFFFF6F00),
+    ],
+    sparkle: Color(0xFFFFE082),
+    particle: Color(0xFFFFB300),
+  );
+
   static _GlowPalette forPath(String path) {
-    final tier = SymbolRegistry.byPath(path)?.tier;
-    switch (tier) {
-      case SymbolTier.low:
-        return const _GlowPalette(
-          halo: Color(0xFFFFC107),
-          sweep: [
-            Color(0xFFFFB300),
-            Color(0xFFFFE082),
-            Color(0xFFFFFFFF),
-            Color(0xFFFFE082),
-            Color(0xFFFFB300),
-          ],
-          sparkle: Color(0xFFFFF8E1),
-          particle: Color(0xFFFFD54F),
-        );
-      case SymbolTier.mid:
-        return const _GlowPalette(
-          halo: Color(0xFFFF9800),
-          sweep: [
-            Color(0xFFEF6C00),
-            Color(0xFFFFB74D),
-            Color(0xFFFFFFFF),
-            Color(0xFFFFB74D),
-            Color(0xFFEF6C00),
-          ],
-          sparkle: Color(0xFFFFE0B2),
-          particle: Color(0xFFFFA726),
-        );
-      case SymbolTier.high:
-        return const _GlowPalette(
-          halo: Color(0xFFFF5722),
-          sweep: [
-            Color(0xFFD84315),
-            Color(0xFFFF8A65),
-            Color(0xFFFFFFFF),
-            Color(0xFFFF8A65),
-            Color(0xFFD84315),
-          ],
-          sparkle: Color(0xFFFFCCBC),
-          particle: Color(0xFFFF7043),
-        );
-      case SymbolTier.multiplier:
-        return const _GlowPalette(
-          halo: Color(0xFFAB47BC),
-          sweep: [
-            Color(0xFF6A1B9A),
-            Color(0xFFCE93D8),
-            Color(0xFFFFFFFF),
-            Color(0xFFCE93D8),
-            Color(0xFF6A1B9A),
-          ],
-          sparkle: Color(0xFFE1BEE7),
-          particle: Color(0xFFBA68C8),
-        );
-      case SymbolTier.scatter:
-        return const _GlowPalette(
-          halo: Color(0xFF00BCD4),
-          sweep: [
-            Color(0xFF006064),
-            Color(0xFF80DEEA),
-            Color(0xFFFFFFFF),
-            Color(0xFF80DEEA),
-            Color(0xFF006064),
-          ],
-          sparkle: Color(0xFFB2EBF2),
-          particle: Color(0xFF4DD0E1),
-        );
-      case null:
-        return const _GlowPalette(
-          halo: Color(0xFFFFB300),
-          sweep: [
-            Color(0xFFFFC107),
-            Color(0xFFFFE082),
-            Color(0xFFFFFFFF),
-            Color(0xFFFFE082),
-            Color(0xFFFFC107),
-          ],
-          sparkle: Color(0xFFFFF8E1),
-          particle: Color(0xFFFFD54F),
-        );
+    final id = SymbolRegistry.byPath(path)?.id;
+    switch (id) {
+      case 'muz':
+        return _yellow;
+      case 'uzum':
+        return _purple;
+      case 'karpuz':
+      case 'yesil_ayi':
+        return _green;
+      case 'seftali':
+        return _orange;
+      case 'elma':
+      case 'cilek':
+      case 'kalp':
+        return _red;
+      case 'pembe_ayi':
+        return _pink;
+      case 'cupcake':
+        return _cyan;
+      case 'multi_2x':
+      case 'multi_3x':
+      case 'multi_5x':
+      case 'multi_10x':
+      case 'multi_25x':
+      case 'multi_50x':
+      case 'multi_100x':
+        return _gold;
+      default:
+        return _yellow;
     }
   }
 }
