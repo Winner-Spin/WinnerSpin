@@ -49,6 +49,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     // Pre-decode symbol assets at the cell-sized cache width so the
     // first appearance of each symbol doesn't block the main thread.
+    // The free-spin backdrop is also pre-decoded so the first FS trigger
+    // doesn't stall the swap.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       for (final sym in SymbolRegistry.all) {
@@ -57,6 +59,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           context,
         );
       }
+      precacheImage(
+        const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
+        context,
+      );
     });
 
     final softShadow = [
@@ -185,14 +191,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           return Stack(
             children: [
               Positioned.fill(
-                // RepaintBoundary keeps the static backdrop out of grid
-                // and button repaint passes.
-                child: RepaintBoundary(
-                  child: Image.asset(
-                    'lib/images/slot_main_screen/nihai arka plan.png',
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.low,
-                  ),
+                // Backdrop swaps to the FS-mode artwork while a free-spin
+                // round is active, so the round's distinct atmosphere is
+                // visible the moment FS starts.
+                child: ListenableBuilder(
+                  listenable: _viewModel.fsCtrl,
+                  builder: (context, _) {
+                    final bgPath = _viewModel.isInFreeSpins
+                        ? 'lib/images/slot_main_screen/freespin arka plan.png'
+                        : 'lib/images/slot_main_screen/nihai arka plan.png';
+                    return RepaintBoundary(
+                      child: Image.asset(
+                        bgPath,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.low,
+                      ),
+                    );
+                  },
                 ),
               ),
               Positioned(

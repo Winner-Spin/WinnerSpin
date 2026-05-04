@@ -86,6 +86,7 @@ class SymbolRegistry {
       baseWeight: 8,
       tier: SymbolTier.scatter,
       scatterPayouts: {4: 3.0, 5: 5.0, 6: 100.0},
+      displayScale: 1.40,
     ),
 
     // Multipliers — weights shifted toward higher values so FS rounds show
