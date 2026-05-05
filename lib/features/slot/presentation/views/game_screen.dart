@@ -392,7 +392,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               Positioned(
                 top: screenH * 0.90,
                 left: 0,
-                child: const InfoButton(),
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, _) => InfoButton(
+                    betAmount: _viewModel.betAmount,
+                  ),
+                ),
               ),
               Positioned(
                 top: screenH * 0.90,
