@@ -263,10 +263,18 @@ class _FrozenBomb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Static PNG snapshot of the bomb body — drops the per-frame Skia
+    // path-replay cost of the full Lottie composition. The animated
+    // detonation runs in [MultiplierBombAnimation] overlay; this cell's
+    // PNG is hidden via [GameViewModel.clearedPositions] the moment that
+    // overlay starts, so there is no overlap during the fuse phase.
     return AnimatedBuilder(
       animation: opacity,
-      builder: (context, _) => Opacity(
+      builder: (context, child) => Opacity(
         opacity: opacity.value,
+        child: child,
+      ),
+      child: RepaintBoundary(
         child: Lottie.asset(
           MultiplierBombAnimation.assetPath,
           fit: BoxFit.contain,

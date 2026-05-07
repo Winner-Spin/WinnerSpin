@@ -3,22 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-/// Lottie bomb animation that replaces the per-multiplier visual on a
-/// winning cell. The grid cell renders the bomb frozen on frame 0; this
-/// overlay then plays the full timeline (fuse → blast → tail) when the
-/// presentation reaches that multiplier.
-///
-/// The composition's natural duration (~10 s in the current asset) is
-/// overridden to [_playbackDuration] so a multi-multiplier sequence
-/// stays inside a sane window. The blast moment is exposed via
-/// [onBlast] so the host can clear the underlying cell symbol the
-/// instant the bomb visually detonates, instead of waiting for the
-/// smoke tail to finish.
+/// Lottie bomb animation that plays in a root overlay above a multiplier
+/// cell. The grid cell renders the bomb frozen on frame 0; this overlay
+/// then plays the full timeline (fuse → blast → tail) on top. The blast
+/// moment is exposed via [onBlast] so the host can clear the underlying
+/// frozen bomb the instant it visually detonates, instead of waiting for
+/// the smoke tail to finish.
 class MultiplierBombAnimation {
   MultiplierBombAnimation._();
 
   static const String assetPath =
-      'lib/app/Bomb_Animation_fuse35_explosion50.json';
+      'lib/app/Bomb_Animation_half_fuse_35frame_explosion50.json';
 
   /// Composition timeline: blast frame / total frames (35 / 85).
   static const double _blastProgress = 35.0 / 85.0;
@@ -36,8 +31,7 @@ class MultiplierBombAnimation {
     late final OverlayEntry entry;
 
     // Overlay matches the cell so the playing bomb stays at the same
-    // visual size as the frozen bomb in the grid — earlier 2× size made
-    // the explosion balloon mid-sequence relative to the resting state.
+    // visual size as the frozen bomb in the grid.
     final renderSize = cellSize;
 
     entry = OverlayEntry(
@@ -67,10 +61,7 @@ class _BombPlayer extends StatefulWidget {
   final VoidCallback? onBlast;
   final VoidCallback onComplete;
 
-  const _BombPlayer({
-    required this.onComplete,
-    this.onBlast,
-  });
+  const _BombPlayer({required this.onComplete, this.onBlast});
 
   @override
   State<_BombPlayer> createState() => _BombPlayerState();

@@ -196,11 +196,10 @@ class _WinPresentationState extends State<WinPresentation> {
     // inside the multiplier symbol's cell at start.
     final cellSize = cellW < cellH ? cellW : cellH;
 
-    // Bomb phase — the cell already shows the bomb frozen on frame 0;
-    // this overlay plays the full Lottie timeline (fuse → blast → tail)
-    // on top. Cell symbol is cleared at the blast moment so the smoke
-    // tail reads as "the bomb is gone" instead of overlapping the still
-    // -frozen sprite underneath.
+    // The cell shows the bomb frozen on frame 0; this overlay plays the
+    // full Lottie timeline (fuse → blast → tail) on top. The cell symbol
+    // is cleared at the blast moment so the smoke tail reads as "the
+    // bomb is gone" instead of overlapping the still-frozen sprite.
     await MultiplierBombAnimation.play(
       context: context,
       cellCenter: start,

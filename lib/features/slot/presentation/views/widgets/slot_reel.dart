@@ -226,11 +226,16 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     // Multiplier cells render the bomb (frozen on frame 0)
                     // already during the column-wide drop-in / drop-out so
                     // the player never sees a flash of the legacy `multi_*x.png`
-                    // sprite that then morphs into a bomb in the static phase.
-                    ? Lottie.asset(
-                        MultiplierBombAnimation.assetPath,
-                        fit: BoxFit.contain,
-                        animate: false,
+                    // sprite morph into a bomb in the static phase.
+                    // RepaintBoundary keeps the bomb on its own paint layer
+                    // so the per-frame Positioned shift in the drop animation
+                    // doesn't re-rasterize the composition.
+                    ? RepaintBoundary(
+                        child: Lottie.asset(
+                          MultiplierBombAnimation.assetPath,
+                          fit: BoxFit.contain,
+                          animate: false,
+                        ),
                       )
                     : Image.asset(
                         assetPath,

@@ -16,9 +16,10 @@ void main() async {
   );
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Warm the Lottie cache before the first frame — the bomb composition
-  // is ~1.4 MB and parsing it inline on the first multiplier landing
-  // causes a noticeable jank. Fire-and-forget so launch isn't blocked.
+  // Warm the Lottie cache in the background — the bomb composition is
+  // ~1.4 MB and parsing it inline on the first multiplier landing leaves
+  // a visible gap between the underlying PNG vanishing and the overlay
+  // painting its first frame.
   unawaited(AssetLottie(MultiplierBombAnimation.assetPath).load());
 
   runApp(const WinnerSpinApp());
