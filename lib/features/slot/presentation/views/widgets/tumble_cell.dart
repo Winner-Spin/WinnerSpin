@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
+import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
+import 'multiplier_bomb_animation.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
 /// of the column-wide spin in [SlotReel]:
@@ -54,7 +57,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     super.initState();
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 900),
     );
     _dropController = AnimationController(
       vsync: this,
@@ -62,11 +65,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     );
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2000),
     );
     _burstController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 950),
     );
 
     // Opacity holds full through the first half — the player needs to see
@@ -170,6 +173,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final symbol = SymbolRegistry.byPath(widget.path);
     final perSymbolScale = symbol?.displayScale ?? 1.0;
+    final isMultiplier = symbol?.tier == SymbolTier.multiplier;
 
     return RepaintBoundary(
       child: AnimatedBuilder(
@@ -231,15 +235,42 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         child: Padding(
           padding: const EdgeInsets.all(2),
           child: Center(
-            child: Image.asset(
-              widget.path,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.low,
-              gaplessPlayback: true,
-              cacheWidth: 256,
-              opacity: _imageOpacity,
-            ),
+            child: isMultiplier
+                ? _FrozenBomb(opacity: _imageOpacity)
+                : Image.asset(
+                    widget.path,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.low,
+                    gaplessPlayback: true,
+                    cacheWidth: 256,
+                    opacity: _imageOpacity,
+                  ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bomb sprite shown frozen on frame 0 in place of the multiplier face.
+/// The animated detonation runs in [MultiplierBombAnimation] as a root
+/// overlay when the win presentation reaches this cell, so this widget
+/// only needs to render the static bomb body. Wrapped in [Opacity] so
+/// the cell's existing fade-out path keeps working.
+class _FrozenBomb extends StatelessWidget {
+  final Animation<double> opacity;
+  const _FrozenBomb({required this.opacity});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: opacity,
+      builder: (context, _) => Opacity(
+        opacity: opacity.value,
+        child: Lottie.asset(
+          MultiplierBombAnimation.assetPath,
+          fit: BoxFit.contain,
+          animate: false,
         ),
       ),
     );

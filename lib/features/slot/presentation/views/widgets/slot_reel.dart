@@ -1,7 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
+import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
+import 'multiplier_bomb_animation.dart';
 import 'tumble_cell.dart';
 
 /// A single slot-machine reel column that animates symbols
@@ -22,6 +25,12 @@ class SlotReel extends StatefulWidget {
   /// Empty when no tumble is in progress.
   final Set<String> fadingPaths;
 
+  /// Positions (encoded as `column * 100 + row`) the reel should render
+  /// as empty even though the grid still holds a symbol there. The win
+  /// presentation layer fills this when a multiplier asset has lifted
+  /// off its cell — the cell reads as consumed for the rest of the spin.
+  final Set<int> clearedPositions;
+
   /// Stagger delay before this reel starts moving.
   final Duration delay;
 
@@ -40,6 +49,7 @@ class SlotReel extends StatefulWidget {
     required this.targetItems,
     required this.spinning,
     this.fadingPaths = const {},
+    this.clearedPositions = const {},
     this.speedMultiplier = 1,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 1200),
@@ -176,6 +186,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     );
 
     final bool isScatter = assetPath.contains('cupCake');
+    final bool isMultiplier =
+        SymbolRegistry.byPath(assetPath)?.tier == SymbolTier.multiplier;
 
     return AnimatedBuilder(
       animation: _animation!,
@@ -210,14 +222,24 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     animation: _animation!,
                     landThreshold: endFraction,
                   )
-                : Image.asset(
-                    assetPath,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.low,
-                    gaplessPlayback: true,
-                    // Source PNGs are ~2000px wide; cells render far smaller.
-                    cacheWidth: 256,
-                  ),
+                : isMultiplier
+                    // Multiplier cells render the bomb (frozen on frame 0)
+                    // already during the column-wide drop-in / drop-out so
+                    // the player never sees a flash of the legacy `multi_*x.png`
+                    // sprite that then morphs into a bomb in the static phase.
+                    ? Lottie.asset(
+                        MultiplierBombAnimation.assetPath,
+                        fit: BoxFit.contain,
+                        animate: false,
+                      )
+                    : Image.asset(
+                        assetPath,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.low,
+                        gaplessPlayback: true,
+                        // Source PNGs are ~2000px wide; cells render far smaller.
+                        cacheWidth: 256,
+                      ),
           ),
         ),
       ),
@@ -249,6 +271,17 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
               // sparks vanish at the column edge and the burst feels truncated.
               clipBehavior: Clip.none,
               children: List.generate(items.length, (i) {
+                final cleared = widget.clearedPositions
+                    .contains(widget.columnIndex * 100 + i);
+                if (cleared) {
+                  return Positioned(
+                    top: i * itemH,
+                    left: 0,
+                    right: 0,
+                    height: itemH,
+                    child: const SizedBox.shrink(),
+                  );
+                }
                 return Positioned(
                   top: i * itemH,
                   left: 0,

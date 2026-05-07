@@ -73,6 +73,7 @@ class GameViewModel extends ChangeNotifier {
   Set<String> get fadingPaths => _gridCtrl.fadingPaths;
   List<ClusterWin> get activeExplosions => _gridCtrl.activeExplosions;
   Set<int> get winningPositions => _gridCtrl.winningPositions;
+  Set<int> get clearedPositions => _gridCtrl.clearedPositions;
 
   bool _isTumbling = false;
   bool get isTumbling => _isTumbling;
@@ -93,6 +94,14 @@ class GameViewModel extends ChangeNotifier {
   bool get showInsufficientFundsHint => _showInsufficientFundsHint;
   Timer? _insufficientHintTimer;
 
+  /// Running cluster-win total reported live as each tumble step pops.
+  /// Drives the status-bar counter so the player watches the value
+  /// climb in lock-step with each cluster's celebration animation,
+  /// instead of the old behaviour where the counter only ticked up
+  /// once after every tumble had finished.
+  double _liveTumbleWin = 0;
+  double get liveTumbleWin => _liveTumbleWin;
+
   // ── Balance & bet (delegated to BalanceController) ──
 
   double get balance => _balanceCtrl.balance;
@@ -111,8 +120,15 @@ class GameViewModel extends ChangeNotifier {
 
   // ── Free spins (delegated to FreeSpinsController) ──
 
+  /// TEMPORARY testing flag — when true the spin always runs in
+  /// free-spin mode so multipliers land far more often (engine boosts
+  /// hit rate + multiplier weights inside FS). Bypasses balance
+  /// charge AND FS counter consumption. Flip back to `false` before
+  /// shipping anything.
+  static const bool kTestForceFreeSpins = true;
+
   int get freeSpinsRemaining => _fsCtrl.remaining;
-  bool get isInFreeSpins => _fsCtrl.isActive;
+  bool get isInFreeSpins => kTestForceFreeSpins || _fsCtrl.isActive;
 
   /// True only when the buy CTA can fire.
   bool get canBuyFreeSpins =>
@@ -149,10 +165,17 @@ class GameViewModel extends ChangeNotifier {
   PoolState _pool = PoolState();
   SpinResult? _pendingResult;
 
+  /// Exposed result of the most recently completed spin. The win
+  /// presentation layer reads `baseWin`, `finalMultipliers`, and
+  /// `totalWin` off this to drive the staged collect-and-multiply
+  /// reveal.
+  SpinResult? _lastSpinResult;
+  SpinResult? get lastSpinResult => _lastSpinResult;
+
   // ── Tumble animation timing ──
   /// Window for the winning-cell glow + fade. First half is the gold-glow
   /// celebration, second half is the symbol fade-out — see [TumbleCell].
-  static const Duration _tumbleFadeDuration = Duration(milliseconds: 600);
+  static const Duration _tumbleFadeDuration = Duration(milliseconds: 900);
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   // ── User actions ──
@@ -275,12 +298,15 @@ class GameViewModel extends ChangeNotifier {
       }
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
-    } else {
+    } else if (!kTestForceFreeSpins) {
+      // Real FS round — consume one. Skipped under the test flag so
+      // testing isn't bottlenecked by an FS counter that drains.
       _fsCtrl.consumeOne();
     }
 
     _isSpinning = true;
     _balanceCtrl.resetLastWin();
+    _liveTumbleWin = 0;
     _gridCtrl.capturePreviousGrid();
     _gridCtrl.resetForNewSpin();
     notifyListeners();
@@ -341,10 +367,15 @@ class GameViewModel extends ChangeNotifier {
       _isTumbling = true;
       notifyListeners();
       for (final tumble in result.tumbles) {
+        // Bump the live counter target right when the cluster starts
+        // popping so the bar climbs in lock-step with the cell
+        // celebration instead of waiting for every tumble to finish.
+        _liveTumbleWin += tumble.winAmount;
         _gridCtrl.startTumble(
           fadingPaths: tumble.winningPaths,
           activeExplosions: tumble.clusterWins,
         );
+        notifyListeners();
         await Future.delayed(_tumbleFadeDuration);
 
         _gridCtrl.endTumble(newGrid: tumble.gridAfter);
@@ -356,6 +387,7 @@ class GameViewModel extends ChangeNotifier {
 
     _balanceCtrl.awardWin(result.totalWin);
     _gridCtrl.setWinningPositions(result.winningPositions);
+    _lastSpinResult = result;
 
     if (result.freeSpinsTriggered) {
       if (result.isRetrigger) {

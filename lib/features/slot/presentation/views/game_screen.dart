@@ -19,6 +19,8 @@ import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
+import 'widgets/win_amount_counter.dart';
+import 'widgets/win_presentation.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -294,7 +296,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         _viewModel,
                         _viewModel.balanceCtrl,
                       ]),
-                      builder: (context, _) => _buildStatusText(),
+                      builder: (context, _) => _buildStatusText(
+                        screenH: screenH,
+                        gridLeft: gridLeftPx,
+                        gridRight: gridRightPx,
+                        screenW: screenW,
+                      ),
                     ),
                   ],
                 ),
@@ -471,6 +478,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   targetItems: _viewModel.grid[col],
                   spinning: _viewModel.isSpinning,
                   fadingPaths: _viewModel.fadingPaths,
+                  clearedPositions: _viewModel.clearedPositions,
                   speedMultiplier: _viewModel.speedMultiplier,
                   onComplete: col == GameViewModel.columns - 1
                       ? () => _viewModel.onSpinComplete()
@@ -484,15 +492,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildStatusText() {
+  Widget _buildStatusText({
+    required double screenH,
+    required double screenW,
+    required double gridLeft,
+    required double gridRight,
+  }) {
     final lastWin = _viewModel.lastWin;
+    final liveWin = _viewModel.liveTumbleWin;
     final isBusy = _viewModel.isBusy;
+    final isTumbling = _viewModel.isTumbling;
 
     if (_viewModel.showInsufficientFundsHint) {
       return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
     }
 
-    if (lastWin > 0 && !isBusy) {
+    // Live counter — visible whenever cluster wins are accumulating
+    // mid-cascade. The chase counter inside [WinAmountCounter] tracks
+    // every tumble bump without resetting, so the value climbs as the
+    // symbols pop, not after.
+    if (isTumbling && liveWin > 0) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -500,14 +519,49 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         children: [
           Text('KAZANÇ', style: _statusKazancStyle),
           const SizedBox(width: 6),
-          TweenAnimationBuilder<double>(
-            key: ValueKey<double>(lastWin),
-            tween: Tween<double>(begin: 0, end: lastWin),
-            duration: const Duration(seconds: 1),
-            curve: Curves.easeOut,
-            builder: (context, value, _) =>
-                Text('₺${formatMoney(value)}', style: _statusBaseStyle),
+          WinAmountCounter(
+            to: liveWin,
+            style: _statusBaseStyle,
+            duration: const Duration(milliseconds: 900),
           ),
+        ],
+      );
+    }
+
+    if (lastWin > 0 && !isBusy) {
+      final result = _viewModel.lastSpinResult;
+      final hasMultiplierSequence =
+          result != null &&
+          result.baseWin > 0 &&
+          result.finalMultipliers.isNotEmpty;
+
+      if (hasMultiplierSequence) {
+        return WinPresentation(
+          key: ValueKey<double>(lastWin),
+          spinResult: result,
+          gridLeft: gridLeft,
+          gridTop: screenH * 0.195,
+          gridWidth: screenW - gridLeft - gridRight,
+          gridHeight: screenH * 0.32,
+          baseStyle: _statusBaseStyle,
+          accentStyle: _statusKazancStyle,
+          onMultiplierLifted: (col, row) {
+            _viewModel.gridCtrl.clearMultiplierPosition(col, row);
+          },
+        );
+      }
+
+      // Non-multiplier win — value already showed live during the
+      // cascade, so the counter just holds at [lastWin] without
+      // re-animating from zero.
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('KAZANÇ', style: _statusKazancStyle),
+          const SizedBox(width: 6),
+          Text('₺${formatMoney(lastWin)}', style: _statusBaseStyle),
         ],
       );
     }

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../models/multiplier_landing.dart';
 import '../models/spin_result.dart';
 import '../models/symbol_registry.dart';
 import '../models/tumble_step.dart';
@@ -117,6 +118,22 @@ class TumbleSimulator {
       buyFs: buyFs,
     );
 
+    // Snapshot every multiplier symbol still on the final grid so the
+    // win-presentation layer can fly each face value out of its own cell.
+    final finalMultipliers = <MultiplierLanding>[];
+    for (int c = 0; c < kEngineColumns; c++) {
+      for (int r = 0; r < kEngineRows; r++) {
+        final sym = SymbolRegistry.byPath(grid[c][r]);
+        if (sym != null && sym.isMultiplier) {
+          finalMultipliers.add(MultiplierLanding(
+            column: c,
+            row: r,
+            value: sym.multiplierValue,
+          ));
+        }
+      }
+    }
+
     // Scatters are evaluated after all tumbles so cascades can build them up.
     // Asymmetric: 4+ scatters trigger from base, 3+ retrigger from inside FS.
     final scatterCount = _countAsset(grid, scatterPath);
@@ -129,6 +146,8 @@ class TumbleSimulator {
       initialGrid: _deepCopy(startGrid),
       tumbles: tumbles,
       totalWin: totalWin,
+      baseWin: totalBaseWin,
+      finalMultipliers: finalMultipliers,
       tumbleCount: tumbleCount,
       freeSpinsTriggered: freeSpinsTriggered,
       isRetrigger: isFreeSpins && freeSpinsTriggered,

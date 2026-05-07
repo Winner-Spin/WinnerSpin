@@ -16,6 +16,7 @@ class GridController extends ChangeNotifier {
   Set<String> _fadingPaths = const {};
   List<ClusterWin> _activeExplosions = const [];
   Set<int> _winningPositions = {};
+  Set<int> _clearedPositions = const {};
 
   GridController(List<List<String>> initialGrid) {
     _grid = initialGrid;
@@ -28,6 +29,13 @@ class GridController extends ChangeNotifier {
   List<ClusterWin> get activeExplosions => _activeExplosions;
   Set<int> get winningPositions => _winningPositions;
 
+  /// Cells that should render as empty even though the grid still
+  /// holds a symbol there. Used by the win-presentation layer to
+  /// remove a multiplier symbol the moment its asset has lifted off
+  /// the cell, so the cell reads as "consumed". Encoded as
+  /// `column * 100 + row`.
+  Set<int> get clearedPositions => _clearedPositions;
+
   /// Snapshots the current grid so reels can animate from the previous
   /// layout to the next one. Mutates silently — paired with [setGrid]
   /// inside the same spin transaction.
@@ -39,6 +47,17 @@ class GridController extends ChangeNotifier {
     _fadingPaths = const {};
     _activeExplosions = const [];
     _winningPositions = {};
+    _clearedPositions = const {};
+    notifyListeners();
+  }
+
+  /// Marks a single (column, row) as cleared so the slot reel renders
+  /// it empty for the rest of the current spin. Called from the win
+  /// presentation layer when a multiplier asset lifts off its cell.
+  void clearMultiplierPosition(int column, int row) {
+    final key = column * 100 + row;
+    if (_clearedPositions.contains(key)) return;
+    _clearedPositions = {..._clearedPositions, key};
     notifyListeners();
   }
 
