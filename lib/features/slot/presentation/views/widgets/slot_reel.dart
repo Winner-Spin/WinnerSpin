@@ -230,11 +230,37 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     // RepaintBoundary keeps the bomb on its own paint layer
                     // so the per-frame Positioned shift in the drop animation
                     // doesn't re-rasterize the composition.
-                    ? RepaintBoundary(
-                        child: Lottie.asset(
-                          MultiplierBombAnimation.assetPath,
-                          fit: BoxFit.contain,
-                          animate: false,
+                    ? Center(
+                        child: SizedBox(
+                          width: itemH * 1.3,
+                          height: itemH * 1.3,
+                          child: RepaintBoundary(
+                            child: Stack(
+                              fit: StackFit.expand,
+                              clipBehavior: Clip.none,
+                              children: [
+                                Lottie.asset(
+                                  MultiplierBombAnimation.assetPath,
+                                  fit: BoxFit.contain,
+                                  animate: false,
+                                ),
+                                const Align(
+                                  alignment: Alignment(-0.10, 0.15),
+                                  child: FractionallySizedBox(
+                                    widthFactor: 0.50,
+                                    heightFactor: 0.50,
+                                    child: Image(
+                                      image: AssetImage(
+                                        'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
+                                      ),
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.medium,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       )
                     : Image.asset(

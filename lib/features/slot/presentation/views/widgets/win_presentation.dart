@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/spin_result.dart';
@@ -197,40 +199,49 @@ class _WinPresentationState extends State<WinPresentation> {
     final cellSize = cellW < cellH ? cellW : cellH;
 
     // The cell shows the bomb frozen on frame 0; this overlay plays the
-    // full Lottie timeline (fuse → blast → tail) on top. The cell symbol
-    // is cleared at the blast moment so the smoke tail reads as "the
-    // bomb is gone" instead of overlapping the still-frozen sprite.
-    await MultiplierBombAnimation.play(
+    // full Lottie timeline (fuse → blast → tail) on top. We don't await
+    // the whole timeline — we kick off the bomb in parallel, then wait
+    // only until the blast moment fires so the multiplier value can lift
+    // off in sync with the explosion. The smoke tail keeps playing
+    // alongside the collect flight.
+    final blastCompleter = Completer<void>();
+    final bombFuture = MultiplierBombAnimation.play(
       context: context,
       cellCenter: start,
       cellSize: cellSize,
       onBlast: () {
         widget.onMultiplierLifted?.call(landing.column, landing.row);
+        if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
     );
+
+    await blastCompleter.future;
     if (!mounted) return;
 
     // Landing is triggered the moment the floating asset crosses the
     // approach threshold (~70% of the flight) — well before the asset
     // has fully faded. The bar pulse and the asset's last 30% of fade
     // overlap, reading as a single merge instead of "lands then
-    // pulses". The await below only governs overlay cleanup.
-    await MultiplierCollectAnimation.play(
-      context: context,
-      start: start,
-      end: end,
-      value: landing.value,
-      cellSize: cellSize,
-      // End size at the bar tracks the bar's text height — the value
-      // shrinks to about a regular symbol slot in the running-sum text.
-      endSize: 30,
-      settleDuration: WinPresentationController.multiplierSettleDuration,
-      flightDuration: WinPresentationController.multiplierFlightDuration,
-      onApproaching: () {
-        if (!mounted) return;
-        _controller.onMultiplierLanded();
-      },
-    );
+    // pulses". Collect runs in parallel with the bomb's smoke tail.
+    await Future.wait([
+      bombFuture,
+      MultiplierCollectAnimation.play(
+        context: context,
+        start: start,
+        end: end,
+        value: landing.value,
+        cellSize: cellSize,
+        // End size at the bar tracks the bar's text height — the value
+        // shrinks to about a regular symbol slot in the running-sum text.
+        endSize: 30,
+        settleDuration: WinPresentationController.multiplierSettleDuration,
+        flightDuration: WinPresentationController.multiplierFlightDuration,
+        onApproaching: () {
+          if (!mounted) return;
+          _controller.onMultiplierLanded();
+        },
+      ),
+    ]);
   }
 
   @override

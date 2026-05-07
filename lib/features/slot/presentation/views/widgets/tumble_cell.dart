@@ -236,7 +236,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(2),
           child: Center(
             child: isMultiplier
-                ? _FrozenBomb(opacity: _imageOpacity)
+                ? _FrozenBomb(opacity: _imageOpacity, itemH: widget.itemH)
                 : Image.asset(
                     widget.path,
                     fit: BoxFit.contain,
@@ -259,7 +259,8 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 /// the cell's existing fade-out path keeps working.
 class _FrozenBomb extends StatelessWidget {
   final Animation<double> opacity;
-  const _FrozenBomb({required this.opacity});
+  final double itemH;
+  const _FrozenBomb({required this.opacity, required this.itemH});
 
   @override
   Widget build(BuildContext context) {
@@ -274,11 +275,46 @@ class _FrozenBomb extends StatelessWidget {
         opacity: opacity.value,
         child: child,
       ),
-      child: RepaintBoundary(
-        child: Lottie.asset(
-          MultiplierBombAnimation.assetPath,
-          fit: BoxFit.contain,
-          animate: false,
+      // Render the Lottie in a 1.3x cell-sized box so the rope can
+      // overflow into the row above (Clip.none lets it spill). The
+      // bomb's own scale was counter-shrunk in the composition so the
+      // visible bomb body stays the same size as before.
+      child: Center(
+        child: SizedBox(
+          width: itemH * 1.3,
+          height: itemH * 1.3,
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.none,
+              children: [
+                Lottie.asset(
+                  MultiplierBombAnimation.assetPath,
+                  fit: BoxFit.contain,
+                  animate: false,
+                ),
+                // The bomb body sits ~22% below the Lottie box's
+                // geometric centre. We wrap the 5x label in Align
+                // (with the same y-bias) because Stack's `alignment`
+                // is ignored when StackFit.expand gives non-positioned
+                // children tight constraints.
+                const Align(
+                  alignment: Alignment(-0.10, 0.22),
+                  child: FractionallySizedBox(
+                    widthFactor: 0.50,
+                    heightFactor: 0.50,
+                    child: Image(
+                      image: AssetImage(
+                        'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
+                      ),
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
