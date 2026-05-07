@@ -17,15 +17,11 @@ import 'package:lottie/lottie.dart';
 class MultiplierBombAnimation {
   MultiplierBombAnimation._();
 
-  static const String assetPath = 'lib/app/Bomb_Animation_1.json';
+  static const String assetPath =
+      'lib/app/Bomb_Animation_fuse35_explosion50.json';
 
-  /// Composition timeline: blast frame / total frames (459 / 602).
-  static const double _blastProgress = 459.0 / 602.0;
-
-  /// Playback length we force on the Lottie controller — the source
-  /// timeline is ~10 s of slow fuse, which is fine in isolation but
-  /// turns a 5-multiplier sequence into a minute of waiting.
-  static const Duration _playbackDuration = Duration(milliseconds: 2000);
+  /// Composition timeline: blast frame / total frames (35 / 85).
+  static const double _blastProgress = 35.0 / 85.0;
 
   /// Spawns the bomb in the root overlay. Future resolves the moment
   /// the full timeline finishes and the entry has been removed.
@@ -115,7 +111,7 @@ class _BombPlayerState extends State<_BombPlayer>
       fit: BoxFit.contain,
       onLoaded: (composition) {
         _ctrl
-          ..duration = MultiplierBombAnimation._playbackDuration
+          ..duration = composition.duration
           ..forward().then((_) {
             if (!mounted) return;
             if (!_blastFired) {
