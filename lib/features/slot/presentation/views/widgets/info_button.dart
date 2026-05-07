@@ -2,16 +2,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../game_rules_screen.dart';
+
 class InfoButton extends StatefulWidget {
   final VoidCallback? onTap;
   final double width;
   final double height;
+  final double betAmount;
 
   const InfoButton({
     super.key,
     this.onTap,
     this.width = 70,
     this.height = 42,
+    this.betAmount = 1.0,
   });
 
   @override
@@ -42,7 +46,20 @@ class _InfoButtonState extends State<InfoButton> {
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+      onTap: widget.onTap ??
+          () {
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: false,
+                barrierDismissible: true,
+                pageBuilder: (_, __, ___) => GameRulesScreen(betAmount: widget.betAmount),
+                transitionsBuilder: (_, anim, __, child) {
+                  return FadeTransition(opacity: anim, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 250),
+              ),
+            );
+          },
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
         alignment: Alignment.centerLeft,

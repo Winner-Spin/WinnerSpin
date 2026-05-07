@@ -22,6 +22,7 @@ import 'widgets/floating_win_overlay.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
 import '../../../auth/presentation/views/login_screen.dart';
+import 'system_settings_screen.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -136,6 +137,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       case AppLifecycleState.detached:
         _viewModel.onAppLifecycleEvent();
       case AppLifecycleState.resumed:
+        _viewModel.onAppResumed();
         break;
     }
   }
@@ -399,12 +401,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               Positioned(
                 top: screenH * 0.90,
                 left: 0,
-                child: const InfoButton(),
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, _) => InfoButton(
+                    betAmount: _viewModel.betAmount,
+                  ),
+                ),
               ),
               Positioned(
                 top: screenH * 0.90,
                 right: 0,
-                child: const SettingsButton(),
+                child: SettingsButton(
+                  onTap: () {
+                    showGeneralDialog(
+                      context: context,
+                      barrierColor: Colors.transparent,
+                      barrierDismissible: true,
+                      barrierLabel: 'Settings',
+                      transitionDuration: const Duration(milliseconds: 250),
+                      pageBuilder: (context, _, __) =>
+                          SystemSettingsScreen(viewModel: _viewModel),
+                      transitionBuilder: (context, anim, _, child) {
+                        return FadeTransition(opacity: anim, child: child);
+                      },
+                    );
+                  },
+                ),
               ),
               Positioned(
                 top: screenH * 0.90,

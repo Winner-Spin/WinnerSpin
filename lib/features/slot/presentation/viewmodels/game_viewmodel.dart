@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
@@ -31,6 +32,18 @@ class GameViewModel extends ChangeNotifier {
        _poolRepository = poolRepository ?? FirestorePoolRepository() {
     final result = SlotEngine.spin(_pool, 0);
     _gridCtrl = GridController(result.initialGrid);
+    _initMusic();
+  }
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isMusicInitialized = false;
+  
+  Future<void> _initMusic() async {
+    _isMusicInitialized = true;
+    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    if (_ambientMusic) {
+      await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
+    }
   }
 
   final AuthRepository _authRepository;
@@ -178,6 +191,49 @@ class GameViewModel extends ChangeNotifier {
   static const Duration _tumbleFadeDuration = Duration(milliseconds: 900);
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
+  // ── Settings ──
+  bool _batterySaver = false;
+  bool get batterySaver => _batterySaver;
+  void setBatterySaver(bool value) {
+    if (_batterySaver == value) return;
+    _batterySaver = value;
+    if (_batterySaver) {
+      _speedMultiplier = 1; // Force standard speed to save battery
+    }
+    notifyListeners();
+  }
+
+  bool _ambientMusic = true;
+  bool get ambientMusic => _ambientMusic;
+  void setAmbientMusic(bool value) {
+    if (_ambientMusic == value) return;
+    _ambientMusic = value;
+    if (_ambientMusic) {
+      if (!_isMusicInitialized) {
+        _initMusic();
+      } else {
+        _audioPlayer.resume();
+      }
+    } else {
+      _audioPlayer.pause();
+    }
+    notifyListeners();
+  }
+
+  bool _soundEffects = true;
+  bool get soundEffects => _soundEffects;
+  void setSoundEffects(bool value) {
+    _soundEffects = value;
+    notifyListeners();
+  }
+
+  bool _introScreen = true;
+  bool get introScreen => _introScreen;
+  void setIntroScreen(bool value) {
+    _introScreen = value;
+    notifyListeners();
+  }
+
   // ── User actions ──
 
   /// Flashes a transient "deposit funds" hint in the status bar for a
@@ -209,6 +265,7 @@ class GameViewModel extends ChangeNotifier {
 
   void toggleSpeed() {
     if (isBusy || _isAutoSpinning) return;
+    if (_batterySaver) return; // Block speed increase if battery saver is on
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
@@ -482,10 +539,22 @@ class GameViewModel extends ChangeNotifier {
   /// the last incremental save.
   Future<void> onAppLifecycleEvent() async {
     await _forceSavePool();
+    // Pause music if backgrounded
+    if (_ambientMusic) {
+      await _audioPlayer.pause();
+    }
+  }
+
+  void onAppResumed() {
+    // Resume music if it should be playing
+    if (_ambientMusic) {
+      _audioPlayer.resume();
+    }
   }
 
   @override
   void dispose() {
+    _audioPlayer.dispose();
     _userSubscription?.cancel();
     _insufficientHintTimer?.cancel();
     _balanceCtrl.dispose();
