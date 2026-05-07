@@ -32,4 +32,4 @@ flutter:
     - lib/images/slot_main_screen/
     - lib/images/slot_main_screen/Items/
     - assets/audio/
-    - lib/app/
+    - assets/animations/

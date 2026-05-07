@@ -13,7 +13,7 @@ class MultiplierBombAnimation {
   MultiplierBombAnimation._();
 
   static const String assetPath =
-      'lib/app/Bomb_Animation_half_fuse_35frame_explosion50.json';
+      'assets/animations/Bomb_Animation_half_fuse_burns_with_spark_aligned_35frame_explosion50.json';
 
   /// Composition timeline: blast frame / total frames (35 / 85).
   static const double _blastProgress = 35.0 / 85.0;
