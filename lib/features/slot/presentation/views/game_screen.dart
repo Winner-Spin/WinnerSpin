@@ -505,6 +505,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   onComplete: col == GameViewModel.columns - 1
                       ? () => _viewModel.onSpinComplete()
                       : null,
+                  // Only the first column triggers the residue wipe; the
+                  // grid controller no-ops if it's already empty so the
+                  // other columns calling later is harmless either way.
+                  onDropInStart: col == 0
+                      ? () => _viewModel.clearMultiplierResidues()
+                      : null,
                 ),
               ),
             );

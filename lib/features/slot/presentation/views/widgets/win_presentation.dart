@@ -204,6 +204,13 @@ class _WinPresentationState extends State<WinPresentation> {
     // only until the blast moment fires so the multiplier value can lift
     // off in sync with the explosion. The smoke tail keeps playing
     // alongside the collect flight.
+    // Wipe the resting bomb sprite from the grid the instant the
+    // overlay launches — otherwise the cell's frozen bomb sits behind
+    // the playing Lottie all through the fuse and blast frames, which
+    // reads as "two bombs" until the cell clear that used to be tied
+    // to the blast moment finally fires.
+    widget.onMultiplierLifted?.call(landing.column, landing.row);
+
     final blastCompleter = Completer<void>();
     final bombFuture = MultiplierBombAnimation.play(
       context: context,
@@ -211,7 +218,6 @@ class _WinPresentationState extends State<WinPresentation> {
       cellSize: cellSize,
       multiplierValue: landing.value,
       onBlast: () {
-        widget.onMultiplierLifted?.call(landing.column, landing.row);
         if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
     );

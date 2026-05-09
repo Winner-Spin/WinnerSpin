@@ -408,10 +408,19 @@ class GameViewModel extends ChangeNotifier {
     _fsCtrl.awardBoughtRound();
   }
 
+  /// Wipes the dust residue left by last round's exploded multipliers.
+  /// SlotReel calls this the moment the drop-in phase begins so the
+  /// drop-out can finish showing the residue but the static state
+  /// renders the new symbol cleanly.
+  void clearMultiplierResidues() {
+    _gridCtrl.clearMultiplierResidues();
+  }
+
   /// Plays back cascade tumbles, awards the win, and persists state.
   /// Called by SlotReel once the initial drop-in animation completes.
   Future<void> onSpinComplete() async {
     final result = _pendingResult;
+    _gridCtrl.clearMultiplierResidues();
     if (result == null) {
       _isSpinning = false;
       notifyListeners();
