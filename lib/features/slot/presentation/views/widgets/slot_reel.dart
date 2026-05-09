@@ -7,6 +7,22 @@ import '../../viewmodels/game_viewmodel.dart';
 import 'multiplier_bomb_animation.dart';
 import 'tumble_cell.dart';
 
+class SlotReelController {
+  _SlotReelState? _state;
+
+  void quickStop() => _state?._quickStop();
+
+  void _attach(_SlotReelState state) {
+    _state = state;
+  }
+
+  void _detach(_SlotReelState state) {
+    if (_state == state) {
+      _state = null;
+    }
+  }
+}
+
 /// A single slot-machine reel column that animates symbols
 /// through drop-out, empty, and drop-in phases.
 class SlotReel extends StatefulWidget {
@@ -40,6 +56,8 @@ class SlotReel extends StatefulWidget {
   /// Called when this reel's animation completes.
   final VoidCallback? onComplete;
 
+  final SlotReelController? controller;
+
   final int speedMultiplier;
 
   const SlotReel({
@@ -49,7 +67,11 @@ class SlotReel extends StatefulWidget {
     required this.targetItems,
     required this.spinning,
     this.fadingPaths = const {},
+<<<<<<< Updated upstream
     this.clearedPositions = const {},
+=======
+    this.controller,
+>>>>>>> Stashed changes
     this.speedMultiplier = 1,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 1200),
@@ -71,14 +93,30 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   Animation<double>? _animation;
 
   ReelState _state = ReelState.static;
+  bool _quickStopped = false;
+  bool _completeNotified = false;
+  bool _quickStopDropIn = false;
 
   /// Whether at least one spin has completed (to know which items to show).
   bool _hasCompleted = false;
 
   @override
+  void initState() {
+    super.initState();
+    widget.controller?._attach(this);
+  }
+
+  @override
   void didUpdateWidget(SlotReel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (widget.spinning && !oldWidget.spinning) {
+      _quickStopped = false;
+      _quickStopDropIn = false;
+      _completeNotified = false;
       _hasCompleted = false;
       _startSpin();
     }
@@ -94,7 +132,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     if (dropOutDelayMs > 0) {
       await Future.delayed(Duration(milliseconds: dropOutDelayMs));
-      if (!mounted) return;
+      if (!mounted || _quickStopped) return;
     }
 
     _controller?.dispose();
@@ -108,7 +146,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     setState(() => _state = ReelState.droppingOut);
 
     await _controller!.forward();
-    if (!mounted) return;
+    if (!mounted || _quickStopped) return;
 
     setState(() => _state = ReelState.empty);
 
@@ -123,7 +161,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final int totalEmptyWaitMs = waitToGlobalEmptyMs + 300 + dropInStaggerMs;
 
     await Future.delayed(Duration(milliseconds: totalEmptyWaitMs));
-    if (!mounted) return;
+    if (!mounted || _quickStopped) return;
 
     int dropInDurationMs = 900 ~/ speedMult;
 
@@ -138,14 +176,39 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     setState(() => _state = ReelState.droppingIn);
 
     await _controller!.forward();
+    _completeSpin();
+  }
 
-    if (mounted) {
-      setState(() {
-        _state = ReelState.static;
-        _hasCompleted = true;
-      });
-      widget.onComplete?.call();
-    }
+  Future<void> _quickStop() async {
+    if (_state == ReelState.static && _hasCompleted) return;
+    if (_quickStopped) return;
+    _quickStopped = true;
+
+    _controller?.stop();
+    _controller?.dispose();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
+
+    if (!mounted) return;
+    _quickStopDropIn = true;
+    setState(() => _state = ReelState.droppingIn);
+
+    await _controller!.forward();
+    _quickStopDropIn = false;
+    _completeSpin();
+  }
+
+  void _completeSpin() {
+    if (!mounted || _completeNotified) return;
+    _completeNotified = true;
+    setState(() {
+      _state = ReelState.static;
+      _hasCompleted = true;
+    });
+    widget.onComplete?.call();
   }
 
   Widget _buildIndependentItem(
@@ -175,8 +238,17 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       1.0,
     );
 
+    final bool useQuickStopDropIn = _quickStopDropIn && !isDropOut;
+    if (useQuickStopDropIn) {
+      final rowProgress = index / (rowCount - 1);
+      startDelayFraction = rowProgress * 0.12;
+      endFraction = (0.58 + rowProgress * 0.42).clamp(0.0, 1.0);
+    }
+
     final Curve curveType = isDropOut
         ? Curves.easeInCubic
+        : useQuickStopDropIn
+        ? _heftyBounceCurve
         : (speedMult > 1 ? _heftyBounceCurve : Curves.easeOutQuad);
 
     final Curve itemCurve = Interval(
@@ -331,20 +403,19 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _controller?.dispose();
     super.dispose();
   }
 }
 
-/// A custom curve creating a subtle recoil (bounce) effect.
-/// Derives from BackOut curve logic but uses a strictly limited
-/// amplitude (s=0.15) to prevent extreme positional overshoot.
+/// A custom curve creating a candy-machine spring landing effect.
 class _HeftyBounceCurve extends Curve {
   const _HeftyBounceCurve();
   @override
   double transformInternal(double t) {
     final double t1 = t - 1.0;
-    const double s = 1.0;
+    const double s = 1.35;
     return (t1 * t1 * ((s + 1.0) * t1 + s) + 1.0);
   }
 }

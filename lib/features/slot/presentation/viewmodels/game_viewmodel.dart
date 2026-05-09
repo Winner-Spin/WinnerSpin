@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
@@ -16,6 +20,43 @@ import 'controllers/ante_controller.dart';
 import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
 import 'controllers/grid_controller.dart';
+
+class GameHistoryEntry {
+  const GameHistoryEntry({
+    required this.id,
+    required this.playedAt,
+    required this.newBalance,
+    required this.bet,
+    required this.winAmount,
+  });
+
+  factory GameHistoryEntry.fromJson(Map<String, dynamic> json) {
+    final playedAt = DateTime.parse(json['playedAt'] as String);
+    return GameHistoryEntry(
+      id: json['id'] as String? ?? playedAt.microsecondsSinceEpoch.toString(),
+      playedAt: playedAt,
+      newBalance: (json['newBalance'] as num).toDouble(),
+      bet: (json['bet'] as num).toDouble(),
+      winAmount: (json['winAmount'] as num).toDouble(),
+    );
+  }
+
+  final String id;
+  final DateTime playedAt;
+  final double newBalance;
+  final double bet;
+  final double winAmount;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'playedAt': playedAt.toIso8601String(),
+      'newBalance': newBalance,
+      'bet': bet,
+      'winAmount': winAmount,
+    };
+  }
+}
 
 /// Top-level orchestrator for the slot screen. Composes four focused
 /// sub-controllers (balance, ante, free spins, grid) and coordinates the
@@ -37,7 +78,7 @@ class GameViewModel extends ChangeNotifier {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isMusicInitialized = false;
-  
+
   Future<void> _initMusic() async {
     _isMusicInitialized = true;
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
@@ -165,18 +206,20 @@ class GameViewModel extends ChangeNotifier {
   /// User-facing spin availability. Same rationale as
   /// [canBuyFreeSpinsForUi] — uses the displayed balance.
   bool get canSpinForUi =>
-      isInFreeSpins ||
-      _balanceCtrl.canAffordDisplayed(effectiveBetCost);
+      isInFreeSpins || _balanceCtrl.canAffordDisplayed(effectiveBetCost);
 
   /// True when the spin CTA can fire — free spins always allow it
   /// (cost-free), otherwise the player must cover the per-spin cost.
-  bool get canSpin =>
-      isInFreeSpins || _balanceCtrl.canAfford(effectiveBetCost);
+  bool get canSpin => isInFreeSpins || _balanceCtrl.canAfford(effectiveBetCost);
 
   // ── Pool + pending result ──
 
   PoolState _pool = PoolState();
   SpinResult? _pendingResult;
+  double _pendingHistoryBet = 0;
+  String? _historyUserId;
+  final List<GameHistoryEntry> _gameHistory = [];
+  List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
 
   /// Exposed result of the most recently completed spin. The win
   /// presentation layer reads `baseWin`, `finalMultipliers`, and
@@ -192,14 +235,11 @@ class GameViewModel extends ChangeNotifier {
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   // ── Settings ──
-  bool _batterySaver = false;
-  bool get batterySaver => _batterySaver;
-  void setBatterySaver(bool value) {
-    if (_batterySaver == value) return;
-    _batterySaver = value;
-    if (_batterySaver) {
-      _speedMultiplier = 1; // Force standard speed to save battery
-    }
+  bool _vibration = true;
+  bool get vibration => _vibration;
+  void setVibration(bool value) {
+    if (_vibration == value) return;
+    _vibration = value;
     notifyListeners();
   }
 
@@ -224,13 +264,6 @@ class GameViewModel extends ChangeNotifier {
   bool get soundEffects => _soundEffects;
   void setSoundEffects(bool value) {
     _soundEffects = value;
-    notifyListeners();
-  }
-
-  bool _introScreen = true;
-  bool get introScreen => _introScreen;
-  void setIntroScreen(bool value) {
-    _introScreen = value;
     notifyListeners();
   }
 
@@ -265,7 +298,6 @@ class GameViewModel extends ChangeNotifier {
 
   void toggleSpeed() {
     if (isBusy || _isAutoSpinning) return;
-    if (_batterySaver) return; // Block speed increase if battery saver is on
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
@@ -293,6 +325,9 @@ class GameViewModel extends ChangeNotifier {
     try {
       final uid = _authRepository.currentUserId;
       if (uid != null) {
+        _historyUserId = uid;
+        await _loadGameHistory();
+
         final results = await Future.wait([
           _authRepository.getUserData(uid),
           _poolRepository.load(uid),
@@ -353,11 +388,17 @@ class GameViewModel extends ChangeNotifier {
         _flashInsufficientFundsHint();
         return;
       }
+      _pendingHistoryBet = cost;
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
+<<<<<<< Updated upstream
     } else if (!kTestForceFreeSpins) {
       // Real FS round — consume one. Skipped under the test flag so
       // testing isn't bottlenecked by an FS counter that drains.
+=======
+    } else {
+      _pendingHistoryBet = 0;
+>>>>>>> Stashed changes
       _fsCtrl.consumeOne();
     }
 
@@ -366,6 +407,7 @@ class GameViewModel extends ChangeNotifier {
     _liveTumbleWin = 0;
     _gridCtrl.capturePreviousGrid();
     _gridCtrl.resetForNewSpin();
+    if (_vibration) HapticFeedback.lightImpact();
     notifyListeners();
 
     // anteBet/buyFs flags propagate the round's origin so multiplier scaling
@@ -432,7 +474,11 @@ class GameViewModel extends ChangeNotifier {
           fadingPaths: tumble.winningPaths,
           activeExplosions: tumble.clusterWins,
         );
+<<<<<<< Updated upstream
         notifyListeners();
+=======
+        if (_vibration) HapticFeedback.mediumImpact();
+>>>>>>> Stashed changes
         await Future.delayed(_tumbleFadeDuration);
 
         _gridCtrl.endTumble(newGrid: tumble.gridAfter);
@@ -443,6 +489,22 @@ class GameViewModel extends ChangeNotifier {
     }
 
     _balanceCtrl.awardWin(result.totalWin);
+    final playedAt = DateTime.now();
+    _gameHistory.insert(
+      0,
+      GameHistoryEntry(
+        id: playedAt.microsecondsSinceEpoch.toString(),
+        playedAt: playedAt,
+        newBalance: userBalance,
+        bet: _pendingHistoryBet,
+        winAmount: result.totalWin,
+      ),
+    );
+    if (_gameHistory.length > 30) {
+      _gameHistory.removeLast();
+    }
+    _saveGameHistory();
+    if (_vibration && result.totalWin > 0) HapticFeedback.heavyImpact();
     _gridCtrl.setWinningPositions(result.winningPositions);
     _lastSpinResult = result;
 
@@ -470,6 +532,7 @@ class GameViewModel extends ChangeNotifier {
     _savePoolIfNeeded();
 
     _pendingResult = null;
+    _pendingHistoryBet = 0;
 
     if (_isAutoSpinning) {
       Future.delayed(const Duration(milliseconds: 600), () {
@@ -496,6 +559,51 @@ class GameViewModel extends ChangeNotifier {
   }
 
   // ── Persistence ──
+
+  Future<File?> _gameHistoryFile() async {
+    final uid = _historyUserId;
+    if (uid == null) return null;
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/game_history_$uid.json');
+  }
+
+  Future<void> _loadGameHistory() async {
+    try {
+      final file = await _gameHistoryFile();
+      if (file == null || !await file.exists()) return;
+
+      final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
+      _gameHistory
+        ..clear()
+        ..addAll(
+          decoded
+              .cast<Map<String, dynamic>>()
+              .map(GameHistoryEntry.fromJson)
+              .take(30),
+        );
+    } catch (e) {
+      debugPrint('Game history load error: $e');
+    }
+  }
+
+  Future<void> _saveGameHistory() async {
+    try {
+      final file = await _gameHistoryFile();
+      if (file == null) return;
+      await file.writeAsString(
+        jsonEncode(_gameHistory.map((entry) => entry.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('Game history save error: $e');
+    }
+  }
+
+  void deleteGameHistoryEntries(Set<String> ids) {
+    if (ids.isEmpty) return;
+    _gameHistory.removeWhere((entry) => ids.contains(entry.id));
+    _saveGameHistory();
+    notifyListeners();
+  }
 
   void _savePlayerState() {
     final uid = _authRepository.currentUserId;

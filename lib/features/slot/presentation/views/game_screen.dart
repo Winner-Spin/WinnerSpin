@@ -33,6 +33,10 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
+  late final List<SlotReelController> _reelControllers;
+  bool _wasInFreeSpins = false;
+  bool _showFreeSpinTransition = false;
+  Timer? _freeSpinTransitionTimer;
 
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
@@ -46,8 +50,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _reelControllers = List.generate(
+      GameViewModel.columns,
+      (_) => SlotReelController(),
+    );
     WidgetsBinding.instance.addObserver(this);
     _viewModel.addListener(_onViewModelChange);
+    _viewModel.fsCtrl.addListener(_onFreeSpinStateChange);
     _viewModel.fetchUserData();
 
     // Pre-decode symbol assets at the cell-sized cache width so the
@@ -125,6 +134,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _handleLogout(context);
   }
 
+  void _onFreeSpinStateChange() {
+    final isInFreeSpins = _viewModel.isInFreeSpins;
+    if (isInFreeSpins && !_wasInFreeSpins) {
+      _freeSpinTransitionTimer?.cancel();
+      setState(() => _showFreeSpinTransition = true);
+      _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() => _showFreeSpinTransition = false);
+        }
+      });
+    }
+    _wasInFreeSpins = isInFreeSpins;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Force-save on every "leaving" lifecycle so balance + pool always reach
@@ -144,7 +167,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _freeSpinTransitionTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    _viewModel.fsCtrl.removeListener(_onFreeSpinStateChange);
     _viewModel.removeListener(_onViewModelChange);
     super.dispose();
   }
@@ -163,135 +188,143 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final double screenH = constraints.maxHeight;
-          final double screenW = constraints.maxWidth;
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _quickStopReels(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double screenH = constraints.maxHeight;
+            final double screenW = constraints.maxWidth;
 
-          // The backdrop is BoxFit.cover'd — when the screen aspect
-          // doesn't match the source aspect, the image gets horizontally
-          // cropped/extended. Compute the inner grid frame's actual
-          // on-screen position so the slot grid lands on the bg's own
-          // cell boundaries regardless of device aspect.
-          const double bgAspect = 1408 / 3040;
-          const double bgInnerLeftRatio = 88 / 1408; // bg's inner-frame left edge
-          const double bgInnerRightRatio = 1319 / 1408; // bg's inner-frame right edge
+            // The backdrop is BoxFit.cover'd — when the screen aspect
+            // doesn't match the source aspect, the image gets horizontally
+            // cropped/extended. Compute the inner grid frame's actual
+            // on-screen position so the slot grid lands on the bg's own
+            // cell boundaries regardless of device aspect.
+            const double bgAspect = 1408 / 3040;
+            const double bgInnerLeftRatio =
+                88 / 1408; // bg's inner-frame left edge
+            const double bgInnerRightRatio =
+                1319 / 1408; // bg's inner-frame right edge
 
-          final double screenAspect = screenW / screenH;
-          final double bgDisplayW;
-          final double bgLeftOnScreen;
-          if (screenAspect >= bgAspect) {
-            bgDisplayW = screenW;
-            bgLeftOnScreen = 0;
-          } else {
-            bgDisplayW = screenH * bgAspect;
-            bgLeftOnScreen = (screenW - bgDisplayW) / 2;
-          }
-          final double gridLeftPx =
-              bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
-          final double gridRightPx =
-              screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
+            final double screenAspect = screenW / screenH;
+            final double bgDisplayW;
+            final double bgLeftOnScreen;
+            if (screenAspect >= bgAspect) {
+              bgDisplayW = screenW;
+              bgLeftOnScreen = 0;
+            } else {
+              bgDisplayW = screenH * bgAspect;
+              bgLeftOnScreen = (screenW - bgDisplayW) / 2;
+            }
+            final double gridLeftPx =
+                bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
+            final double gridRightPx =
+                screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
 
-          return Stack(
-            children: [
-              Positioned.fill(
-                // Backdrop swaps to the FS-mode artwork while a free-spin
-                // round is active, so the round's distinct atmosphere is
-                // visible the moment FS starts.
-                child: ListenableBuilder(
-                  listenable: _viewModel.fsCtrl,
-                  builder: (context, _) {
-                    final bgPath = _viewModel.isInFreeSpins
-                        ? 'lib/images/slot_main_screen/freespin arka plan.png'
-                        : 'lib/images/slot_main_screen/nihai arka plan.png';
-                    return RepaintBoundary(
-                      child: Image.asset(
-                        bgPath,
-                        fit: BoxFit.cover,
-                        filterQuality: FilterQuality.low,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.195,
-                left: gridLeftPx,
-                right: gridRightPx,
-                height: screenH * 0.32,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned.fill(
-                      child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
-                        builder: (context, _) => _buildSlotGrid(),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
-                        builder: (context, _) {
-                          return RepaintBoundary(
-                            child: FloatingWinOverlay(
-                              activeExplosions: _viewModel.activeExplosions,
-                              gridWidth: screenW * 0.87,
-                              gridHeight: screenH * 0.32,
-                              speedMultiplier: _viewModel.speedMultiplier,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.15,
-                left: screenW * 0.1,
-                right: screenW * 0.1,
-                child: ListenableBuilder(
-                  listenable: _viewModel.fsCtrl,
-                  builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
-                      return FreeSpinsBanner(
-                        remaining: _viewModel.freeSpinsRemaining,
+            return Stack(
+              children: [
+                Positioned.fill(
+                  // Backdrop swaps to the FS-mode artwork while a free-spin
+                  // round is active, so the round's distinct atmosphere is
+                  // visible the moment FS starts.
+                  child: ListenableBuilder(
+                    listenable: _viewModel.fsCtrl,
+                    builder: (context, _) {
+                      final bgPath = _viewModel.isInFreeSpins
+                          ? 'lib/images/slot_main_screen/freespin arka plan.png'
+                          : 'lib/images/slot_main_screen/nihai arka plan.png';
+                      return RepaintBoundary(
+                        child: Image.asset(
+                          bgPath,
+                          fit: BoxFit.cover,
+                          alignment: const Alignment(0, -0.4),
+                          filterQuality: FilterQuality.low,
+                        ),
                       );
-                    }
-                    return const SizedBox.shrink();
-                  },
+                    },
+                  ),
                 ),
-              ),
-              Positioned(
-                top: screenH * 0.5185,
-                left: 0,
-                right: 0,
-                height: 31,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.58),
-                              Colors.black.withValues(alpha: 0.58),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.22, 0.78, 1.0],
+                Positioned(
+                  top: screenH * 0.195,
+                  left: gridLeftPx,
+                  right: gridRightPx,
+                  height: screenH * 0.32,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: ListenableBuilder(
+                          listenable: Listenable.merge([
+                            _viewModel,
+                            _viewModel.gridCtrl,
+                          ]),
+                          builder: (context, _) => _buildSlotGrid(),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: ListenableBuilder(
+                          listenable: Listenable.merge([
+                            _viewModel,
+                            _viewModel.gridCtrl,
+                          ]),
+                          builder: (context, _) {
+                            return RepaintBoundary(
+                              child: FloatingWinOverlay(
+                                activeExplosions: _viewModel.activeExplosions,
+                                gridWidth: screenW * 0.87,
+                                gridHeight: screenH * 0.32,
+                                speedMultiplier: _viewModel.speedMultiplier,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.15,
+                  left: screenW * 0.1,
+                  right: screenW * 0.1,
+                  child: ListenableBuilder(
+                    listenable: _viewModel.fsCtrl,
+                    builder: (context, _) {
+                      if (_viewModel.isInFreeSpins) {
+                        return FreeSpinsBanner(
+                          remaining: _viewModel.freeSpinsRemaining,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.5185,
+                  left: 0,
+                  right: 0,
+                  height: 31,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.58),
+                                Colors.black.withValues(alpha: 0.58),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.22, 0.78, 1.0],
+                            ),
                           ),
                         ),
                       ),
+<<<<<<< Updated upstream
                     ),
                     ListenableBuilder(
                       listenable: Listenable.merge([
@@ -367,115 +400,196 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           onTap: _viewModel.decreaseBet,
                           disabled: !_viewModel.canDecreaseBet,
                         ),
+=======
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          _viewModel,
+                          _viewModel.balanceCtrl,
+                        ]),
+                        builder: (context, _) => _buildStatusText(),
+>>>>>>> Stashed changes
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel,
-                        _viewModel.balanceCtrl,
-                        _viewModel.fsCtrl,
-                      ]),
-                      builder: (context, _) => RepaintBoundary(
-                        child: RespinButton(
-                          size: 84,
-                          onTap: _viewModel.spin,
-                          spinning: _viewModel.isBusy,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ListenableBuilder(
-                      listenable: _viewModel.balanceCtrl,
-                      builder: (context, _) => RepaintBoundary(
-                        child: PlusButton(
-                          size: 42,
-                          onTap: _viewModel.increaseBet,
-                          disabled: !_viewModel.canIncreaseBet,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: 0,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => InfoButton(
-                    betAmount: _viewModel.betAmount,
+                    ],
                   ),
                 ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                right: 0,
-                child: SettingsButton(
-                  onTap: () {
-                    showGeneralDialog(
-                      context: context,
-                      barrierColor: Colors.transparent,
-                      barrierDismissible: true,
-                      barrierLabel: 'Settings',
-                      transitionDuration: const Duration(milliseconds: 250),
-                      pageBuilder: (context, _, __) =>
-                          SystemSettingsScreen(viewModel: _viewModel),
-                      transitionBuilder: (context, anim, _, child) {
-                        return FadeTransition(opacity: anim, child: child);
-                      },
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: screenW * 0.30,
-                child: const AutoSpinButton(),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: screenW * 0.5 + 42,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => SpeedButton(
-                    level: _viewModel.speedMultiplier,
-                    onTap: _viewModel.toggleSpeed,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 12,
-                left: 0,
-                right: 0,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.22, 0.78, 1.0],
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  // Bottom panel only reads balance + bet — no need to
-                  // rebuild on unrelated _viewModel notifications.
+                Positioned(
+                  top: screenH * 0.57,
+                  left: screenW * 0.08,
                   child: ListenableBuilder(
-                    listenable: _viewModel.balanceCtrl,
-                    builder: (context, _) => _buildBottomPanel(screenW),
+                    listenable: Listenable.merge([
+                      _viewModel,
+                      _viewModel.balanceCtrl,
+                      _viewModel.anteCtrl,
+                      _viewModel.fsCtrl,
+                    ]),
+                    builder: (context, _) => RepaintBoundary(
+                      child: BuyFeatureButton(
+                        price: _viewModel.buyFeaturePrice,
+                        disabled:
+                            !_viewModel.canBuyFreeSpinsForUi ||
+                            _viewModel.anteBetActive,
+                        onTap: _viewModel.buyFreeSpins,
+                        width: screenW * 0.39,
+                        height: screenW * 0.22,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                Positioned(
+                  top: screenH * 0.57,
+                  right: screenW * 0.08,
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([
+                      _viewModel,
+                      _viewModel.anteCtrl,
+                      _viewModel.balanceCtrl,
+                    ]),
+                    builder: (context, _) => RepaintBoundary(
+                      child: DoubleChanceButton(
+                        betAmount: _viewModel.anteCost,
+                        isOn: _viewModel.anteBetActive,
+                        disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+                        onTap: _viewModel.toggleAnteBet,
+                        width: screenW * 0.39,
+                        height: screenW * 0.22,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.72,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ListenableBuilder(
+                        listenable: _viewModel.balanceCtrl,
+                        builder: (context, _) => RepaintBoundary(
+                          child: MinusButton(
+                            size: 42,
+                            onTap: _viewModel.decreaseBet,
+                            disabled: !_viewModel.canDecreaseBet,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          _viewModel,
+                          _viewModel.balanceCtrl,
+                          _viewModel.fsCtrl,
+                        ]),
+                        builder: (context, _) => RepaintBoundary(
+                          child: RespinButton(
+                            size: 84,
+                            onTap: _viewModel.spin,
+                            spinning: _viewModel.isBusy,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ListenableBuilder(
+                        listenable: _viewModel.balanceCtrl,
+                        builder: (context, _) => RepaintBoundary(
+                          child: PlusButton(
+                            size: 42,
+                            onTap: _viewModel.increaseBet,
+                            disabled: !_viewModel.canIncreaseBet,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.87,
+                  left: 0,
+                  child: ListenableBuilder(
+                    listenable: _viewModel,
+                    builder: (context, _) =>
+                        InfoButton(betAmount: _viewModel.betAmount),
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.87,
+                  right: 0,
+                  child: SettingsButton(
+                    onTap: () {
+                      showGeneralDialog(
+                        context: context,
+                        barrierColor: Colors.transparent,
+                        barrierDismissible: true,
+                        barrierLabel: 'Settings',
+                        transitionDuration: const Duration(milliseconds: 250),
+                        pageBuilder: (context, _, child) =>
+                            SystemSettingsScreen(viewModel: _viewModel),
+                        transitionBuilder: (context, anim, _, child) {
+                          return FadeTransition(opacity: anim, child: child);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: screenH * 0.87,
+                  left: screenW * 0.30,
+                  child: const AutoSpinButton(),
+                ),
+                Positioned(
+                  top: screenH * 0.87,
+                  left: screenW * 0.5 + 42,
+                  child: ListenableBuilder(
+                    listenable: _viewModel,
+                    builder: (context, _) => SpeedButton(
+                      level: _viewModel.speedMultiplier,
+                      onTap: _viewModel.toggleSpeed,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 12,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.45),
+                          Colors.black.withValues(alpha: 0.45),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.22, 0.78, 1.0],
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    // Bottom panel only reads balance + bet — no need to
+                    // rebuild on unrelated _viewModel notifications.
+                    child: ListenableBuilder(
+                      listenable: _viewModel.balanceCtrl,
+                      builder: (context, _) => _buildBottomPanel(screenW),
+                    ),
+                  ),
+                ),
+                if (_showFreeSpinTransition)
+                  const Positioned.fill(child: _FreeSpinScatterTransition()),
+              ],
+            );
+          },
+        ),
       ),
     );
+  }
+
+  void _quickStopReels() {
+    if (!_viewModel.isSpinning || _viewModel.isTumbling) return;
+    for (final controller in _reelControllers) {
+      controller.quickStop();
+    }
   }
 
   Widget _buildSlotGrid() {
@@ -500,7 +614,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   targetItems: _viewModel.grid[col],
                   spinning: _viewModel.isSpinning,
                   fadingPaths: _viewModel.fadingPaths,
+<<<<<<< Updated upstream
                   clearedPositions: _viewModel.clearedPositions,
+=======
+                  controller: _reelControllers[col],
+>>>>>>> Stashed changes
                   speedMultiplier: _viewModel.speedMultiplier,
                   onComplete: col == GameViewModel.columns - 1
                       ? () => _viewModel.onSpinComplete()
@@ -625,6 +743,159 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         const SizedBox(height: 1),
         _ClockText(style: _bottomClockStyle),
       ],
+    );
+  }
+}
+
+class _FreeSpinScatterTransition extends StatefulWidget {
+  const _FreeSpinScatterTransition();
+
+  @override
+  State<_FreeSpinScatterTransition> createState() =>
+      _FreeSpinScatterTransitionState();
+}
+
+class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+  late final Animation<double> _rotation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..forward();
+    _fade = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 18),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 55),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 27),
+    ]).animate(_controller);
+    _scale = Tween<double>(
+      begin: 0.25,
+      end: 1.45,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _rotation = Tween<double>(
+      begin: -0.16,
+      end: 0.08,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<Widget> _buildCupcakeBurst(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    const assetPath = 'lib/images/slot_main_screen/Items/cupCake.png';
+    const specs = [
+      (x: -0.12, y: -0.08, size: 0.38, angle: -0.34, delay: 0.00),
+      (x: 0.18, y: -0.18, size: 0.30, angle: 0.22, delay: 0.06),
+      (x: -0.35, y: 0.14, size: 0.28, angle: 0.38, delay: 0.10),
+      (x: 0.36, y: 0.10, size: 0.32, angle: -0.26, delay: 0.14),
+      (x: 0.02, y: 0.08, size: 0.48, angle: 0.08, delay: 0.02),
+      (x: -0.18, y: 0.34, size: 0.34, angle: -0.18, delay: 0.18),
+      (x: 0.26, y: 0.36, size: 0.27, angle: 0.31, delay: 0.22),
+      (x: -0.02, y: -0.42, size: 0.25, angle: -0.08, delay: 0.16),
+      (x: -0.42, y: -0.24, size: 0.22, angle: -0.52, delay: 0.04),
+      (x: 0.42, y: -0.28, size: 0.24, angle: 0.44, delay: 0.08),
+      (x: -0.48, y: 0.34, size: 0.21, angle: 0.58, delay: 0.20),
+      (x: 0.48, y: 0.30, size: 0.23, angle: -0.46, delay: 0.24),
+      (x: -0.28, y: -0.44, size: 0.19, angle: 0.18, delay: 0.12),
+      (x: 0.30, y: -0.46, size: 0.20, angle: -0.20, delay: 0.18),
+      (x: -0.08, y: 0.48, size: 0.22, angle: 0.36, delay: 0.26),
+      (x: 0.10, y: 0.52, size: 0.18, angle: -0.34, delay: 0.28),
+      (x: -0.54, y: -0.02, size: 0.17, angle: -0.16, delay: 0.15),
+      (x: 0.54, y: -0.04, size: 0.18, angle: 0.24, delay: 0.17),
+      (x: -0.34, y: 0.52, size: 0.16, angle: -0.40, delay: 0.30),
+      (x: 0.36, y: 0.50, size: 0.17, angle: 0.42, delay: 0.32),
+      (x: -0.56, y: -0.34, size: 0.15, angle: 0.26, delay: 0.05),
+      (x: 0.56, y: -0.36, size: 0.16, angle: -0.30, delay: 0.07),
+      (x: -0.58, y: 0.18, size: 0.15, angle: 0.48, delay: 0.21),
+      (x: 0.58, y: 0.16, size: 0.16, angle: -0.52, delay: 0.23),
+      (x: -0.20, y: -0.58, size: 0.15, angle: -0.22, delay: 0.10),
+      (x: 0.20, y: -0.60, size: 0.15, angle: 0.20, delay: 0.13),
+      (x: -0.22, y: 0.64, size: 0.15, angle: 0.54, delay: 0.34),
+      (x: 0.24, y: 0.62, size: 0.15, angle: -0.50, delay: 0.36),
+      (x: -0.46, y: -0.52, size: 0.14, angle: -0.44, delay: 0.11),
+      (x: 0.46, y: -0.54, size: 0.14, angle: 0.46, delay: 0.14),
+    ];
+
+    return specs
+        .map((spec) {
+          final localProgress = ((_controller.value - spec.delay) / 0.78).clamp(
+            0.0,
+            1.0,
+          );
+          final pop = Curves.easeOutBack.transform(localProgress);
+          final drift = Curves.easeOutCubic.transform(localProgress);
+
+          return Positioned(
+            left: size.width * (0.5 + spec.x) - (size.width * spec.size / 2),
+            top: size.height * (0.42 + spec.y) - (size.width * spec.size / 2),
+            child: Transform.translate(
+              offset: Offset(0, (1 - drift) * -90),
+              child: Transform.scale(
+                scale: (0.25 + pop * 0.75) * _scale.value.clamp(0.8, 1.12),
+                child: Transform.rotate(
+                  angle: spec.angle + _rotation.value,
+                  child: Image.asset(
+                    assetPath,
+                    width: size.width * spec.size,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
+            ),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Opacity(
+            opacity: _fade.value,
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.38),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  ..._buildCupcakeBurst(context),
+                  Positioned(
+                    bottom: MediaQuery.of(context).size.height * 0.26,
+                    child: Text(
+                      'FREE SPINS',
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFFFD13B),
+                        letterSpacing: 2.0,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.9),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

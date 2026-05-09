@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Boot iPhone 16 Pro Simulator",
+            "type": "shell",
+            "command": "xcrun simctl list devices booted | grep -q EEE00AD2-3024-4EA9-BF1F-A45742A7DBB3 || xcrun simctl boot EEE00AD2-3024-4EA9-BF1F-A45742A7DBB3; open -a Simulator",
+            "problemMatcher": []
+        }
+    ]
+}
