@@ -268,45 +268,63 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   },
                 ),
               ),
-              Positioned(
-                top: screenH * 0.5185,
-                left: 0,
-                right: 0,
-                height: 31,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.58),
-                              Colors.black.withValues(alpha: 0.58),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.22, 0.78, 1.0],
+              ListenableBuilder(
+                listenable: Listenable.merge([
+                  _viewModel,
+                  _viewModel.fsCtrl,
+                ]),
+                builder: (context, _) {
+                  // In free-spin rounds the strip doubles in height so
+                  // it can host an extra info line beneath the Kazanç
+                  // text.
+                  final isFs = _viewModel.isInFreeSpins;
+                  final stripHeight = isFs ? 62.0 : 31.0;
+                  return Positioned(
+                    top: screenH * 0.5185,
+                    left: 0,
+                    right: 0,
+                    height: stripHeight,
+                    child: Stack(
+                      alignment: isFs
+                          ? Alignment.topCenter
+                          : Alignment.center,
+                      children: [
+                        IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.58),
+                                  Colors.black.withValues(alpha: 0.58),
+                                  Colors.transparent,
+                                ],
+                                stops: const [0.0, 0.22, 0.78, 1.0],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: ListenableBuilder(
+                            listenable: Listenable.merge([
+                              _viewModel,
+                              _viewModel.balanceCtrl,
+                            ]),
+                            builder: (context, _) => _buildStatusText(
+                              screenH: screenH,
+                              gridLeft: gridLeftPx,
+                              gridRight: gridRightPx,
+                              screenW: screenW,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel,
-                        _viewModel.balanceCtrl,
-                      ]),
-                      builder: (context, _) => _buildStatusText(
-                        screenH: screenH,
-                        gridLeft: gridLeftPx,
-                        gridRight: gridRightPx,
-                        screenW: screenW,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
               Positioned(
                 top: screenH * 0.55,
@@ -318,16 +336,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.anteCtrl,
                     _viewModel.fsCtrl,
                   ]),
-                  builder: (context, _) => RepaintBoundary(
-                    child: BuyFeatureButton(
-                      price: _viewModel.buyFeaturePrice,
-                      disabled: !_viewModel.canBuyFreeSpinsForUi ||
-                          _viewModel.anteBetActive,
-                      onTap: _viewModel.buyFreeSpins,
-                      width: screenW * 0.39,
-                      height: screenW * 0.22,
-                    ),
-                  ),
+                  builder: (context, _) {
+                    if (_viewModel.isInFreeSpins) return const SizedBox.shrink();
+                    return RepaintBoundary(
+                      child: BuyFeatureButton(
+                        price: _viewModel.buyFeaturePrice,
+                        disabled: !_viewModel.canBuyFreeSpinsForUi ||
+                            _viewModel.anteBetActive,
+                        onTap: _viewModel.buyFreeSpins,
+                        width: screenW * 0.39,
+                        height: screenW * 0.22,
+                      ),
+                    );
+                  },
                 ),
               ),
               Positioned(
@@ -338,17 +359,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel,
                     _viewModel.anteCtrl,
                     _viewModel.balanceCtrl,
+                    _viewModel.fsCtrl,
                   ]),
-                  builder: (context, _) => RepaintBoundary(
-                    child: DoubleChanceButton(
-                      betAmount: _viewModel.anteCost,
-                      isOn: _viewModel.anteBetActive,
-                      disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
-                      onTap: _viewModel.toggleAnteBet,
-                      width: screenW * 0.39,
-                      height: screenW * 0.22,
-                    ),
-                  ),
+                  builder: (context, _) {
+                    if (_viewModel.isInFreeSpins) return const SizedBox.shrink();
+                    return RepaintBoundary(
+                      child: DoubleChanceButton(
+                        betAmount: _viewModel.anteCost,
+                        isOn: _viewModel.anteBetActive,
+                        disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+                        onTap: _viewModel.toggleAnteBet,
+                        width: screenW * 0.39,
+                        height: screenW * 0.22,
+                      ),
+                    );
+                  },
                 ),
               ),
               Positioned(

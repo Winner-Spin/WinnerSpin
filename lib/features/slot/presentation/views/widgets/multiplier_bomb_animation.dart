@@ -21,10 +21,10 @@ class MultiplierBombAnimation {
   /// Composition timeline: blast frame / total frames (35 / 85).
   static const double _blastProgress = 35.0 / 85.0;
 
-  /// Cut-off after the blast peak — the explosion peaks around frame
-  /// 50, so 60 keeps the colourful detonation fully on screen and
-  /// trims only the long smoke tail before the cell clears.
-  static const double _blastEndProgress = 60.0 / 85.0;
+  /// Cut-off at the blast peak — explosion peaks around frame 50, so
+  /// stopping there keeps the full punch on screen but trims the
+  /// fade-out / light-spread the trailing frames produce.
+  static const double _blastEndProgress = 50.0 / 85.0;
 
   /// Spawns the bomb in the root overlay. Future resolves the moment
   /// the full timeline finishes and the entry has been removed.
