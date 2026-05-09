@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
 
-import '../../domain/models/spin_result.dart';
+import '../../domain/models/cluster_win.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
@@ -37,10 +37,46 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
 
   // Drives the multiplier collect sequence. Lifted into the screen
-  // state so the FS-mode strip can split the presentation: top half
-  // mirrors the live total off the controller while the formula
-  // renders below in the bottom info line.
+  // state so the FS-mode strip can split the presentation across the
+  // top Kazanç readout and the middle tumble-win counter.
   final WinPresentationController _winCtrl = WinPresentationController();
+
+  // Flight target for multiplier collect animations — bombs land on
+  // the middle "TUMBLE WIN" counter rather than on a formula bar.
+  final GlobalKey _tumbleWinAnchorKey = GlobalKey();
+
+  // Last-popped cluster shown on the FS-mode bottom info band. Held
+  // across empty windows between tumbles so the cluster line keeps
+  // reading until the next reel kicks off; cleared the moment a new
+  // spin starts.
+  ClusterWin? _lingeringCluster;
+  bool _wasBusy = false;
+
+  // FS-round running total. Accumulates each spin's awarded win so
+  // the top Kazanç readout climbs through the round instead of
+  // resetting to zero on every new reel.
+  double _fsAccumulatedWin = 0;
+  double _lastSeenLastWin = 0;
+  bool _wasInFs = false;
+
+  // Spin total awaiting the visual hand-off into the top Kazanç. We
+  // hold this through the multiplier collect so the round total only
+  // climbs after the middle TUMBLE WIN has fully resolved at its
+  // final amount.
+  double _pendingFsSpinWin = 0;
+  WinPresentationPhase _lastWinCtrlPhase = WinPresentationPhase.idle;
+
+  // Anchor for the running Kazanç readout — the flying tumble sprite
+  // aims here so the value lands on top of the round total.
+  final GlobalKey _kazancAnchorKey = GlobalKey();
+
+  // True while the tumble-win sprite is in flight toward the Kazanç
+  // readout. The middle band drops to ₺0 for the duration so the
+  // value visually leaves TUMBLE WIN as it arrives at Kazanç. Once
+  // the sprite lands the flag flips back, restoring the multiplied
+  // total in the middle so the player still sees the spin's win
+  // sitting there.
+  bool _isFlyingTumble = false;
 
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
@@ -56,6 +92,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _viewModel.addListener(_onViewModelChange);
+    // The ViewModel itself doesn't notify after `awardWin` — that
+    // path only fires on the balance controller. Listen there too so
+    // the lastWin → FS-accumulator hand-off doesn't get missed.
+    _viewModel.balanceCtrl.addListener(_onViewModelChange);
+    _viewModel.gridCtrl.addListener(_onViewModelChange);
+    _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
 
     // Pre-decode symbol assets at the cell-sized cache width so the
@@ -131,6 +173,80 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onViewModelChange() {
     _handleLogout(context);
+    _trackSpinTransitions();
+    _trackLingeringCluster();
+    _trackFsAccumulator();
+  }
+
+  void _trackSpinTransitions() {
+    final isBusy = _viewModel.isBusy;
+    if (isBusy && !_wasBusy) {
+      // New reel kicked off — drop the lingering cluster so the bottom
+      // info band falls back to FREE SPINS LEFT, and reset the
+      // multiplier controller so the middle tumble-win readout starts
+      // the round at zero rather than carrying the previous spin's
+      // final state. Any FS spin total still waiting for its visual
+      // hand-off is committed now so it isn't lost when the
+      // controller resets back to idle.
+      _commitPendingFsWin();
+      _winCtrl.reset();
+      if (_lingeringCluster != null) {
+        setState(() => _lingeringCluster = null);
+      }
+    }
+    _wasBusy = isBusy;
+  }
+
+  void _trackFsAccumulator() {
+    final isInFs = _viewModel.isInFreeSpins;
+    if (isInFs && !_wasInFs) {
+      // Fresh free-spin round — start the accumulator from scratch.
+      setState(() {
+        _fsAccumulatedWin = 0;
+        _pendingFsSpinWin = 0;
+      });
+    }
+    _wasInFs = isInFs;
+
+    if (!isInFs) return;
+
+    final lastWin = _viewModel.lastWin;
+    if (lastWin > 0 && _lastSeenLastWin == 0) {
+      setState(() => _pendingFsSpinWin = lastWin);
+      // The viewmodel notifies via balanceCtrl from inside awardWin,
+      // but the new `lastSpinResult` is assigned a couple of lines
+      // later — reading it synchronously here would still see the
+      // previous spin's data. A microtask defers the hasSequence
+      // check until that assignment has run.
+      Future.microtask(() {
+        if (!mounted) return;
+        final result = _viewModel.lastSpinResult;
+        final hasSequence = result != null &&
+            result.baseWin > 0 &&
+            result.finalMultipliers.isNotEmpty;
+        if (!hasSequence) {
+          // No multiplier collect to wait on — give the player a
+          // brief beat to read the TUMBLE WIN value, then fly it
+          // up. Multiplier spins instead wait for phase=done from
+          // [_onWinCtrlChange] before triggering the flight.
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) _commitPendingFsWin();
+          });
+        }
+      });
+    }
+    _lastSeenLastWin = lastWin;
+  }
+
+  void _trackLingeringCluster() {
+    final activeExplosions = _viewModel.activeExplosions;
+    if (activeExplosions.isEmpty) return;
+    final best = activeExplosions.reduce(
+      (a, b) => a.amount >= b.amount ? a : b,
+    );
+    if (!identical(_lingeringCluster, best)) {
+      setState(() => _lingeringCluster = best);
+    }
   }
 
   @override
@@ -154,8 +270,84 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
+    _viewModel.balanceCtrl.removeListener(_onViewModelChange);
+    _viewModel.gridCtrl.removeListener(_onViewModelChange);
+    _winCtrl.removeListener(_onWinCtrlChange);
     _winCtrl.dispose();
     super.dispose();
+  }
+
+  void _onWinCtrlChange() {
+    final phase = _winCtrl.phase;
+    if (phase == WinPresentationPhase.done &&
+        _lastWinCtrlPhase != WinPresentationPhase.done) {
+      // Brief hold so the player can read the multiplied total in
+      // TUMBLE WIN before it lifts off toward the Kazanç row.
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _commitPendingFsWin();
+      });
+    }
+    _lastWinCtrlPhase = phase;
+  }
+
+  void _commitPendingFsWin() {
+    if (_pendingFsSpinWin <= 0) return;
+    final amount = _pendingFsSpinWin;
+
+    // Capture the start (TUMBLE WIN) and end (Kazanç) screen
+    // positions before the layout flips — once the band drops to ₺0
+    // the anchor's render rect would describe the shrunken text.
+    final startBox =
+        _tumbleWinAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+    final endBox =
+        _kazancAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (startBox != null && endBox != null) {
+      final startCenter = startBox.localToGlobal(
+        Offset(startBox.size.width / 2, startBox.size.height / 2),
+      );
+      final endCenter = endBox.localToGlobal(
+        Offset(endBox.size.width / 2, endBox.size.height / 2),
+      );
+
+      final overlay = Overlay.of(context, rootOverlay: true);
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (ctx) => _FlyingTumbleSprite(
+          amount: amount,
+          start: startCenter,
+          end: endCenter,
+          style: _statusBaseStyle,
+          duration: const Duration(milliseconds: 700),
+          onComplete: () {
+            entry.remove();
+            if (!mounted) return;
+            // Sprite has landed at the Kazanç readout — fold the
+            // amount into the round accumulator now so the top
+            // counter starts climbing the moment the value arrives.
+            // Flipping [_isFlyingTumble] back also restores the
+            // multiplied total in the middle band.
+            setState(() {
+              _isFlyingTumble = false;
+              _fsAccumulatedWin += amount;
+            });
+          },
+        ),
+      );
+      overlay.insert(entry);
+
+      setState(() {
+        _isFlyingTumble = true;
+        _pendingFsSpinWin = 0;
+      });
+    } else {
+      // Layout missing — fall back to a plain accumulator commit so
+      // the spin's value isn't lost if the anchors haven't laid out.
+      setState(() {
+        _fsAccumulatedWin += amount;
+        _pendingFsSpinWin = 0;
+      });
+    }
   }
 
   void _handleLogout(BuildContext context) {
@@ -283,74 +475,87 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   _viewModel.fsCtrl,
                 ]),
                 builder: (context, _) {
-                  // In free-spin rounds the strip doubles in height so
-                  // it can host an extra info line beneath the Kazanç
-                  // text.
+                  // In free-spin rounds the strip splits into three
+                  // black bands of the original height: top hosts the
+                  // per-spin TUMBLE WIN counter, the FREE SPINS LEFT
+                  // / cluster info line sits flush beneath it, and
+                  // the round Kazanç readout sits at the bottom past
+                  // a transparent gap.
                   final isFs = _viewModel.isInFreeSpins;
-                  final stripHeight = isFs ? 62.0 : 31.0;
+                  const bandHeight = 31.0;
+                  const wideGap = 31.0;
+                  // Tumble + info share one continuous black panel,
+                  // separated from Kazanç by [wideGap] of background.
+                  const infoTop = bandHeight;
+                  const kazancTop = infoTop + bandHeight + wideGap;
+                  const fsTotalHeight = kazancTop + bandHeight;
+                  final totalHeight = isFs ? fsTotalHeight : bandHeight;
+                  final kazancBand = _buildStatusBand(
+                    child: ListenableBuilder(
+                      listenable: Listenable.merge([
+                        _viewModel,
+                        _viewModel.balanceCtrl,
+                      ]),
+                      builder: (context, _) => _buildStatusText(
+                        screenH: screenH,
+                        gridLeft: gridLeftPx,
+                        gridRight: gridRightPx,
+                        screenW: screenW,
+                      ),
+                    ),
+                  );
                   return Positioned(
                     top: screenH * 0.5185,
                     left: 0,
                     right: 0,
-                    height: stripHeight,
+                    height: totalHeight,
                     child: Stack(
-                      alignment: isFs
-                          ? Alignment.topCenter
-                          : Alignment.center,
                       children: [
-                        IgnorePointer(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.58),
-                                  Colors.black.withValues(alpha: 0.58),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.22, 0.78, 1.0],
+                        if (isFs) ...[
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: bandHeight,
+                            child: _buildStatusBand(
+                              child: _buildTumbleWinSlot(
+                                screenH: screenH,
+                                screenW: screenW,
+                                gridLeft: gridLeftPx,
+                                gridRight: gridRightPx,
                               ),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: ListenableBuilder(
-                            listenable: Listenable.merge([
-                              _viewModel,
-                              _viewModel.balanceCtrl,
-                            ]),
-                            builder: (context, _) => _buildStatusText(
-                              screenH: screenH,
-                              gridLeft: gridLeftPx,
-                              gridRight: gridRightPx,
-                              screenW: screenW,
-                            ),
-                          ),
-                        ),
-                        if (isFs)
                           Positioned(
+                            top: infoTop,
                             left: 0,
                             right: 0,
-                            bottom: 4,
-                            child: Center(
+                            height: bandHeight,
+                            child: _buildStatusBand(
                               child: ListenableBuilder(
                                 listenable: Listenable.merge([
                                   _viewModel,
                                   _viewModel.fsCtrl,
                                   _viewModel.gridCtrl,
-                                  _winCtrl,
                                 ]),
-                                builder: (context, _) => _buildFsInfoLine(
-                                  screenH: screenH,
-                                  screenW: screenW,
-                                  gridLeft: gridLeftPx,
-                                  gridRight: gridRightPx,
-                                ),
+                                builder: (context, _) => _buildFsInfoLine(),
                               ),
                             ),
+                          ),
+                          Positioned(
+                            top: kazancTop,
+                            left: 0,
+                            right: 0,
+                            height: bandHeight,
+                            child: kazancBand,
+                          ),
+                        ] else
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: bandHeight,
+                            child: kazancBand,
                           ),
                       ],
                     ),
@@ -592,6 +797,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
     }
 
+    if (isFs) {
+      // FS mode top is the round-running Kazanç total — every spin's
+      // awarded win folds into the accumulator so the value keeps
+      // climbing across the round instead of dropping back to zero on
+      // each new reel. The chase counter animates each fold-in so the
+      // value visibly grows as the tumble sprite lands.
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('KAZANÇ', style: _statusKazancStyle),
+          const SizedBox(width: 6),
+          Container(
+            key: _kazancAnchorKey,
+            child: WinAmountCounter(
+              to: _fsAccumulatedWin,
+              style: _statusBaseStyle,
+              duration: const Duration(milliseconds: 700),
+            ),
+          ),
+        ],
+      );
+    }
+
     // Live counter — visible whenever cluster wins are accumulating
     // mid-cascade. The chase counter inside [WinAmountCounter] tracks
     // every tumble bump without resetting, so the value climbs as the
@@ -621,12 +851,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           result.finalMultipliers.isNotEmpty;
 
       if (hasMultiplierSequence) {
-        // FS mode: top stays a Kazanç readout that climbs in sync
-        // with the formula rendered below; the orchestrator widget is
-        // mounted in the bottom info line instead of here.
-        if (isFs) {
-          return _buildLiveKazancRow(result);
-        }
         return WinPresentation(
           key: ValueKey<double>(lastWin),
           controller: _winCtrl,
@@ -658,23 +882,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       );
     }
 
-    // Free-spin idle / busy fallback — instead of the placeholder
-    // greetings, the strip keeps the Kazanç readout up at zero so the
-    // player always sees the running total format and the bar's height
-    // is never visually empty.
-    if (isFs) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('KAZANÇ', style: _statusKazancStyle),
-          const SizedBox(width: 6),
-          Text('₺${formatMoney(lastWin)}', style: _statusBaseStyle),
-        ],
-      );
-    }
-
     if (isBusy) {
       return Text('GOOD LUCK!', style: _statusBaseStyle);
     }
@@ -682,124 +889,273 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
   }
 
-  Widget _buildLiveKazancRow(SpinResult result) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
+  Widget _buildStatusBand({required Widget child}) {
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        Text('KAZANÇ', style: _statusKazancStyle),
-        const SizedBox(width: 6),
-        ListenableBuilder(
-          listenable: _winCtrl,
-          builder: (ctx, _) {
-            return WinAmountCounter(
-              from: result.baseWin,
-              to: _liveTotalForController(_winCtrl, result),
-              style: _statusBaseStyle,
-              duration: const Duration(milliseconds: 350),
-            );
-          },
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.58),
+                    Colors.black.withValues(alpha: 0.58),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.22, 0.78, 1.0],
+                ),
+              ),
+            ),
+          ),
         ),
+        child,
       ],
     );
   }
 
-  double _liveTotalForController(
-    WinPresentationController ctrl,
-    SpinResult result,
-  ) {
-    switch (ctrl.phase) {
-      case WinPresentationPhase.idle:
-      case WinPresentationPhase.baseCounting:
-        return result.baseWin;
-      case WinPresentationPhase.multiplierCollecting:
-        return ctrl.runningSum > 0
-            ? ctrl.baseWin * ctrl.runningSum
-            : ctrl.baseWin;
-      case WinPresentationPhase.finalCounting:
-      case WinPresentationPhase.done:
-        return result.totalWin;
-    }
-  }
-
-  Widget _buildFsInfoLine({
+  Widget _buildTumbleWinSlot({
     required double screenH,
     required double screenW,
     required double gridLeft,
     required double gridRight,
   }) {
-    final smallStyle = _statusBaseStyle.copyWith(fontSize: 14);
-    final smallAccent = _statusKazancStyle.copyWith(fontSize: 14);
-
     final result = _viewModel.lastSpinResult;
     final hasMultiplierSequence =
         result != null &&
         result.baseWin > 0 &&
         result.finalMultipliers.isNotEmpty;
-    // Mount the multiplier collect orchestrator while the sequence is
-    // live (anything except the post-reveal `done` state). The
-    // formula-only bar handles per-phase visibility from there; once
-    // the sequence finishes, the slot reverts to the base FS line.
-    final showFormulaSlot = hasMultiplierSequence &&
+    // While a multiplier sequence is live, mount the orchestrator on
+    // top of the counter so bombs fire and collect flights aim at the
+    // tumble-win anchor. The widget itself is silent — it stays
+    // mounted only to drive the controller and the overlays.
+    final showOrchestrator = hasMultiplierSequence &&
         !_viewModel.isBusy &&
         _winCtrl.phase != WinPresentationPhase.done;
 
-    if (showFormulaSlot) {
-      return WinPresentation(
-        key: ValueKey<Object?>(result),
-        controller: _winCtrl,
-        formulaOnly: true,
-        spinResult: result,
-        gridLeft: gridLeft,
-        gridTop: screenH * 0.195,
-        gridWidth: screenW - gridLeft - gridRight,
-        gridHeight: screenH * 0.32,
-        baseStyle: smallStyle,
-        accentStyle: smallAccent,
-        onMultiplierLifted: (col, row) {
-          _viewModel.gridCtrl.clearMultiplierPosition(col, row);
-        },
+    return Stack(
+      children: [
+        Center(
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              _viewModel,
+              _viewModel.balanceCtrl,
+              _viewModel.gridCtrl,
+              _winCtrl,
+            ]),
+            builder: (context, _) => _buildTumbleWinLine(),
+          ),
+        ),
+        if (showOrchestrator)
+          WinPresentation(
+            key: ValueKey<Object?>(result),
+            controller: _winCtrl,
+            formulaOnly: true,
+            flightTargetKey: _tumbleWinAnchorKey,
+            spinResult: result,
+            gridLeft: gridLeft,
+            gridTop: screenH * 0.195,
+            gridWidth: screenW - gridLeft - gridRight,
+            gridHeight: screenH * 0.32,
+            baseStyle: _statusBaseStyle,
+            accentStyle: _statusKazancStyle,
+            onMultiplierLifted: (col, row) {
+              _viewModel.gridCtrl.clearMultiplierPosition(col, row);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTumbleWinLine() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text('TUMBLE WIN', style: _statusKazancStyle),
+        const SizedBox(width: 6),
+        _buildTumbleWinValue(),
+      ],
+    );
+  }
+
+  Widget _buildTumbleWinValue() {
+    // While the spin's win is mid-flight up to the Kazanç readout the
+    // middle band drops to ₺0 — once the sprite lands the flag flips
+    // back and the multiplied total restores in place.
+    if (_isFlyingTumble) {
+      return Container(
+        key: _tumbleWinAnchorKey,
+        child: Text('₺${formatMoney(0)}', style: _statusBaseStyle),
       );
     }
 
-    final activeExplosions = _viewModel.activeExplosions;
-    if (activeExplosions.isNotEmpty) {
-      final cluster = activeExplosions.reduce(
-        (a, b) => a.amount >= b.amount ? a : b,
+    // During a live spin (reels turning, cascade popping) the value
+    // chases the running cluster total so the player sees the bar
+    // climb in lock-step with each tumble pop.
+    if (_viewModel.isBusy) {
+      return Container(
+        key: _tumbleWinAnchorKey,
+        child: WinAmountCounter(
+          to: _viewModel.liveTumbleWin,
+          style: _statusBaseStyle,
+          duration: const Duration(milliseconds: 350),
+        ),
       );
+    }
+
+    final result = _viewModel.lastSpinResult;
+    if (result == null) {
+      return Container(
+        key: _tumbleWinAnchorKey,
+        child: Text(
+          '₺${formatMoney(_viewModel.lastWin)}',
+          style: _statusBaseStyle,
+        ),
+      );
+    }
+
+    final hasSequence =
+        result.baseWin > 0 && result.finalMultipliers.isNotEmpty;
+    if (!hasSequence) {
+      return Container(
+        key: _tumbleWinAnchorKey,
+        child: Text(
+          '₺${formatMoney(result.totalWin)}',
+          style: _statusBaseStyle,
+        ),
+      );
+    }
+
+    switch (_winCtrl.phase) {
+      case WinPresentationPhase.idle:
+      case WinPresentationPhase.baseCounting:
+        // Hold at the cluster total while the multiplier collect is
+        // about to start — the formula appears once the first sprite
+        // lifts off.
+        return Container(
+          key: _tumbleWinAnchorKey,
+          child: Text(
+            '₺${formatMoney(result.baseWin)}',
+            style: _statusBaseStyle,
+          ),
+        );
+
+      case WinPresentationPhase.multiplierCollecting:
+        // Live formula — `₺base × runningSum`. Multipliers fly into
+        // the running-sum slot and the integer pops on each landing,
+        // matching the previous Kazanç-bar behaviour.
+        final sum = _winCtrl.runningSum;
+        final showMultiplySign = _winCtrl.multiplierFlightStarted;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '₺${formatMoney(result.baseWin)}',
+              style: _statusBaseStyle,
+            ),
+            if (showMultiplySign) ...[
+              const SizedBox(width: 8),
+              Text('×', style: _statusBaseStyle),
+              const SizedBox(width: 6),
+              Container(
+                key: _tumbleWinAnchorKey,
+                child: sum > 0
+                    ? _PulsingMultiplierSum(
+                        value: sum,
+                        style: _statusKazancStyle,
+                      )
+                    : Text(
+                        '0',
+                        style: _statusKazancStyle.copyWith(
+                          color: const Color(0x00000000),
+                        ),
+                      ),
+              ),
+            ],
+          ],
+        );
+
+      case WinPresentationPhase.finalCounting:
+        // Formula collapses — the multiplied total reels up next to
+        // the TUMBLE WIN label, climbing from the base to the final
+        // amount before the sprite lifts off toward the Kazanç row.
+        return Container(
+          key: _tumbleWinAnchorKey,
+          child: WinAmountCounter(
+            from: _winCtrl.baseWin,
+            to: result.totalWin,
+            style: _statusBaseStyle,
+            duration: WinPresentationController.finalCountUpDuration,
+          ),
+        );
+
+      case WinPresentationPhase.done:
+        // Multiplied total parks here statically — also what the
+        // middle band falls back to after the flight lands so the
+        // value isn't wiped out.
+        return Container(
+          key: _tumbleWinAnchorKey,
+          child: Text(
+            '₺${formatMoney(result.totalWin)}',
+            style: _statusBaseStyle,
+          ),
+        );
+    }
+  }
+
+  Widget _buildFsInfoLine() {
+    // Bottom line sits a touch smaller than the Kazanç / TUMBLE WIN
+    // readouts so the two stacked bands read as a primary-secondary
+    // pair rather than competing at the same weight.
+    final infoStyle = _statusBaseStyle.copyWith(fontSize: 16);
+    final activeExplosions = _viewModel.activeExplosions;
+    final ClusterWin? clusterToShow = activeExplosions.isNotEmpty
+        ? activeExplosions.reduce((a, b) => a.amount >= b.amount ? a : b)
+        : _lingeringCluster;
+
+    if (clusterToShow != null) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('${cluster.positions.length}X', style: smallStyle),
+          Text(
+            '${clusterToShow.positions.length}X',
+            style: infoStyle,
+          ),
           const SizedBox(width: 6),
           Image.asset(
-            cluster.assetPath,
-            width: 22,
-            height: 22,
+            clusterToShow.assetPath,
+            width: 20,
+            height: 20,
             fit: BoxFit.contain,
           ),
           const SizedBox(width: 6),
-          Text('PAYS ₺${formatMoney(cluster.amount)}', style: smallStyle),
+          Text(
+            'PAYS ₺${formatMoney(clusterToShow.amount)}',
+            style: infoStyle,
+          ),
         ],
       );
     }
 
-    // Cluster row's 22px image inflates its height — wrap the
-    // free-spins row in the same height box so the text baselines
-    // line up vertically across both states.
-    return SizedBox(
-      height: 22,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text('FREE SPINS LEFT', style: smallStyle),
-          const SizedBox(width: 6),
-          Text('${_viewModel.freeSpinsRemaining}', style: smallStyle),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text('FREE SPINS LEFT', style: infoStyle),
+        const SizedBox(width: 6),
+        Text(
+          '${_viewModel.freeSpinsRemaining}',
+          style: infoStyle,
+        ),
+      ],
     );
   }
 
@@ -833,6 +1189,153 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         const SizedBox(height: 1),
         _ClockText(style: _bottomClockStyle),
       ],
+    );
+  }
+}
+
+class _FlyingTumbleSprite extends StatefulWidget {
+  final double amount;
+  final Offset start;
+  final Offset end;
+  final TextStyle style;
+  final Duration duration;
+  final VoidCallback onComplete;
+
+  const _FlyingTumbleSprite({
+    required this.amount,
+    required this.start,
+    required this.end,
+    required this.style,
+    required this.duration,
+    required this.onComplete,
+  });
+
+  @override
+  State<_FlyingTumbleSprite> createState() => _FlyingTumbleSpriteState();
+}
+
+class _FlyingTumbleSpriteState extends State<_FlyingTumbleSprite>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.duration);
+    _ctrl.forward().then((_) {
+      if (mounted) widget.onComplete();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final raw = _ctrl.value;
+        final t = Curves.easeInOutCubic.transform(raw);
+        final pos = Offset.lerp(widget.start, widget.end, t)!;
+        // Slight shrink and tail-fade so the sprite "absorbs" into
+        // the Kazanç readout instead of stopping abruptly.
+        final scale = 1.0 - 0.25 * t;
+        final opacity = raw < 0.85 ? 1.0 : (1.0 - raw) / 0.15;
+        // Positioned directly — the OverlayEntry's parent Stack
+        // (Overlay's own) supplies the screen-space frame.
+        return Positioned(
+          left: pos.dx,
+          top: pos.dy,
+          child: IgnorePointer(
+            child: FractionalTranslation(
+              translation: const Offset(-0.5, -0.5),
+              child: Opacity(
+                opacity: opacity.clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: scale,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Text(
+                      '₺${formatMoney(widget.amount)}',
+                      style: widget.style,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PulsingMultiplierSum extends StatefulWidget {
+  final int value;
+  final TextStyle style;
+
+  const _PulsingMultiplierSum({
+    required this.value,
+    required this.style,
+  });
+
+  @override
+  State<_PulsingMultiplierSum> createState() => _PulsingMultiplierSumState();
+}
+
+class _PulsingMultiplierSumState extends State<_PulsingMultiplierSum>
+    with SingleTickerProviderStateMixin {
+  static const Duration _pulseDuration = Duration(milliseconds: 380);
+
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: _pulseDuration);
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.5)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.5, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 55,
+      ),
+    ]).animate(_ctrl);
+    _ctrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulsingMultiplierSum old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) {
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, _) => Transform.scale(
+        scale: _scale.value,
+        alignment: Alignment.center,
+        child: Text('${widget.value}', style: widget.style),
+      ),
     );
   }
 }

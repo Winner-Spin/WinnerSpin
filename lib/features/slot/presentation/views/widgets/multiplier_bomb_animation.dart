@@ -39,9 +39,11 @@ class MultiplierBombAnimation {
     final completer = Completer<void>();
     late final OverlayEntry entry;
 
-    // Match the cell so the blast scale stays consistent with the
-    // resting bomb in the grid.
-    final renderSize = cellSize;
+    // The resting bomb on the cell is rendered at cellSize * the
+    // per-value bomb scale, so the overlay has to match that scale —
+    // otherwise the bomb visually shrinks to its base footprint at
+    // the moment the overlay takes over and explodes there.
+    final renderSize = cellSize * MultiplierLabel.bombScaleFor(multiplierValue);
 
     entry = OverlayEntry(
       builder: (context) => Positioned(

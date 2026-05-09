@@ -39,25 +39,10 @@ class WinSequenceBar extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         if (formulaOnly) {
-          // Formula-only mode: bar holds the running multiplier
-          // formula across baseCounting → finalCounting and stays
-          // empty everywhere else; the host slot's primary readout
-          // carries the Kazanç value.
-          switch (controller.phase) {
-            case WinPresentationPhase.baseCounting:
-            case WinPresentationPhase.multiplierCollecting:
-            case WinPresentationPhase.finalCounting:
-              return _formulaRow(
-                base: controller.baseWin,
-                sum: controller.runningSum,
-                showMultiplySign: controller.multiplierFlightStarted,
-                baseStyle: baseStyle,
-                accentStyle: accentStyle,
-              );
-            case WinPresentationPhase.idle:
-            case WinPresentationPhase.done:
-              return const SizedBox.shrink();
-          }
+          // The host slot owns its own readout — this widget is only
+          // mounted to drive the orchestration (controller / bomb /
+          // collect overlays) and stays visually silent.
+          return const SizedBox.shrink();
         }
 
         switch (controller.phase) {
@@ -130,9 +115,9 @@ class WinSequenceBar extends StatelessWidget {
     // Layout — left half always shows the base. Right half evolves:
     //   • flight not started yet → empty
     //   • flight started, sum still 0 → bare "×" placeholder
-    //   • after first landing → "× N"; on every new sum the value pops
-    //     from 1.0 → ~1.5 → 1.0 in place (no crossfade) so the player
-    //     reads it as the SAME running total being increased.
+    //   • after first landing → "× N = ₺total"; the running sum pops
+    //     1.0 → 1.5 → 1.0 in place and the trailing money amount
+    //     reels up to base*sum on every new landing.
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: Row(
@@ -160,6 +145,17 @@ class WinSequenceBar extends StatelessWidget {
                       ),
                     ),
             ),
+            if (sum > 0) ...[
+              const SizedBox(width: 8),
+              Text('=', style: baseStyle),
+              const SizedBox(width: 6),
+              WinAmountCounter(
+                from: base,
+                to: base * sum,
+                style: accentStyle,
+                duration: const Duration(milliseconds: 350),
+              ),
+            ],
           ],
         ],
       ),

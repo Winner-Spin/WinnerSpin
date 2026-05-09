@@ -47,6 +47,12 @@ class WinPresentation extends StatefulWidget {
   /// Forwards to [WinSequenceBar.formulaOnly] — see there.
   final bool formulaOnly;
 
+  /// Optional externally-supplied flight target. If provided, the
+  /// multiplier collect flights aim at this key's render rect instead
+  /// of the bar's internal anchor — used when the host renders its own
+  /// running-total widget elsewhere on the screen.
+  final GlobalKey? flightTargetKey;
+
   const WinPresentation({
     super.key,
     required this.spinResult,
@@ -61,6 +67,7 @@ class WinPresentation extends StatefulWidget {
     this.onMultiplierLifted,
     this.controller,
     this.formulaOnly = false,
+    this.flightTargetKey,
   });
 
   @override
@@ -173,8 +180,9 @@ class _WinPresentationState extends State<WinPresentation> {
     // sum text. Fall back to the bar's overall centre if the anchor
     // hasn't laid out yet (first frame), then to a grid-relative
     // position if the bar itself hasn't laid out either.
+    final anchorKey = widget.flightTargetKey ?? _sumAnchorKey;
     final anchorBox =
-        _sumAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+        anchorKey.currentContext?.findRenderObject() as RenderBox?;
     if (anchorBox != null) {
       final topLeft = anchorBox.localToGlobal(Offset.zero);
       return Offset(
