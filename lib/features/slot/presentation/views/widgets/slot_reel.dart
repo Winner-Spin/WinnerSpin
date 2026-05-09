@@ -5,6 +5,7 @@ import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'multiplier_bomb_animation.dart';
+import 'multiplier_label.dart';
 import 'tumble_cell.dart';
 
 /// A single slot-machine reel column that animates symbols
@@ -185,9 +186,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       curve: curveType,
     );
 
+    final symbolDef = SymbolRegistry.byPath(assetPath);
     final bool isScatter = assetPath.contains('cupCake');
-    final bool isMultiplier =
-        SymbolRegistry.byPath(assetPath)?.tier == SymbolTier.multiplier;
+    final bool isMultiplier = symbolDef?.tier == SymbolTier.multiplier;
+    final int multiplierValue = symbolDef?.multiplierValue ?? 5;
 
     return AnimatedBuilder(
       animation: _animation!,
@@ -239,22 +241,29 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                               fit: StackFit.expand,
                               clipBehavior: Clip.none,
                               children: [
-                                Lottie.asset(
-                                  MultiplierBombAnimation.assetPath,
-                                  fit: BoxFit.contain,
-                                  animate: false,
+                                Transform.scale(
+                                  scale: MultiplierLabel.bombScaleFor(
+                                    multiplierValue,
+                                  ),
+                                  child: Lottie.asset(
+                                    MultiplierBombAnimation.assetPath,
+                                    fit: BoxFit.contain,
+                                    animate: false,
+                                  ),
                                 ),
-                                const Align(
-                                  alignment: Alignment(-0.10, 0.15),
+                                Align(
+                                  alignment: Alignment(
+                                    MultiplierLabel.labelXOffsetFor(
+                                      multiplierValue,
+                                    ),
+                                    0.15,
+                                  ),
                                   child: FractionallySizedBox(
-                                    widthFactor: 0.50,
-                                    heightFactor: 0.50,
-                                    child: Image(
-                                      image: AssetImage(
-                                        'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
-                                      ),
-                                      fit: BoxFit.contain,
-                                      filterQuality: FilterQuality.medium,
+                                    widthFactor: 1.0,
+                                    heightFactor: 0.43,
+                                    child: MultiplierLabel(
+                                      value: multiplierValue,
+                                      fit: BoxFit.fitHeight,
                                     ),
                                   ),
                                 ),

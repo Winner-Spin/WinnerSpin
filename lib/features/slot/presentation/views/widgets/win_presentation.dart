@@ -209,6 +209,7 @@ class _WinPresentationState extends State<WinPresentation> {
       context: context,
       cellCenter: start,
       cellSize: cellSize,
+      multiplierValue: landing.value,
       onBlast: () {
         widget.onMultiplierLifted?.call(landing.column, landing.row);
         if (!blastCompleter.isCompleted) blastCompleter.complete();
@@ -230,7 +231,7 @@ class _WinPresentationState extends State<WinPresentation> {
         start: start,
         end: end,
         value: landing.value,
-        cellSize: cellSize,
+        cellSize: cellSize * 0.67,
         // End size at the bar tracks the bar's text height — the value
         // shrinks to about a regular symbol slot in the running-sum text.
         endSize: 30,

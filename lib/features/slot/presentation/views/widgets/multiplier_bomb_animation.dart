@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import 'multiplier_label.dart';
+
 /// Lottie bomb animation that plays in a root overlay above a multiplier
 /// cell. The grid cell renders the bomb frozen on frame 0; this overlay
 /// then plays the full timeline (fuse → blast → tail) on top. The blast
@@ -30,6 +32,7 @@ class MultiplierBombAnimation {
     required BuildContext context,
     required Offset cellCenter,
     required double cellSize,
+    required int multiplierValue,
     VoidCallback? onBlast,
   }) async {
     final overlay = Overlay.of(context, rootOverlay: true);
@@ -48,6 +51,7 @@ class MultiplierBombAnimation {
         height: renderSize,
         child: IgnorePointer(
           child: _BombPlayer(
+            multiplierValue: multiplierValue,
             onBlast: onBlast,
             onComplete: () {
               if (entry.mounted) entry.remove();
@@ -66,8 +70,13 @@ class MultiplierBombAnimation {
 class _BombPlayer extends StatefulWidget {
   final VoidCallback? onBlast;
   final VoidCallback onComplete;
+  final int multiplierValue;
 
-  const _BombPlayer({required this.onComplete, this.onBlast});
+  const _BombPlayer({
+    required this.onComplete,
+    required this.multiplierValue,
+    this.onBlast,
+  });
 
   @override
   State<_BombPlayer> createState() => _BombPlayerState();
@@ -148,35 +157,27 @@ class _BombPlayerState extends State<_BombPlayer>
       fit: StackFit.expand,
       clipBehavior: Clip.none,
       children: [
-        // Lottie sits in the back layer and fades during the blast so
-        // the smoke tail doesn't bury the multiplier label.
-        AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, child) {
-            const blast = MultiplierBombAnimation._blastProgress;
-            const blastEnd = MultiplierBombAnimation._blastEndProgress;
-            final v = _ctrl.value;
-            final fade = ((v - blast) / (blastEnd - blast)).clamp(0.0, 1.0);
-            return Opacity(opacity: 1.0 - fade, child: child);
+        // Lottie back layer plays the JSON's blast frames at full
+        // opacity — fade was muting the colourful explosion. The
+        // overlay still cuts off at _blastEndProgress so the smoke
+        // tail doesn't linger behind the rising sprite.
+        Lottie.asset(
+          MultiplierBombAnimation.assetPath,
+          controller: _ctrl,
+          fit: BoxFit.contain,
+          onLoaded: (composition) {
+            _ctrl
+              ..duration = composition.duration
+              ..forward().then((_) {
+                if (!mounted || _bombEnded) return;
+                _bombEnded = true;
+                if (!_blastFired) {
+                  _blastFired = true;
+                  widget.onBlast?.call();
+                }
+                widget.onComplete();
+              });
           },
-          child: Lottie.asset(
-            MultiplierBombAnimation.assetPath,
-            controller: _ctrl,
-            fit: BoxFit.contain,
-            onLoaded: (composition) {
-              _ctrl
-                ..duration = composition.duration
-                ..forward().then((_) {
-                  if (!mounted || _bombEnded) return;
-                  _bombEnded = true;
-                  if (!_blastFired) {
-                    _blastFired = true;
-                    widget.onBlast?.call();
-                  }
-                  widget.onComplete();
-                });
-            },
-          ),
         ),
         // Multiplier label rides in the same overlay, on top of the
         // bomb. The fade above only dims the Lottie, so the label
@@ -193,19 +194,19 @@ class _BombPlayerState extends State<_BombPlayer>
             final v = _ctrl.value;
             final scale = _bombScaleAt(v);
             return Align(
-              alignment: const Alignment(-0.10, 0.22),
+              alignment: Alignment(
+                MultiplierLabel.labelXOffsetFor(widget.multiplierValue),
+                0.22,
+              ),
               child: Transform.scale(scale: scale, child: child),
             );
           },
-          child: const FractionallySizedBox(
-            widthFactor: 0.50,
-            heightFactor: 0.50,
-            child: Image(
-              image: AssetImage(
-                'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
-              ),
+          child: FractionallySizedBox(
+            widthFactor: 1.0,
+            heightFactor: 0.43,
+            child: MultiplierLabel(
+              value: widget.multiplierValue,
               fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
             ),
           ),
         ),

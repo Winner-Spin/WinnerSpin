@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import 'multiplier_bomb_animation.dart';
+import 'multiplier_label.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
 /// of the column-wide spin in [SlotReel]:
@@ -236,7 +237,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(2),
           child: Center(
             child: isMultiplier
-                ? _FrozenBomb(opacity: _imageOpacity, itemH: widget.itemH)
+                ? _FrozenBomb(
+                    opacity: _imageOpacity,
+                    itemH: widget.itemH,
+                    multiplierValue: symbol?.multiplierValue ?? 5,
+                  )
                 : Image.asset(
                     widget.path,
                     fit: BoxFit.contain,
@@ -260,7 +265,12 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 class _FrozenBomb extends StatelessWidget {
   final Animation<double> opacity;
   final double itemH;
-  const _FrozenBomb({required this.opacity, required this.itemH});
+  final int multiplierValue;
+  const _FrozenBomb({
+    required this.opacity,
+    required this.itemH,
+    required this.multiplierValue,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -288,27 +298,30 @@ class _FrozenBomb extends StatelessWidget {
               fit: StackFit.expand,
               clipBehavior: Clip.none,
               children: [
-                Lottie.asset(
-                  MultiplierBombAnimation.assetPath,
-                  fit: BoxFit.contain,
-                  animate: false,
+                Transform.scale(
+                  scale: MultiplierLabel.bombScaleFor(multiplierValue),
+                  child: Lottie.asset(
+                    MultiplierBombAnimation.assetPath,
+                    fit: BoxFit.contain,
+                    animate: false,
+                  ),
                 ),
                 // The bomb body sits ~22% below the Lottie box's
                 // geometric centre. We wrap the 5x label in Align
                 // (with the same y-bias) because Stack's `alignment`
                 // is ignored when StackFit.expand gives non-positioned
                 // children tight constraints.
-                const Align(
-                  alignment: Alignment(-0.10, 0.22),
+                Align(
+                  alignment: Alignment(
+                    MultiplierLabel.labelXOffsetFor(multiplierValue),
+                    0.22,
+                  ),
                   child: FractionallySizedBox(
-                    widthFactor: 0.50,
-                    heightFactor: 0.50,
-                    child: Image(
-                      image: AssetImage(
-                        'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
-                      ),
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.medium,
+                    widthFactor: 1.0,
+                    heightFactor: 0.43,
+                    child: MultiplierLabel(
+                      value: multiplierValue,
+                      fit: BoxFit.fitHeight,
                     ),
                   ),
                 ),
