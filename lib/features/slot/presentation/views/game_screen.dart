@@ -321,6 +321,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             ),
                           ),
                         ),
+                        if (isFs)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 4,
+                            child: Center(
+                              child: ListenableBuilder(
+                                listenable: Listenable.merge([
+                                  _viewModel,
+                                  _viewModel.fsCtrl,
+                                  _viewModel.gridCtrl,
+                                ]),
+                                builder: (context, _) => _buildFsInfoLine(),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -641,6 +657,49 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
+  }
+
+  Widget _buildFsInfoLine() {
+    final activeExplosions = _viewModel.activeExplosions;
+    final smallStyle = _statusBaseStyle.copyWith(fontSize: 14);
+
+    if (activeExplosions.isNotEmpty) {
+      final cluster = activeExplosions.reduce(
+        (a, b) => a.amount >= b.amount ? a : b,
+      );
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text('${cluster.positions.length}X', style: smallStyle),
+          const SizedBox(width: 6),
+          Image.asset(
+            cluster.assetPath,
+            width: 22,
+            height: 22,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 6),
+          Text('PAYS ₺${formatMoney(cluster.amount)}', style: smallStyle),
+        ],
+      );
+    }
+
+    // Cluster row's 22px image inflates its height — wrap the
+    // free-spins row in the same height box so the text baselines
+    // line up vertically across both states.
+    return SizedBox(
+      height: 22,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text('FREE SPINS LEFT', style: smallStyle),
+          const SizedBox(width: 6),
+          Text('${_viewModel.freeSpinsRemaining}', style: smallStyle),
+        ],
+      ),
+    );
   }
 
   Widget _buildBottomPanel(double screenW) {
