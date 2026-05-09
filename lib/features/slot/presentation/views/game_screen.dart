@@ -619,6 +619,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       );
     }
 
+    // Free-spin idle / busy fallback — instead of the placeholder
+    // greetings, the strip keeps the Kazanç readout up at zero so the
+    // player always sees the running total format and the bar's height
+    // is never visually empty.
+    if (_viewModel.isInFreeSpins) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('KAZANÇ', style: _statusKazancStyle),
+          const SizedBox(width: 6),
+          Text('₺${formatMoney(lastWin)}', style: _statusBaseStyle),
+        ],
+      );
+    }
+
     if (isBusy) {
       return Text('GOOD LUCK!', style: _statusBaseStyle);
     }
