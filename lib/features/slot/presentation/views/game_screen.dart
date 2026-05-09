@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
 
+import '../../domain/models/spin_result.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
@@ -21,6 +22,7 @@ import 'widgets/speed_button.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
+import 'widgets/win_presentation_controller.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 import 'system_settings_screen.dart';
 
@@ -33,6 +35,12 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
+
+  // Drives the multiplier collect sequence. Lifted into the screen
+  // state so the FS-mode strip can split the presentation: top half
+  // mirrors the live total off the controller while the formula
+  // renders below in the bottom info line.
+  final WinPresentationController _winCtrl = WinPresentationController();
 
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
@@ -146,6 +154,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
+    _winCtrl.dispose();
     super.dispose();
   }
 
@@ -332,8 +341,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   _viewModel,
                                   _viewModel.fsCtrl,
                                   _viewModel.gridCtrl,
+                                  _winCtrl,
                                 ]),
-                                builder: (context, _) => _buildFsInfoLine(),
+                                builder: (context, _) => _buildFsInfoLine(
+                                  screenH: screenH,
+                                  screenW: screenW,
+                                  gridLeft: gridLeftPx,
+                                  gridRight: gridRightPx,
+                                ),
                               ),
                             ),
                           ),
@@ -571,6 +586,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final liveWin = _viewModel.liveTumbleWin;
     final isBusy = _viewModel.isBusy;
     final isTumbling = _viewModel.isTumbling;
+    final isFs = _viewModel.isInFreeSpins;
 
     if (_viewModel.showInsufficientFundsHint) {
       return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
@@ -605,8 +621,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           result.finalMultipliers.isNotEmpty;
 
       if (hasMultiplierSequence) {
+        // FS mode: top stays a Kazanç readout that climbs in sync
+        // with the formula rendered below; the orchestrator widget is
+        // mounted in the bottom info line instead of here.
+        if (isFs) {
+          return _buildLiveKazancRow(result);
+        }
         return WinPresentation(
           key: ValueKey<double>(lastWin),
+          controller: _winCtrl,
           spinResult: result,
           gridLeft: gridLeft,
           gridTop: screenH * 0.195,
@@ -639,7 +662,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // greetings, the strip keeps the Kazanç readout up at zero so the
     // player always sees the running total format and the bar's height
     // is never visually empty.
-    if (_viewModel.isInFreeSpins) {
+    if (isFs) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -659,10 +682,88 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
   }
 
-  Widget _buildFsInfoLine() {
-    final activeExplosions = _viewModel.activeExplosions;
-    final smallStyle = _statusBaseStyle.copyWith(fontSize: 14);
+  Widget _buildLiveKazancRow(SpinResult result) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text('KAZANÇ', style: _statusKazancStyle),
+        const SizedBox(width: 6),
+        ListenableBuilder(
+          listenable: _winCtrl,
+          builder: (ctx, _) {
+            return WinAmountCounter(
+              from: result.baseWin,
+              to: _liveTotalForController(_winCtrl, result),
+              style: _statusBaseStyle,
+              duration: const Duration(milliseconds: 350),
+            );
+          },
+        ),
+      ],
+    );
+  }
 
+  double _liveTotalForController(
+    WinPresentationController ctrl,
+    SpinResult result,
+  ) {
+    switch (ctrl.phase) {
+      case WinPresentationPhase.idle:
+      case WinPresentationPhase.baseCounting:
+        return result.baseWin;
+      case WinPresentationPhase.multiplierCollecting:
+        return ctrl.runningSum > 0
+            ? ctrl.baseWin * ctrl.runningSum
+            : ctrl.baseWin;
+      case WinPresentationPhase.finalCounting:
+      case WinPresentationPhase.done:
+        return result.totalWin;
+    }
+  }
+
+  Widget _buildFsInfoLine({
+    required double screenH,
+    required double screenW,
+    required double gridLeft,
+    required double gridRight,
+  }) {
+    final smallStyle = _statusBaseStyle.copyWith(fontSize: 14);
+    final smallAccent = _statusKazancStyle.copyWith(fontSize: 14);
+
+    final result = _viewModel.lastSpinResult;
+    final hasMultiplierSequence =
+        result != null &&
+        result.baseWin > 0 &&
+        result.finalMultipliers.isNotEmpty;
+    // Mount the multiplier collect orchestrator while the sequence is
+    // live (anything except the post-reveal `done` state). The
+    // formula-only bar handles per-phase visibility from there; once
+    // the sequence finishes, the slot reverts to the base FS line.
+    final showFormulaSlot = hasMultiplierSequence &&
+        !_viewModel.isBusy &&
+        _winCtrl.phase != WinPresentationPhase.done;
+
+    if (showFormulaSlot) {
+      return WinPresentation(
+        key: ValueKey<Object?>(result),
+        controller: _winCtrl,
+        formulaOnly: true,
+        spinResult: result,
+        gridLeft: gridLeft,
+        gridTop: screenH * 0.195,
+        gridWidth: screenW - gridLeft - gridRight,
+        gridHeight: screenH * 0.32,
+        baseStyle: smallStyle,
+        accentStyle: smallAccent,
+        onMultiplierLifted: (col, row) {
+          _viewModel.gridCtrl.clearMultiplierPosition(col, row);
+        },
+      );
+    }
+
+    final activeExplosions = _viewModel.activeExplosions;
     if (activeExplosions.isNotEmpty) {
       final cluster = activeExplosions.reduce(
         (a, b) => a.amount >= b.amount ? a : b,

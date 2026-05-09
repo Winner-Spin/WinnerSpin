@@ -38,6 +38,15 @@ class WinPresentation extends StatefulWidget {
   /// so the cell reads as consumed.
   final void Function(int column, int row)? onMultiplierLifted;
 
+  /// Optional externally-owned controller. When provided, the host can
+  /// observe phase / running-sum changes alongside this widget — used
+  /// by the free-spin layout where the strip's top half mirrors the
+  /// live total while the formula renders below.
+  final WinPresentationController? controller;
+
+  /// Forwards to [WinSequenceBar.formulaOnly] — see there.
+  final bool formulaOnly;
+
   const WinPresentation({
     super.key,
     required this.spinResult,
@@ -50,6 +59,8 @@ class WinPresentation extends StatefulWidget {
     this.columns = 6,
     this.rows = 5,
     this.onMultiplierLifted,
+    this.controller,
+    this.formulaOnly = false,
   });
 
   @override
@@ -57,7 +68,9 @@ class WinPresentation extends StatefulWidget {
 }
 
 class _WinPresentationState extends State<WinPresentation> {
-  final WinPresentationController _controller = WinPresentationController();
+  late final WinPresentationController _controller =
+      widget.controller ?? WinPresentationController();
+  late final bool _ownsController = widget.controller == null;
   final GlobalKey _barKey = GlobalKey();
   // Anchored to the running-sum slot inside the bar — flights aim
   // here so the asset lands on top of the value the player is reading.
@@ -95,7 +108,7 @@ class _WinPresentationState extends State<WinPresentation> {
   @override
   void dispose() {
     _controller.removeListener(_onPhaseChanged);
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
@@ -260,6 +273,7 @@ class _WinPresentationState extends State<WinPresentation> {
         baseStyle: widget.baseStyle,
         accentStyle: widget.accentStyle,
         sumAnchorKey: _sumAnchorKey,
+        formulaOnly: widget.formulaOnly,
       ),
     );
   }

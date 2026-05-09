@@ -19,12 +19,18 @@ class WinSequenceBar extends StatelessWidget {
   /// landing, the live sum after).
   final GlobalKey sumAnchorKey;
 
+  /// When true the bar omits the Kazanç readout rows and only renders
+  /// the running multiplier formula. Used by the free-spin layout where
+  /// the strip's top half already shows the live total.
+  final bool formulaOnly;
+
   const WinSequenceBar({
     super.key,
     required this.controller,
     required this.baseStyle,
     required this.accentStyle,
     required this.sumAnchorKey,
+    this.formulaOnly = false,
   });
 
   @override
@@ -32,6 +38,28 @@ class WinSequenceBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        if (formulaOnly) {
+          // Formula-only mode: bar holds the running multiplier
+          // formula across baseCounting → finalCounting and stays
+          // empty everywhere else; the host slot's primary readout
+          // carries the Kazanç value.
+          switch (controller.phase) {
+            case WinPresentationPhase.baseCounting:
+            case WinPresentationPhase.multiplierCollecting:
+            case WinPresentationPhase.finalCounting:
+              return _formulaRow(
+                base: controller.baseWin,
+                sum: controller.runningSum,
+                showMultiplySign: controller.multiplierFlightStarted,
+                baseStyle: baseStyle,
+                accentStyle: accentStyle,
+              );
+            case WinPresentationPhase.idle:
+            case WinPresentationPhase.done:
+              return const SizedBox.shrink();
+          }
+        }
+
         switch (controller.phase) {
           case WinPresentationPhase.idle:
             return const SizedBox.shrink();
