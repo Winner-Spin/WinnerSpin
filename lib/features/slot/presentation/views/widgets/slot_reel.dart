@@ -273,7 +273,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     final Curve curveType = isDropOut
         ? Curves.easeInCubic
-        : (speedMult > 1 ? _heftyBounceCurve : Curves.easeOutQuad);
+        : _heftyBounceCurve;
 
     final Curve itemCurve = Interval(
       startDelayFraction,

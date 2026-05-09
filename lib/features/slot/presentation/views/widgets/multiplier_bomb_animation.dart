@@ -21,11 +21,10 @@ class MultiplierBombAnimation {
   /// Composition timeline: blast frame / total frames (35 / 85).
   static const double _blastProgress = 35.0 / 85.0;
 
-  /// Cut-off shortly after the blast trigger — keeps the explosion
-  /// visible just long enough to read, then drops the overlay so the
-  /// rising 5x sprite has the screen to itself instead of competing
-  /// with the smoke tail.
-  static const double _blastEndProgress = 38.0 / 85.0;
+  /// Cut-off after the blast peak — the explosion peaks around frame
+  /// 50, so 60 keeps the colourful detonation fully on screen and
+  /// trims only the long smoke tail before the cell clears.
+  static const double _blastEndProgress = 60.0 / 85.0;
 
   /// Spawns the bomb in the root overlay. Future resolves the moment
   /// the full timeline finishes and the entry has been removed.
@@ -208,12 +207,20 @@ class _BombPlayerState extends State<_BombPlayer>
             // Frames are normalised against the 85-frame timeline.
             final v = _ctrl.value;
             final scale = _bombScaleAt(v);
+            // Hide the label the moment the blast triggers — the
+            // collect overlay's flying sprite takes over from there,
+            // and leaving this label visible stacks two labels on
+            // top of the explosion.
+            final visible = v < MultiplierBombAnimation._blastProgress;
             return Align(
               alignment: Alignment(
                 MultiplierLabel.labelXOffsetFor(widget.multiplierValue),
                 0.22,
               ),
-              child: Transform.scale(scale: scale, child: child),
+              child: Opacity(
+                opacity: visible ? 1.0 : 0.0,
+                child: Transform.scale(scale: scale, child: child),
+              ),
             );
           },
           child: FractionallySizedBox(
@@ -233,62 +240,126 @@ class _BombPlayerState extends State<_BombPlayer>
 class _DustResiduePainter extends CustomPainter {
   const _DustResiduePainter();
 
-  static const _colors = [
-    Color(0xFF24D8FF),
-    Color(0xFF00AFFF),
-    Color(0xFFFF40D0),
-    Color(0xFFFF5BA8),
-    Color(0xFFFFC247),
-    Color(0xFFFF7A45),
+  // Multi-coloured palette — keeps the energy of the Lottie blast but
+  // adds the magenta / cyan / violet hits the user asked for so the
+  // residue doesn't read as a flat orange burst.
+  static const _coreColor = Color(0xFFFFF6C8);
+  static const _palette = <Color>[
+    Color(0xFFFFEC50), // yellow
+    Color(0xFFFFC247), // gold
+    Color(0xFFFF7A30), // orange
+    Color(0xFFFF3E70), // pink/magenta
+    Color(0xFFB246FF), // violet
+    Color(0xFF24D8FF), // cyan
   ];
+
+  // Deterministic pseudo-random hash so each value (i) lands on a
+  // stable angle / length without using dart:math Random (which would
+  // change every paint and look noisy).
+  double _h(int seed, int i) =>
+      (math.sin(seed * 12.9898 + i * 78.233) * 43758.5453) %
+          1.0;
 
   @override
   void paint(Canvas canvas, Size size) {
     final shortest = math.min(size.width, size.height);
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = shortest * 0.36;
+    final radius = shortest * 0.42;
 
-    final cloud = Paint()
+    // Soft cream/white core — the bright flash at the centre of the
+    // explosion.
+    final coreGlow = Paint()
       ..shader = RadialGradient(
         colors: [
-          Colors.white.withValues(alpha: 0.12),
-          const Color(0xFFFFC247).withValues(alpha: 0.34),
-          const Color(0xFFFF45C8).withValues(alpha: 0.32),
-          const Color(0xFF24D8FF).withValues(alpha: 0.38),
-          const Color(0x0024D8FF),
+          _coreColor.withValues(alpha: 0.78),
+          const Color(0xFFFFC247).withValues(alpha: 0.40),
+          const Color(0xFFFF7A30).withValues(alpha: 0.18),
+          const Color(0x00FF7A30),
         ],
-        stops: const [0.0, 0.20, 0.47, 0.74, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, cloud);
+        stops: const [0.0, 0.35, 0.7, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.55));
+    canvas.drawCircle(center, radius * 0.55, coreGlow);
 
-    for (var i = 0; i < 72; i++) {
-      final angle = i * 2.399963229728653;
-      final ring = ((i * 37) % 100) / 100.0;
-      final dist = radius * math.sqrt(ring);
-      final wobble = math.sin(i * 12.9898) * shortest * 0.012;
+    // Sparks — 30 rays at irregular angles + lengths + colours so the
+    // overall shape reads as a dense starburst, not a circle. Each ray
+    // picks a colour from the multi-colour palette.
+    const rayCount = 30;
+    for (var i = 0; i < rayCount; i++) {
+      // Base angle is uniform; jitter adds the irregular feel.
+      final base = (i / rayCount) * math.pi * 2;
+      final jitter = (_h(11, i) - 0.5) * (math.pi / rayCount) * 1.4;
+      final angle = base + jitter;
+
+      final outer = radius * (0.55 + _h(17, i) * 0.55);
+      final inner = radius * (0.14 + _h(23, i) * 0.12);
+      final width = shortest * (0.010 + _h(31, i) * 0.014);
+
+      final color = _palette[i % _palette.length];
+      _drawSpark(canvas, center, angle, inner, outer, width, color);
+    }
+
+    // Random coloured dust dots scattered in the gaps between rays —
+    // dense colour specks fill the silhouette without forming a disc.
+    for (var i = 0; i < 36; i++) {
+      final angle = i * 2.399963229728653 + 0.7;
+      final dist = radius * (0.30 + _h(53, i) * 0.70);
       final point = center +
-          Offset(
-            math.cos(angle) * dist + math.cos(angle + math.pi / 2) * wobble,
-            math.sin(angle) * dist + math.sin(angle + math.pi / 2) * wobble,
-          );
-      final color = _colors[i % _colors.length];
-      final alpha = (0.46 - ring * 0.24).clamp(0.12, 0.46).toDouble();
-      final dotRadius = shortest * (0.008 + (((i * 17) % 7) / 7.0) * 0.012);
+          Offset(math.cos(angle) * dist, math.sin(angle) * dist);
+      final dotRadius = shortest * (0.008 + _h(67, i) * 0.012);
+      final color = _palette[(i * 5) % _palette.length];
 
+      // Soft halo so the dot doesn't read as a hard pixel.
       final glow = Paint()
         ..shader = RadialGradient(
           colors: [
-            color.withValues(alpha: alpha * 0.42),
-            color.withValues(alpha: 0),
+            color.withValues(alpha: 0.50),
+            color.withValues(alpha: 0.0),
           ],
         ).createShader(
-          Rect.fromCircle(center: point, radius: dotRadius * 3.0),
+          Rect.fromCircle(center: point, radius: dotRadius * 2.6),
         );
-      canvas.drawCircle(point, dotRadius * 3.0, glow);
-
-      final dust = Paint()..color = color.withValues(alpha: alpha);
-      canvas.drawCircle(point, dotRadius, dust);
+      canvas.drawCircle(point, dotRadius * 2.6, glow);
+      canvas.drawCircle(
+        point,
+        dotRadius,
+        Paint()..color = color.withValues(alpha: 0.75),
+      );
     }
+  }
+
+  void _drawSpark(
+    Canvas canvas,
+    Offset center,
+    double angle,
+    double innerR,
+    double outerR,
+    double width,
+    Color color,
+  ) {
+    final p1 = center +
+        Offset(math.cos(angle) * innerR, math.sin(angle) * innerR);
+    final p2 = center +
+        Offset(math.cos(angle) * outerR, math.sin(angle) * outerR);
+    final paint = Paint()
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..shader = LinearGradient(
+        colors: [
+          _coreColor.withValues(alpha: 0.55),
+          color.withValues(alpha: 0.65),
+          color.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.4, 1.0],
+        begin: const Alignment(-1, 0),
+        end: const Alignment(1, 0),
+        transform: GradientRotation(angle),
+      ).createShader(
+        Rect.fromPoints(
+          center.translate(-outerR, -outerR),
+          center.translate(outerR, outerR),
+        ),
+      );
+    canvas.drawLine(p1, p2, paint);
   }
 
   @override

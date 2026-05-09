@@ -206,9 +206,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
             clipBehavior: Clip.none,
             fit: StackFit.expand,
             children: [
-              // Glow stays outside the Opacity wrapper so the halo remains
-              // visible while the symbol underneath fades.
-              if (glow > 0)
+              // Glow + burst are reserved for fruit cluster pops. The
+              // multiplier bomb has its own Lottie explosion overlay,
+              // so suppressing both here keeps the bomb's blast clean
+              // instead of stacking gold sparks on top of it.
+              if (glow > 0 && !isMultiplier)
                 IgnorePointer(
                   child: CustomPaint(
                     painter: _WinningGlowPainter(
@@ -218,7 +220,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              if (particleProgress > 0)
+              if (particleProgress > 0 && !isMultiplier)
                 IgnorePointer(
                   child: CustomPaint(
                     painter: _ParticleBurstPainter(
