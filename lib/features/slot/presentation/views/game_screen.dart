@@ -19,6 +19,7 @@ import 'widgets/auto_spin_button.dart';
 import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
+import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
@@ -78,6 +79,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // sitting there.
   bool _isFlyingTumble = false;
 
+  // Normal-mode lastWin snapshot — used to detect 0 → positive
+  // transitions for the big-win trigger when FS isn't active.
+  double _lastSeenLastWinNormal = 0;
+
+  // True after [_maybeShowBigWin] has actually mounted the overlay
+  // for the current spin — the FS hand-off skips the flying sprite
+  // when this is set so the celebration carries the win to Kazanç
+  // on its own. Resets at the start of every spin.
+  bool _bigWinShownThisSpin = false;
+  OverlayEntry? _bigWinEntry;
+
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
   late final TextStyle _statusBaseStyle;
@@ -131,6 +143,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       fontSize: 20,
       letterSpacing: 0.8,
       height: 1.0,
+      decoration: TextDecoration.none,
       shadows: [
         Shadow(
           color: Colors.black.withValues(alpha: 0.70),
@@ -176,6 +189,62 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _trackSpinTransitions();
     _trackLingeringCluster();
     _trackFsAccumulator();
+    _trackNormalBigWin();
+  }
+
+  void _trackNormalBigWin() {
+    if (_viewModel.isInFreeSpins) return;
+    final lastWin = _viewModel.lastWin;
+    if (lastWin > 0 && _lastSeenLastWinNormal == 0) {
+      // The viewmodel sets `_lastSpinResult` a couple of lines after
+      // the awardWin notify, so defer the multiplier-sequence check
+      // until that assignment has run.
+      Future.microtask(() {
+        if (!mounted) return;
+        final result = _viewModel.lastSpinResult;
+        final hasSequence = result != null &&
+            result.baseWin > 0 &&
+            result.finalMultipliers.isNotEmpty;
+        if (!hasSequence) {
+          // No multiplier collect to wait on — let the player read
+          // the new total briefly, then pop the celebration.
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) _maybeShowBigWin(lastWin);
+          });
+        }
+        // Multiplier spins instead trigger the overlay from the
+        // win-presentation controller's `done` phase, after the
+        // collect scene has settled at its final amount.
+      });
+    }
+    _lastSeenLastWinNormal = lastWin;
+  }
+
+  void _maybeShowBigWin(double amount) {
+    if (!mounted) return;
+    if (_bigWinShownThisSpin || _bigWinEntry != null) return;
+    if (_viewModel.isBusy) return;
+    final bet = _viewModel.betAmount;
+    if (bet <= 0) return;
+    final tier = WinTier.forMultiplier(amount / bet);
+    if (tier == null) return;
+
+    _bigWinShownThisSpin = true;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => BigWinOverlay(
+        amount: amount,
+        tier: tier,
+        onComplete: () {
+          if (_bigWinEntry == entry) _bigWinEntry = null;
+          entry.remove();
+        },
+      ),
+    );
+    _bigWinEntry = entry;
+    overlay.insert(entry);
   }
 
   void _trackSpinTransitions() {
@@ -190,6 +259,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       // controller resets back to idle.
       _commitPendingFsWin();
       _winCtrl.reset();
+      _bigWinShownThisSpin = false;
       if (_lingeringCluster != null) {
         setState(() => _lingeringCluster = null);
       }
@@ -228,9 +298,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           // No multiplier collect to wait on — give the player a
           // brief beat to read the TUMBLE WIN value, then fly it
           // up. Multiplier spins instead wait for phase=done from
-          // [_onWinCtrlChange] before triggering the flight.
+          // [_onWinCtrlChange] before triggering the flight. The
+          // big-win overlay pops alongside the flight kick-off so
+          // the celebration starts the moment the value visibly
+          // begins moving.
           Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) _commitPendingFsWin();
+            if (mounted) {
+              _maybeShowBigWin(lastWin);
+              _commitPendingFsWin();
+            }
           });
         }
       });
@@ -268,6 +344,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _bigWinEntry?.remove();
+    _bigWinEntry = null;
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
@@ -279,13 +357,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onWinCtrlChange() {
     final phase = _winCtrl.phase;
+    // Pop the big-win overlay the instant the multiplied total
+    // starts climbing in TUMBLE WIN, so the celebration runs in
+    // sync with the count-up rather than waiting for it to settle.
+    if (phase == WinPresentationPhase.finalCounting &&
+        _lastWinCtrlPhase != WinPresentationPhase.finalCounting) {
+      _maybeShowBigWin(_viewModel.lastWin);
+    }
     if (phase == WinPresentationPhase.done &&
         _lastWinCtrlPhase != WinPresentationPhase.done) {
-      // Brief hold so the player can read the multiplied total in
-      // TUMBLE WIN before it lifts off toward the Kazanç row.
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) _commitPendingFsWin();
-      });
+      if (_viewModel.isInFreeSpins) {
+        // Brief hold so the player can read the multiplied total in
+        // TUMBLE WIN before it lifts off toward the Kazanç row.
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) _commitPendingFsWin();
+        });
+      }
     }
     _lastWinCtrlPhase = phase;
   }
@@ -293,6 +380,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _commitPendingFsWin() {
     if (_pendingFsSpinWin <= 0) return;
     final amount = _pendingFsSpinWin;
+
+    // The big-win celebration carries the value to Kazanç on its
+    // own — skip the flying sprite when the overlay is on screen so
+    // the two effects don't fight for attention.
+    if (_bigWinShownThisSpin) {
+      setState(() {
+        _fsAccumulatedWin += amount;
+        _pendingFsSpinWin = 0;
+      });
+      return;
+    }
 
     // Capture the start (TUMBLE WIN) and end (Kazanç) screen
     // positions before the layout flips — once the band drops to ₺0
@@ -326,7 +424,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             // amount into the round accumulator now so the top
             // counter starts climbing the moment the value arrives.
             // Flipping [_isFlyingTumble] back also restores the
-            // multiplied total in the middle band.
+            // multiplied total in the middle band. The big-win
+            // overlay (if any) was already popped at phase=
+            // finalCounting, so no trigger here.
             setState(() {
               _isFlyingTumble = false;
               _fsAccumulatedWin += amount;

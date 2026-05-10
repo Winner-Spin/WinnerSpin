@@ -31,5 +31,6 @@ flutter:
     - lib/images/register_screen/
     - lib/images/slot_main_screen/
     - lib/images/slot_main_screen/Items/
+    - lib/images/slot_main_screen/WIN_ARTICLES/
     - assets/audio/
     - assets/animations/
