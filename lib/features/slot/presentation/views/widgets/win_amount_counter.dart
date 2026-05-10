@@ -16,6 +16,12 @@ class WinAmountCounter extends StatefulWidget {
   final Duration duration;
   final Curve curve;
 
+  /// When flipped true after construction, snaps the displayed value
+  /// to [to] immediately and stops the running animation — used by
+  /// the big-win overlay's tap-to-skip path so the player can dismiss
+  /// the count-up without waiting out the full duration.
+  final bool forceComplete;
+
   const WinAmountCounter({
     super.key,
     this.from = 0,
@@ -23,6 +29,7 @@ class WinAmountCounter extends StatefulWidget {
     required this.style,
     this.duration = const Duration(milliseconds: 1100),
     this.curve = Curves.easeOut,
+    this.forceComplete = false,
   });
 
   @override
@@ -43,8 +50,12 @@ class _WinAmountCounterState extends State<WinAmountCounter>
       CurvedAnimation(parent: _ctrl, curve: widget.curve),
     );
     _ctrl.addListener(_onTick);
-    _displayed = widget.from;
-    if (widget.to != widget.from) _ctrl.forward();
+    if (widget.forceComplete) {
+      _displayed = widget.to;
+    } else {
+      _displayed = widget.from;
+      if (widget.to != widget.from) _ctrl.forward();
+    }
   }
 
   void _onTick() {
@@ -63,6 +74,10 @@ class _WinAmountCounterState extends State<WinAmountCounter>
       _ctrl
         ..duration = widget.duration
         ..forward(from: 0);
+    }
+    if (widget.forceComplete && !old.forceComplete) {
+      _ctrl.stop();
+      setState(() => _displayed = widget.to);
     }
   }
 

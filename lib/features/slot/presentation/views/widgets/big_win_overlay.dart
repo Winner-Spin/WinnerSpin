@@ -72,7 +72,7 @@ class BigWinOverlay extends StatefulWidget {
     required this.amount,
     required this.tier,
     required this.onComplete,
-    this.duration = const Duration(seconds: 11),
+    this.duration = const Duration(seconds: 12),
   });
 
   @override
@@ -80,11 +80,40 @@ class BigWinOverlay extends StatefulWidget {
 }
 
 class _BigWinOverlayState extends State<BigWinOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scaleAnim;
   late final Animation<double> _fadeAnim;
   late final List<_Coin> _coins;
+
+  // Drives the amount-banner pop sequence that fires once the count-up
+  // settles — independent from the main timeline so a tap-driven skip
+  // can run the pop immediately without disturbing the coin shower,
+  // star pulse, or headline breathing.
+  late final AnimationController _amountPopCtrl;
+  late final Animation<double> _amountPopScale;
+  bool _amountPopStarted = false;
+
+  // Flipped true the moment the player taps anywhere on the overlay.
+  // The amount banner snaps to the final value while the coin shower,
+  // star pulse, headline breathing, and fade stay on their original
+  // schedule — the tap only short-circuits the count-up readout.
+  bool _amountSkipped = false;
+
+  // Guards against [widget.onComplete] firing twice — once from the
+  // tap-driven shortcut and once when the main controller's natural
+  // forward run finishes.
+  bool _completed = false;
+
+  // Count-up duration the [_AmountBanner] runs for. The natural
+  // post-count pop is scheduled against this value so it always
+  // fires the instant the counter lands.
+  static const Duration _countDuration = Duration(seconds: 10);
+
+  // Hold the overlay sits after the count-up settles (or after a
+  // tap-driven skip) before tearing itself down — gives the player a
+  // beat to read the final amount and watch the banner pop.
+  static const Duration _postCountHold = Duration(milliseconds: 2000);
 
   @override
   void initState() {
@@ -168,20 +197,88 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     });
 
     _ctrl.forward().then((_) {
-      if (mounted) widget.onComplete();
+      if (mounted) _completeOnce();
+    });
+
+    // Post-count pop runs whether the player waits the count-up out
+    // or skips it via tap. Schedule the natural-flow trigger now so
+    // the banner pops the instant the counter lands.
+    _amountPopCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    _amountPopScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.3)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 18,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.3, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 13,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.18, end: 1.3)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 13,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.3, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 13,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.18, end: 1.3)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 13,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.3, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 30,
+      ),
+    ]).animate(_amountPopCtrl);
+
+    Future.delayed(_countDuration, () {
+      if (mounted) _startAmountPop();
+    });
+  }
+
+  void _startAmountPop() {
+    if (_amountPopStarted) return;
+    _amountPopStarted = true;
+    _amountPopCtrl.forward();
+  }
+
+  void _completeOnce() {
+    if (_completed) return;
+    _completed = true;
+    widget.onComplete();
+  }
+
+  void _handleTap() {
+    if (_amountSkipped || _completed) return;
+    setState(() => _amountSkipped = true);
+    _startAmountPop();
+    Future.delayed(_postCountHold, () {
+      if (mounted) _completeOnce();
     });
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _amountPopCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
-      child: IgnorePointer(
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (_) => _handleTap(),
         child: AnimatedBuilder(
           animation: _ctrl,
           builder: (ctx, _) {
@@ -220,9 +317,17 @@ class _BigWinOverlayState extends State<BigWinOverlay>
                             ],
                           ),
                         ),
-                        _AmountBanner(
-                          amount: widget.amount,
-                          duration: const Duration(seconds: 10),
+                        AnimatedBuilder(
+                          animation: _amountPopScale,
+                          builder: (ctx, child) => Transform.scale(
+                            scale: _amountPopScale.value,
+                            child: child,
+                          ),
+                          child: _AmountBanner(
+                            amount: widget.amount,
+                            duration: _countDuration,
+                            skipCountUp: _amountSkipped,
+                          ),
                         ),
                       ],
                     ),
@@ -303,10 +408,12 @@ class _TierHeadline extends StatelessWidget {
 class _AmountBanner extends StatelessWidget {
   final double amount;
   final Duration duration;
+  final bool skipCountUp;
 
   const _AmountBanner({
     required this.amount,
     required this.duration,
+    this.skipCountUp = false,
   });
 
   @override
@@ -327,6 +434,7 @@ class _AmountBanner extends StatelessWidget {
             from: 0,
             to: amount,
             duration: duration,
+            forceComplete: skipCountUp,
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontSize: 38,
