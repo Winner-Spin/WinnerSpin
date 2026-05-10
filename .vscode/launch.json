@@ -43,9 +43,10 @@
             "type": "dart"
         },
         {
-            "name": "iPhone 16 Pro (macOS only)",
+            "name": "WinnerSpin (Flutter iPhone 16 Pro)",
             "program": "lib/main.dart",
             "deviceId": "EEE00AD2-3024-4EA9-BF1F-A45742A7DBB3",
+            "preLaunchTask": "Boot iPhone 16 Pro Simulator",
             "request": "launch",
             "type": "dart"
         }

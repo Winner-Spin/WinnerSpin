@@ -242,14 +242,14 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                   Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: w * 0.06,
-                      vertical: h * 0.04,
+                      vertical: h * 0.02,
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Padding(
-                          padding: EdgeInsets.only(top: h * 0.04),
+                          padding: EdgeInsets.only(top: h * 0.02),
                           child: SizedBox(
                             width: w * 0.85,
                             child: FittedBox(
