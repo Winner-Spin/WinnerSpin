@@ -728,12 +728,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     ListenableBuilder(
-                      listenable: _viewModel.balanceCtrl,
+                      listenable: Listenable.merge([
+                        _viewModel.balanceCtrl,
+                        _viewModel.fsCtrl,
+                      ]),
                       builder: (context, _) => RepaintBoundary(
                         child: MinusButton(
                           size: 42,
                           onTap: _viewModel.decreaseBet,
-                          disabled: !_viewModel.canDecreaseBet,
+                          disabled: !_viewModel.canDecreaseBet ||
+                              _viewModel.isInFreeSpins,
                         ),
                       ),
                     ),
@@ -754,12 +758,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 16),
                     ListenableBuilder(
-                      listenable: _viewModel.balanceCtrl,
+                      listenable: Listenable.merge([
+                        _viewModel.balanceCtrl,
+                        _viewModel.fsCtrl,
+                      ]),
                       builder: (context, _) => RepaintBoundary(
                         child: PlusButton(
                           size: 42,
                           onTap: _viewModel.increaseBet,
-                          disabled: !_viewModel.canIncreaseBet,
+                          disabled: !_viewModel.canIncreaseBet ||
+                              _viewModel.isInFreeSpins,
                         ),
                       ),
                     ),

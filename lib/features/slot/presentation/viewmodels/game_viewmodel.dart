@@ -278,12 +278,12 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void increaseBet() {
-    if (_isAutoSpinning) return;
+    if (_isAutoSpinning || isInFreeSpins) return;
     _balanceCtrl.increaseBet();
   }
 
   void decreaseBet() {
-    if (_isAutoSpinning) return;
+    if (_isAutoSpinning || isInFreeSpins) return;
     _balanceCtrl.decreaseBet();
   }
 
