@@ -106,6 +106,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   OverlayEntry? _bigWinEntry;
 
+  // Optimistic lock raised the instant the cascade ends, before the
+  // multiplier collect sequence has actually entered its first phase.
+  // Without it, a single frame slips through where isBusy is false
+  // but the controller is still idle — long enough for the respin
+  // button to flash active before the sequence locks it again. The
+  // lock clears automatically the moment a microtask confirms the
+  // spin won't trigger a celebration, and otherwise stays raised
+  // until the controller reaches [WinPresentationPhase.done].
+  bool _celebrationLocked = false;
+
+  // True while either the multiplier collect sequence is mid-flight or
+  // the big-win celebration overlay is on screen. The respin button
+  // stays locked through both phases so the player can't trigger a
+  // fresh reel before the previous spin's celebration has resolved.
+  bool get _isCelebrationActive {
+    final phase = _winCtrl.phase;
+    final winPresentationActive =
+        phase != WinPresentationPhase.idle &&
+        phase != WinPresentationPhase.done;
+    return winPresentationActive || _bigWinEntry != null || _celebrationLocked;
+  }
+
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
   late final TextStyle _statusBaseStyle;
@@ -281,13 +303,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         amount: amount,
         tier: tier,
         onComplete: () {
-          if (_bigWinEntry == entry) _bigWinEntry = null;
+          if (_bigWinEntry == entry) {
+            setState(() {
+              _bigWinEntry = null;
+              _celebrationLocked = false;
+            });
+          }
           entry.remove();
         },
       ),
     );
-    _bigWinEntry = entry;
     overlay.insert(entry);
+    setState(() => _bigWinEntry = entry);
   }
 
   void _trackSpinTransitions() {
@@ -303,9 +330,43 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _commitPendingFsWin();
       _winCtrl.reset();
       _bigWinShownThisSpin = false;
+      if (_celebrationLocked) {
+        setState(() => _celebrationLocked = false);
+      }
       if (_lingeringCluster != null) {
         setState(() => _lingeringCluster = null);
       }
+    }
+    if (!isBusy && _wasBusy) {
+      // Cascade just ended — raise the lock optimistically so the
+      // respin button doesn't flash active in the single frame
+      // between isBusy flipping false and the controller entering
+      // its first phase. A microtask defers the sequence-prediction
+      // check until after the viewmodel finishes assigning
+      // [lastSpinResult], at which point we unlock immediately when
+      // there's nothing to celebrate.
+      setState(() => _celebrationLocked = true);
+      Future.microtask(() {
+        if (!mounted) return;
+        final result = _viewModel.lastSpinResult;
+        final hasSequence = result != null &&
+            result.baseWin > 0 &&
+            result.finalMultipliers.isNotEmpty;
+        final hasBigWin = result != null &&
+            result.totalWin > 0 &&
+            _viewModel.betAmount > 0 &&
+            WinTier.forMultiplier(result.totalWin / _viewModel.betAmount) !=
+                null;
+        // FS rounds always run the TUMBLE WIN → Kazanç flight + the
+        // top-row count-up after every winning spin, so the lock must
+        // hold past phase=done until the count-up settles.
+        final hasFsFlight = _viewModel.isInFreeSpins &&
+            result != null &&
+            result.totalWin > 0;
+        if (!hasSequence && !hasBigWin && !hasFsFlight) {
+          setState(() => _celebrationLocked = false);
+        }
+      });
     }
     _wasBusy = isBusy;
   }
@@ -412,11 +473,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (phase == WinPresentationPhase.done &&
         _lastWinCtrlPhase != WinPresentationPhase.done) {
       if (_viewModel.isInFreeSpins) {
-        // Brief hold so the player can read the multiplied total in
-        // TUMBLE WIN before it lifts off toward the Kazanç row.
+        // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
+        // count-up that follows it) is still to come. Leave
+        // _celebrationLocked raised — the flight's onComplete handler
+        // releases it after the count-up settles.
         Future.delayed(const Duration(milliseconds: 600), () {
           if (mounted) _commitPendingFsWin();
         });
+      } else {
+        // Normal round: no flight follows, so the lock can drop the
+        // instant the final count-up reaches its target. The big-win
+        // overlay (if running) still keeps it locked through its own
+        // _bigWinEntry check.
+        if (_celebrationLocked) {
+          setState(() => _celebrationLocked = false);
+        }
       }
     }
     _lastWinCtrlPhase = phase;
@@ -459,6 +530,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           _fsAccumulatedWin += amount;
           _pendingFsSpinWin = 0;
         });
+        _releaseLockAfterFsCountUp();
         return;
       }
       late OverlayEntry entry;
@@ -483,6 +555,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               _isFlyingTumble = false;
               _fsAccumulatedWin += amount;
             });
+            // The Kazanç counter now spends ~700ms chasing the new
+            // total. Hold the respin button locked until that
+            // count-up settles so the player can read the round
+            // total before triggering the next reel.
+            Future.delayed(const Duration(milliseconds: 700), () {
+              if (!mounted) return;
+              if (_celebrationLocked) {
+                setState(() => _celebrationLocked = false);
+              }
+            });
           },
         ),
       );
@@ -499,7 +581,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _fsAccumulatedWin += amount;
         _pendingFsSpinWin = 0;
       });
+      _releaseLockAfterFsCountUp();
     }
+  }
+
+  /// Releases [_celebrationLocked] once the Kazanç counter has had
+  /// enough time to chase the new accumulator total. Used by the FS
+  /// fallback paths where the value is folded in directly (no flying
+  /// sprite carries the lock release on its own onComplete).
+  void _releaseLockAfterFsCountUp() {
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      if (_celebrationLocked) {
+        setState(() => _celebrationLocked = false);
+      }
+    });
   }
 
   void _handleLogout(BuildContext context) {
@@ -791,12 +887,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         _viewModel,
                         _viewModel.balanceCtrl,
                         _viewModel.fsCtrl,
+                        _winCtrl,
                       ]),
                       builder: (context, _) => RepaintBoundary(
                         child: RespinButton(
                           size: 84,
                           onTap: _viewModel.spin,
-                          spinning: _viewModel.isBusy,
+                          spinning:
+                              _viewModel.isBusy || _isCelebrationActive,
                         ),
                       ),
                     ),
