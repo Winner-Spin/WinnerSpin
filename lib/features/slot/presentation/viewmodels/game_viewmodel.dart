@@ -391,14 +391,11 @@ class GameViewModel extends ChangeNotifier {
       _pendingHistoryBet = cost;
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
-<<<<<<< Updated upstream
     } else if (!kTestForceFreeSpins) {
-      // Real FS round — consume one. Skipped under the test flag so
-      // testing isn't bottlenecked by an FS counter that drains.
-=======
-    } else {
+      // Real FS round — no charge, so the history entry records a
+      // zero stake. Consume one FS counter. Skipped under the test
+      // flag so testing isn't bottlenecked by an FS counter drain.
       _pendingHistoryBet = 0;
->>>>>>> Stashed changes
       _fsCtrl.consumeOne();
     }
 
@@ -483,11 +480,8 @@ class GameViewModel extends ChangeNotifier {
           fadingPaths: tumble.winningPaths,
           activeExplosions: tumble.clusterWins,
         );
-<<<<<<< Updated upstream
         notifyListeners();
-=======
         if (_vibration) HapticFeedback.mediumImpact();
->>>>>>> Stashed changes
         await Future.delayed(_tumbleFadeDuration);
 
         _gridCtrl.endTumble(newGrid: tumble.gridAfter);
