@@ -5,6 +5,7 @@ import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'multiplier_bomb_animation.dart';
+import 'multiplier_label.dart';
 import 'tumble_cell.dart';
 
 class SlotReelController {
@@ -56,6 +57,13 @@ class SlotReel extends StatefulWidget {
   /// Called when this reel's animation completes.
   final VoidCallback? onComplete;
 
+  /// Called the instant this reel starts the drop-in phase, so the
+  /// view-model can wipe last round's residue dust just before the
+  /// new symbols land — keeps the drop-out's residue visible while
+  /// stopping the static state from flashing dust before the new
+  /// symbol appears.
+  final VoidCallback? onDropInStart;
+
   final SlotReelController? controller;
 
   final int speedMultiplier;
@@ -67,15 +75,13 @@ class SlotReel extends StatefulWidget {
     required this.targetItems,
     required this.spinning,
     this.fadingPaths = const {},
-<<<<<<< Updated upstream
     this.clearedPositions = const {},
-=======
     this.controller,
->>>>>>> Stashed changes
     this.speedMultiplier = 1,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 1200),
     this.onComplete,
+    this.onDropInStart,
   });
 
   @override
@@ -173,6 +179,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
 
+    widget.onDropInStart?.call();
     setState(() => _state = ReelState.droppingIn);
 
     await _controller!.forward();
@@ -211,6 +218,92 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     widget.onComplete?.call();
   }
 
+  Widget _buildDustResidue(double itemH) {
+    return SizedBox(
+      width: itemH * 1.1,
+      height: itemH * 1.1,
+      child: const MultiplierDustResidue(),
+    );
+  }
+
+  Widget _buildReelSymbol({
+    required String assetPath,
+    required double itemH,
+    required bool isDropOut,
+    required bool cleared,
+    required bool isScatter,
+    required bool isMultiplier,
+    required double landThreshold,
+    required int multiplierValue,
+    required Animation<double> animation,
+  }) {
+    if (isDropOut && cleared) {
+      return _buildDustResidue(itemH);
+    }
+
+    final Widget symbolChild;
+    if (!isDropOut && isScatter) {
+      symbolChild = _ScatterPulse(
+        assetPath: assetPath,
+        animation: animation,
+        landThreshold: landThreshold,
+      );
+    } else if (isMultiplier) {
+      // Multiplier cells render the bomb (frozen on frame 0) already during
+      // the column-wide drop-in / drop-out so the player never sees a flash
+      // of the legacy multiplier sprite morph into a bomb in the static phase.
+      symbolChild = Center(
+        child: SizedBox(
+          width: itemH * 1.3,
+          height: itemH * 1.3,
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.none,
+              children: [
+                Transform.scale(
+                  scale: MultiplierLabel.bombScaleFor(multiplierValue),
+                  child: Lottie.asset(
+                    MultiplierBombAnimation.assetPath,
+                    fit: BoxFit.contain,
+                    animate: false,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment(
+                    MultiplierLabel.labelXOffsetFor(multiplierValue),
+                    0.15,
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: 1.0,
+                    heightFactor: 0.43,
+                    child: MultiplierLabel(
+                      value: multiplierValue,
+                      fit: BoxFit.fitHeight,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      symbolChild = Image.asset(
+        assetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.low,
+        gaplessPlayback: true,
+        cacheWidth: 256,
+      );
+    }
+
+    return Transform.scale(
+      scale: SymbolRegistry.byPath(assetPath)?.displayScale ?? 1.0,
+      child: symbolChild,
+    );
+  }
+
   Widget _buildIndependentItem(
     int index,
     String assetPath,
@@ -247,9 +340,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     final Curve curveType = isDropOut
         ? Curves.easeInCubic
-        : useQuickStopDropIn
-        ? _heftyBounceCurve
-        : (speedMult > 1 ? _heftyBounceCurve : Curves.easeOutQuad);
+        : _heftyBounceCurve;
 
     final Curve itemCurve = Interval(
       startDelayFraction,
@@ -257,9 +348,12 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       curve: curveType,
     );
 
+    final symbolDef = SymbolRegistry.byPath(assetPath);
     final bool isScatter = assetPath.contains('cupCake');
-    final bool isMultiplier =
-        SymbolRegistry.byPath(assetPath)?.tier == SymbolTier.multiplier;
+    final bool isMultiplier = symbolDef?.tier == SymbolTier.multiplier;
+    final bool cleared = widget.clearedPositions
+        .contains(widget.columnIndex * 100 + index);
+    final int multiplierValue = symbolDef?.multiplierValue ?? 5;
 
     return AnimatedBuilder(
       animation: _animation!,
@@ -286,32 +380,16 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       child: Padding(
         padding: const EdgeInsets.all(2),
         child: Center(
-          child: Transform.scale(
-            scale: SymbolRegistry.byPath(assetPath)?.displayScale ?? 1.0,
-            child: !isDropOut && isScatter
-                ? _ScatterPulse(
-                    assetPath: assetPath,
-                    animation: _animation!,
-                    landThreshold: endFraction,
-                  )
-                : isMultiplier
-                    // Multiplier cells render the bomb (frozen on frame 0)
-                    // already during the column-wide drop-in / drop-out so
-                    // the player never sees a flash of the legacy `multi_*x.png`
-                    // sprite that then morphs into a bomb in the static phase.
-                    ? Lottie.asset(
-                        MultiplierBombAnimation.assetPath,
-                        fit: BoxFit.contain,
-                        animate: false,
-                      )
-                    : Image.asset(
-                        assetPath,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.low,
-                        gaplessPlayback: true,
-                        // Source PNGs are ~2000px wide; cells render far smaller.
-                        cacheWidth: 256,
-                      ),
+          child: _buildReelSymbol(
+            assetPath: assetPath,
+            itemH: itemH,
+            isDropOut: isDropOut,
+            cleared: cleared,
+            isScatter: isScatter,
+            isMultiplier: isMultiplier,
+            landThreshold: endFraction,
+            multiplierValue: multiplierValue,
+            animation: _animation!,
           ),
         ),
       ),
@@ -351,7 +429,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     left: 0,
                     right: 0,
                     height: itemH,
-                    child: const SizedBox.shrink(),
+                    child: Center(child: _buildDustResidue(itemH)),
                   );
                 }
                 return Positioned(

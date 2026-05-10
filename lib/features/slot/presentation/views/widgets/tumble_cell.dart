@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import 'multiplier_bomb_animation.dart';
+import 'multiplier_label.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
 /// of the column-wide spin in [SlotReel]:
@@ -205,9 +206,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
             clipBehavior: Clip.none,
             fit: StackFit.expand,
             children: [
-              // Glow stays outside the Opacity wrapper so the halo remains
-              // visible while the symbol underneath fades.
-              if (glow > 0)
+              // Glow + burst are reserved for fruit cluster pops. The
+              // multiplier bomb has its own Lottie explosion overlay,
+              // so suppressing both here keeps the bomb's blast clean
+              // instead of stacking gold sparks on top of it.
+              if (glow > 0 && !isMultiplier)
                 IgnorePointer(
                   child: CustomPaint(
                     painter: _WinningGlowPainter(
@@ -217,7 +220,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              if (particleProgress > 0)
+              if (particleProgress > 0 && !isMultiplier)
                 IgnorePointer(
                   child: CustomPaint(
                     painter: _ParticleBurstPainter(
@@ -236,7 +239,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(2),
           child: Center(
             child: isMultiplier
-                ? _FrozenBomb(opacity: _imageOpacity)
+                ? _FrozenBomb(
+                    opacity: _imageOpacity,
+                    itemH: widget.itemH,
+                    multiplierValue: symbol?.multiplierValue ?? 5,
+                  )
                 : Image.asset(
                     widget.path,
                     fit: BoxFit.contain,
@@ -259,18 +266,70 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 /// the cell's existing fade-out path keeps working.
 class _FrozenBomb extends StatelessWidget {
   final Animation<double> opacity;
-  const _FrozenBomb({required this.opacity});
+  final double itemH;
+  final int multiplierValue;
+  const _FrozenBomb({
+    required this.opacity,
+    required this.itemH,
+    required this.multiplierValue,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Static PNG snapshot of the bomb body — drops the per-frame Skia
+    // path-replay cost of the full Lottie composition. The animated
+    // detonation runs in [MultiplierBombAnimation] overlay; this cell's
+    // PNG is hidden via [GameViewModel.clearedPositions] the moment that
+    // overlay starts, so there is no overlap during the fuse phase.
     return AnimatedBuilder(
       animation: opacity,
-      builder: (context, _) => Opacity(
+      builder: (context, child) => Opacity(
         opacity: opacity.value,
-        child: Lottie.asset(
-          MultiplierBombAnimation.assetPath,
-          fit: BoxFit.contain,
-          animate: false,
+        child: child,
+      ),
+      // Render the Lottie in a 1.3x cell-sized box so the rope can
+      // overflow into the row above (Clip.none lets it spill). The
+      // bomb's own scale was counter-shrunk in the composition so the
+      // visible bomb body stays the same size as before.
+      child: Center(
+        child: SizedBox(
+          width: itemH * 1.3,
+          height: itemH * 1.3,
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.none,
+              children: [
+                Transform.scale(
+                  scale: MultiplierLabel.bombScaleFor(multiplierValue),
+                  child: Lottie.asset(
+                    MultiplierBombAnimation.assetPath,
+                    fit: BoxFit.contain,
+                    animate: false,
+                  ),
+                ),
+                // The bomb body sits ~22% below the Lottie box's
+                // geometric centre. We wrap the 5x label in Align
+                // (with the same y-bias) because Stack's `alignment`
+                // is ignored when StackFit.expand gives non-positioned
+                // children tight constraints.
+                Align(
+                  alignment: Alignment(
+                    MultiplierLabel.labelXOffsetFor(multiplierValue),
+                    0.22,
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: 1.0,
+                    heightFactor: 0.43,
+                    child: MultiplierLabel(
+                      value: multiplierValue,
+                      fit: BoxFit.fitHeight,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

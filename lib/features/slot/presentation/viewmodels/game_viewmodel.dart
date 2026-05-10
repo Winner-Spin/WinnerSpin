@@ -310,12 +310,12 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void increaseBet() {
-    if (_isAutoSpinning) return;
+    if (_isAutoSpinning || isInFreeSpins) return;
     _balanceCtrl.increaseBet();
   }
 
   void decreaseBet() {
-    if (_isAutoSpinning) return;
+    if (_isAutoSpinning || isInFreeSpins) return;
     _balanceCtrl.decreaseBet();
   }
 
@@ -391,14 +391,11 @@ class GameViewModel extends ChangeNotifier {
       _pendingHistoryBet = cost;
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
-<<<<<<< Updated upstream
     } else if (!kTestForceFreeSpins) {
-      // Real FS round — consume one. Skipped under the test flag so
-      // testing isn't bottlenecked by an FS counter that drains.
-=======
-    } else {
+      // Real FS round — no charge, so the history entry records a
+      // zero stake. Consume one FS counter. Skipped under the test
+      // flag so testing isn't bottlenecked by an FS counter drain.
       _pendingHistoryBet = 0;
->>>>>>> Stashed changes
       _fsCtrl.consumeOne();
     }
 
@@ -450,10 +447,19 @@ class GameViewModel extends ChangeNotifier {
     _fsCtrl.awardBoughtRound();
   }
 
+  /// Wipes the dust residue left by last round's exploded multipliers.
+  /// SlotReel calls this the moment the drop-in phase begins so the
+  /// drop-out can finish showing the residue but the static state
+  /// renders the new symbol cleanly.
+  void clearMultiplierResidues() {
+    _gridCtrl.clearMultiplierResidues();
+  }
+
   /// Plays back cascade tumbles, awards the win, and persists state.
   /// Called by SlotReel once the initial drop-in animation completes.
   Future<void> onSpinComplete() async {
     final result = _pendingResult;
+    _gridCtrl.clearMultiplierResidues();
     if (result == null) {
       _isSpinning = false;
       notifyListeners();
@@ -474,11 +480,8 @@ class GameViewModel extends ChangeNotifier {
           fadingPaths: tumble.winningPaths,
           activeExplosions: tumble.clusterWins,
         );
-<<<<<<< Updated upstream
         notifyListeners();
-=======
         if (_vibration) HapticFeedback.mediumImpact();
->>>>>>> Stashed changes
         await Future.delayed(_tumbleFadeDuration);
 
         _gridCtrl.endTumble(newGrid: tumble.gridAfter);

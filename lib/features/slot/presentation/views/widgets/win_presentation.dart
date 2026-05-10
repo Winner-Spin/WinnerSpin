@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/spin_result.dart';
@@ -36,6 +38,21 @@ class WinPresentation extends StatefulWidget {
   /// so the cell reads as consumed.
   final void Function(int column, int row)? onMultiplierLifted;
 
+  /// Optional externally-owned controller. When provided, the host can
+  /// observe phase / running-sum changes alongside this widget — used
+  /// by the free-spin layout where the strip's top half mirrors the
+  /// live total while the formula renders below.
+  final WinPresentationController? controller;
+
+  /// Forwards to [WinSequenceBar.formulaOnly] — see there.
+  final bool formulaOnly;
+
+  /// Optional externally-supplied flight target. If provided, the
+  /// multiplier collect flights aim at this key's render rect instead
+  /// of the bar's internal anchor — used when the host renders its own
+  /// running-total widget elsewhere on the screen.
+  final GlobalKey? flightTargetKey;
+
   const WinPresentation({
     super.key,
     required this.spinResult,
@@ -48,6 +65,9 @@ class WinPresentation extends StatefulWidget {
     this.columns = 6,
     this.rows = 5,
     this.onMultiplierLifted,
+    this.controller,
+    this.formulaOnly = false,
+    this.flightTargetKey,
   });
 
   @override
@@ -55,7 +75,9 @@ class WinPresentation extends StatefulWidget {
 }
 
 class _WinPresentationState extends State<WinPresentation> {
-  final WinPresentationController _controller = WinPresentationController();
+  late final WinPresentationController _controller =
+      widget.controller ?? WinPresentationController();
+  late final bool _ownsController = widget.controller == null;
   final GlobalKey _barKey = GlobalKey();
   // Anchored to the running-sum slot inside the bar — flights aim
   // here so the asset lands on top of the value the player is reading.
@@ -93,7 +115,7 @@ class _WinPresentationState extends State<WinPresentation> {
   @override
   void dispose() {
     _controller.removeListener(_onPhaseChanged);
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
@@ -158,8 +180,9 @@ class _WinPresentationState extends State<WinPresentation> {
     // sum text. Fall back to the bar's overall centre if the anchor
     // hasn't laid out yet (first frame), then to a grid-relative
     // position if the bar itself hasn't laid out either.
+    final anchorKey = widget.flightTargetKey ?? _sumAnchorKey;
     final anchorBox =
-        _sumAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+        anchorKey.currentContext?.findRenderObject() as RenderBox?;
     if (anchorBox != null) {
       final topLeft = anchorBox.localToGlobal(Offset.zero);
       return Offset(
@@ -196,42 +219,57 @@ class _WinPresentationState extends State<WinPresentation> {
     // inside the multiplier symbol's cell at start.
     final cellSize = cellW < cellH ? cellW : cellH;
 
-    // Bomb phase — the cell already shows the bomb frozen on frame 0;
-    // this overlay plays the full Lottie timeline (fuse → blast → tail)
-    // on top. Cell symbol is cleared at the blast moment so the smoke
-    // tail reads as "the bomb is gone" instead of overlapping the still
-    // -frozen sprite underneath.
-    await MultiplierBombAnimation.play(
+    // The cell shows the bomb frozen on frame 0; this overlay plays the
+    // full Lottie timeline (fuse → blast → tail) on top. We don't await
+    // the whole timeline — we kick off the bomb in parallel, then wait
+    // only until the blast moment fires so the multiplier value can lift
+    // off in sync with the explosion. The smoke tail keeps playing
+    // alongside the collect flight.
+    // Wipe the resting bomb sprite from the grid the instant the
+    // overlay launches — otherwise the cell's frozen bomb sits behind
+    // the playing Lottie all through the fuse and blast frames, which
+    // reads as "two bombs" until the cell clear that used to be tied
+    // to the blast moment finally fires.
+    widget.onMultiplierLifted?.call(landing.column, landing.row);
+
+    final blastCompleter = Completer<void>();
+    final bombFuture = MultiplierBombAnimation.play(
       context: context,
       cellCenter: start,
       cellSize: cellSize,
+      multiplierValue: landing.value,
       onBlast: () {
-        widget.onMultiplierLifted?.call(landing.column, landing.row);
+        if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
     );
+
+    await blastCompleter.future;
     if (!mounted) return;
 
     // Landing is triggered the moment the floating asset crosses the
     // approach threshold (~70% of the flight) — well before the asset
     // has fully faded. The bar pulse and the asset's last 30% of fade
     // overlap, reading as a single merge instead of "lands then
-    // pulses". The await below only governs overlay cleanup.
-    await MultiplierCollectAnimation.play(
-      context: context,
-      start: start,
-      end: end,
-      value: landing.value,
-      cellSize: cellSize,
-      // End size at the bar tracks the bar's text height — the value
-      // shrinks to about a regular symbol slot in the running-sum text.
-      endSize: 30,
-      settleDuration: WinPresentationController.multiplierSettleDuration,
-      flightDuration: WinPresentationController.multiplierFlightDuration,
-      onApproaching: () {
-        if (!mounted) return;
-        _controller.onMultiplierLanded();
-      },
-    );
+    // pulses". Collect runs in parallel with the bomb's smoke tail.
+    await Future.wait([
+      bombFuture,
+      MultiplierCollectAnimation.play(
+        context: context,
+        start: start,
+        end: end,
+        value: landing.value,
+        cellSize: cellSize * 0.67,
+        // End size at the bar tracks the bar's text height — the value
+        // shrinks to about a regular symbol slot in the running-sum text.
+        endSize: 30,
+        settleDuration: WinPresentationController.multiplierSettleDuration,
+        flightDuration: WinPresentationController.multiplierFlightDuration,
+        onApproaching: () {
+          if (!mounted) return;
+          _controller.onMultiplierLanded();
+        },
+      ),
+    ]);
   }
 
   @override
@@ -243,6 +281,7 @@ class _WinPresentationState extends State<WinPresentation> {
         baseStyle: widget.baseStyle,
         accentStyle: widget.accentStyle,
         sumAnchorKey: _sumAnchorKey,
+        formulaOnly: widget.formulaOnly,
       ),
     );
   }

@@ -19,12 +19,18 @@ class WinSequenceBar extends StatelessWidget {
   /// landing, the live sum after).
   final GlobalKey sumAnchorKey;
 
+  /// When true the bar omits the Kazanç readout rows and only renders
+  /// the running multiplier formula. Used by the free-spin layout where
+  /// the strip's top half already shows the live total.
+  final bool formulaOnly;
+
   const WinSequenceBar({
     super.key,
     required this.controller,
     required this.baseStyle,
     required this.accentStyle,
     required this.sumAnchorKey,
+    this.formulaOnly = false,
   });
 
   @override
@@ -32,6 +38,13 @@ class WinSequenceBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        if (formulaOnly) {
+          // The host slot owns its own readout — this widget is only
+          // mounted to drive the orchestration (controller / bomb /
+          // collect overlays) and stays visually silent.
+          return const SizedBox.shrink();
+        }
+
         switch (controller.phase) {
           case WinPresentationPhase.idle:
             return const SizedBox.shrink();
@@ -102,9 +115,9 @@ class WinSequenceBar extends StatelessWidget {
     // Layout — left half always shows the base. Right half evolves:
     //   • flight not started yet → empty
     //   • flight started, sum still 0 → bare "×" placeholder
-    //   • after first landing → "× N"; on every new sum the value pops
-    //     from 1.0 → ~1.5 → 1.0 in place (no crossfade) so the player
-    //     reads it as the SAME running total being increased.
+    //   • after first landing → "× N = ₺total"; the running sum pops
+    //     1.0 → 1.5 → 1.0 in place and the trailing money amount
+    //     reels up to base*sum on every new landing.
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: Row(
@@ -132,6 +145,17 @@ class WinSequenceBar extends StatelessWidget {
                       ),
                     ),
             ),
+            if (sum > 0) ...[
+              const SizedBox(width: 8),
+              Text('=', style: baseStyle),
+              const SizedBox(width: 6),
+              WinAmountCounter(
+                from: base,
+                to: base * sum,
+                style: accentStyle,
+                duration: const Duration(milliseconds: 350),
+              ),
+            ],
           ],
         ],
       ),

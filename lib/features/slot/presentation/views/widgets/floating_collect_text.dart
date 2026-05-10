@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'multiplier_label.dart';
+
 /// One stylised multiplier face value flying out of its grid cell into
 /// the win bar. Three phases:
 ///   1. **Settle** ([settleDuration]): the asset appears centred on the
@@ -247,7 +249,7 @@ class _ValueImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'lib/images/slot_main_screen/Items/5x_yazi_transparan.png',
+      MultiplierLabel.assetPathFor(value),
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,

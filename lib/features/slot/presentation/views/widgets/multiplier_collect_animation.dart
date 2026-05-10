@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 
 import 'floating_collect_text.dart';
 
-/// Drops a [FloatingCollectText] into the root overlay and removes it
-/// when the flight finishes. Decoupled from layout — the caller
-/// supplies start/end screen coordinates and the cell-sized origin
-/// dimensions for the on-grid pop.
+/// Drops a [FloatingCollectText] into the nearest enclosing overlay
+/// and removes it when the flight finishes. Decoupled from layout —
+/// the caller supplies start/end screen coordinates and the cell-sized
+/// origin dimensions for the on-grid pop.
 class MultiplierCollectAnimation {
   MultiplierCollectAnimation._();
 
@@ -31,7 +31,7 @@ class MultiplierCollectAnimation {
     VoidCallback? onApproaching,
     VoidCallback? onSettleComplete,
   }) async {
-    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlay = Overlay.of(context);
     final completer = Completer<void>();
     late final OverlayEntry entry;
 

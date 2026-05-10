@@ -357,8 +357,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 const SizedBox(width: 16),
                 _buildBetButton(
                   icon: Icons.add,
-                  color: const Color(0xFF00C853), // Green plus button
-                  iconColor: Colors.white,
+                  color: Colors.white,
+                  iconColor: Colors.black,
                   onTap: widget.viewModel.increaseBet,
                 ),
               ],

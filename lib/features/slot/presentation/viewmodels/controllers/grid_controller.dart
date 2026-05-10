@@ -29,11 +29,10 @@ class GridController extends ChangeNotifier {
   List<ClusterWin> get activeExplosions => _activeExplosions;
   Set<int> get winningPositions => _winningPositions;
 
-  /// Cells that should render as empty even though the grid still
-  /// holds a symbol there. Used by the win-presentation layer to
-  /// remove a multiplier symbol the moment its asset has lifted off
-  /// the cell, so the cell reads as "consumed". Encoded as
-  /// `column * 100 + row`.
+  /// Cells that should render as consumed even though the grid still
+  /// holds a multiplier symbol there. The reel shows the colorful
+  /// residue in these cells until the next drop-out completes.
+  /// Encoded as `column * 100 + row`.
   Set<int> get clearedPositions => _clearedPositions;
 
   /// Snapshots the current grid so reels can animate from the previous
@@ -47,17 +46,28 @@ class GridController extends ChangeNotifier {
     _fadingPaths = const {};
     _activeExplosions = const [];
     _winningPositions = {};
-    _clearedPositions = const {};
+    // Residues are NOT cleared here on purpose — keeping them lets the
+    // drop-out frames render dust where the multiplier exploded last
+    // round (instead of replaying the bomb sprite). The reels reset
+    // residues themselves the moment they start dropping the new
+    // symbols in (see `onDropInStart`), so static-state never flashes
+    // dust before the new symbol appears.
     notifyListeners();
   }
 
-  /// Marks a single (column, row) as cleared so the slot reel renders
-  /// it empty for the rest of the current spin. Called from the win
+  /// Marks a single (column, row) as consumed so the slot reel renders
+  /// residue for the rest of the current spin. Called from the win
   /// presentation layer when a multiplier asset lifts off its cell.
   void clearMultiplierPosition(int column, int row) {
     final key = column * 100 + row;
     if (_clearedPositions.contains(key)) return;
     _clearedPositions = {..._clearedPositions, key};
+    notifyListeners();
+  }
+
+  void clearMultiplierResidues() {
+    if (_clearedPositions.isEmpty) return;
+    _clearedPositions = const {};
     notifyListeners();
   }
 
