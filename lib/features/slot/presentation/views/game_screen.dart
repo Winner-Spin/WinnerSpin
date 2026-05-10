@@ -10,7 +10,6 @@ import '../../domain/models/symbol_registry.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
-import 'widgets/free_spins_banner.dart';
 import 'widgets/slot_reel.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
@@ -70,6 +69,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // Anchor for the running Kazanç readout — the flying tumble sprite
   // aims here so the value lands on top of the round total.
   final GlobalKey _kazancAnchorKey = GlobalKey();
+
+  // Page-local overlay that hosts cinematic effects (bomb explosions,
+  // multiplier flights, big-win celebration). Routes pushed by
+  // `showGeneralDialog` go to the root navigator above this layer, so
+  // panels like Settings sit on top of any in-flight animation.
+  final GlobalKey<OverlayState> _stageOverlayKey = GlobalKey<OverlayState>();
 
   // True while the tumble-win sprite is in flight toward the Kazanç
   // readout. The middle band drops to ₺0 for the duration so the
@@ -231,7 +236,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     _bigWinShownThisSpin = true;
 
-    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlay = _stageOverlayKey.currentState;
+    if (overlay == null) return;
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (ctx) => BigWinOverlay(
@@ -408,7 +414,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         Offset(endBox.size.width / 2, endBox.size.height / 2),
       );
 
-      final overlay = Overlay.of(context, rootOverlay: true);
+      final overlay = _stageOverlayKey.currentState;
+      if (overlay == null) {
+        setState(() {
+          _fsAccumulatedWin += amount;
+          _pendingFsSpinWin = 0;
+        });
+        return;
+      }
       late OverlayEntry entry;
       entry = OverlayEntry(
         builder: (ctx) => _FlyingTumbleSprite(
@@ -464,10 +477,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final double screenH = constraints.maxHeight;
-          final double screenW = constraints.maxWidth;
+      body: Overlay(
+        key: _stageOverlayKey,
+        initialEntries: [
+          OverlayEntry(builder: (context) => _buildStage()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStage() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double screenH = constraints.maxHeight;
+        final double screenW = constraints.maxWidth;
 
           // The backdrop is BoxFit.cover'd — when the screen aspect
           // doesn't match the source aspect, the image gets horizontally
@@ -551,22 +574,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       ),
                     ),
                   ],
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.15,
-                left: screenW * 0.1,
-                right: screenW * 0.1,
-                child: ListenableBuilder(
-                  listenable: _viewModel.fsCtrl,
-                  builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
-                      return FreeSpinsBanner(
-                        remaining: _viewModel.freeSpinsRemaining,
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
                 ),
               ),
               ListenableBuilder(
@@ -835,7 +842,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ],
           );
         },
-      ),
     );
   }
 

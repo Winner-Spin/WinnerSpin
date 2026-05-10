@@ -6,12 +6,12 @@ import 'package:lottie/lottie.dart';
 
 import 'multiplier_label.dart';
 
-/// Lottie bomb animation that plays in a root overlay above a multiplier
-/// cell. The grid cell renders the bomb frozen on frame 0; this overlay
-/// then plays the full timeline (fuse → blast → tail) on top. The blast
-/// moment is exposed via [onBlast] so the host can clear the underlying
-/// frozen bomb the instant it visually detonates, instead of waiting for
-/// the smoke tail to finish.
+/// Lottie bomb animation that plays in the page-local stage overlay
+/// above a multiplier cell. The grid cell renders the bomb frozen on
+/// frame 0; this overlay then plays the full timeline (fuse → blast →
+/// tail) on top. The blast moment is exposed via [onBlast] so the host
+/// can clear the underlying frozen bomb the instant it visually
+/// detonates, instead of waiting for the smoke tail to finish.
 class MultiplierBombAnimation {
   MultiplierBombAnimation._();
 
@@ -26,8 +26,9 @@ class MultiplierBombAnimation {
   /// fade-out / light-spread the trailing frames produce.
   static const double _blastEndProgress = 50.0 / 85.0;
 
-  /// Spawns the bomb in the root overlay. Future resolves the moment
-  /// the full timeline finishes and the entry has been removed.
+  /// Spawns the bomb in the nearest enclosing overlay. Future resolves
+  /// the moment the full timeline finishes and the entry has been
+  /// removed.
   static Future<void> play({
     required BuildContext context,
     required Offset cellCenter,
@@ -35,7 +36,7 @@ class MultiplierBombAnimation {
     required int multiplierValue,
     VoidCallback? onBlast,
   }) async {
-    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlay = Overlay.of(context);
     final completer = Completer<void>();
     late final OverlayEntry entry;
 
