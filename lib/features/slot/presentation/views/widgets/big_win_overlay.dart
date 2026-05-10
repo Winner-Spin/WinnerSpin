@@ -67,12 +67,19 @@ class BigWinOverlay extends StatefulWidget {
   final Duration duration;
   final VoidCallback onComplete;
 
+  /// When true, the overlay opens with the count-up already settled at
+  /// [amount] and runs the same shortened dismissal flow the tap path
+  /// uses — added for the turbo speed level so big-win presentations
+  /// stay compact when the player has chosen the fastest pacing.
+  final bool instantAmount;
+
   const BigWinOverlay({
     super.key,
     required this.amount,
     required this.tier,
     required this.onComplete,
     this.duration = const Duration(seconds: 12),
+    this.instantAmount = false,
   });
 
   @override
@@ -243,6 +250,17 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     Future.delayed(_countDuration, () {
       if (mounted) _startAmountPop();
     });
+
+    if (widget.instantAmount) {
+      // Turbo path: opening straight at the final amount, with the
+      // same post-count hold the tap-to-skip flow uses so the
+      // celebration still has a beat to read before tearing down.
+      _amountSkipped = true;
+      _startAmountPop();
+      Future.delayed(_postCountHold, () {
+        if (mounted) _completeOnce();
+      });
+    }
   }
 
   void _startAmountPop() {

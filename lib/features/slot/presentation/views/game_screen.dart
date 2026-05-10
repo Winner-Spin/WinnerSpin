@@ -302,6 +302,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       builder: (ctx) => BigWinOverlay(
         amount: amount,
         tier: tier,
+        // Turbo speed skips the count-up the same way the tap path
+        // does so big-win celebrations stay compact on the fastest
+        // pacing setting.
+        instantAmount: _viewModel.speedMultiplier >= 3,
         onComplete: () {
           if (_bigWinEntry == entry) {
             setState(() {
@@ -1000,42 +1004,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Widget _buildSlotGrid() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: List.generate(GameViewModel.columns, (col) {
-            return Expanded(
-              // Per-column RepaintBoundary so a reel's drop animation
-              // doesn't invalidate sibling columns or the grid frame.
-              child: RepaintBoundary(
-                child: SlotReel(
-                  columnIndex: col,
-                  controller: _reelControllers[col],
-                  // Pass column lists by reference; List.generate
-                  // here was producing fresh refs every rebuild.
-                  previousItems: _viewModel.previousGrid[col],
-                  targetItems: _viewModel.grid[col],
-                  spinning: _viewModel.isSpinning,
-                  fadingPaths: _viewModel.fadingPaths,
-                  clearedPositions: _viewModel.clearedPositions,
-                  speedMultiplier: _viewModel.speedMultiplier,
-                  onComplete: col == GameViewModel.columns - 1
-                      ? () => _viewModel.onSpinComplete()
-                      : null,
-                  // Only the first column triggers the residue wipe; the
-                  // grid controller no-ops if it's already empty so the
-                  // other columns calling later is harmless either way.
-                  onDropInStart: col == 0
-                      ? () => _viewModel.clearMultiplierResidues()
-                      : null,
-                ),
+      child: Row(
+        children: List.generate(GameViewModel.columns, (col) {
+          return Expanded(
+            // Per-column RepaintBoundary so a reel's drop animation
+            // doesn't invalidate sibling columns or the grid frame.
+            child: RepaintBoundary(
+              child: SlotReel(
+                columnIndex: col,
+                controller: _reelControllers[col],
+                // Pass column lists by reference; List.generate
+                // here was producing fresh refs every rebuild.
+                previousItems: _viewModel.previousGrid[col],
+                targetItems: _viewModel.grid[col],
+                spinning: _viewModel.isSpinning,
+                fadingPaths: _viewModel.fadingPaths,
+                clearedPositions: _viewModel.clearedPositions,
+                speedMultiplier: _viewModel.speedMultiplier,
+                onComplete: col == GameViewModel.columns - 1
+                    ? () => _viewModel.onSpinComplete()
+                    : null,
+                // Only the first column triggers the residue wipe; the
+                // grid controller no-ops if it's already empty so the
+                // other columns calling later is harmless either way.
+                onDropInStart: col == 0
+                    ? () => _viewModel.clearMultiplierResidues()
+                    : null,
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
