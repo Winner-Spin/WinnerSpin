@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/audio/app_audio_context.dart';
 import 'win_amount_counter.dart';
 
 const double _coinRainCycleProgress = 0.78;
@@ -65,6 +68,7 @@ class BigWinOverlay extends StatefulWidget {
   final double amount;
   final WinTier tier;
   final Duration duration;
+  final bool soundEnabled;
   final VoidCallback onComplete;
 
   /// When true, the overlay opens with the count-up already settled at
@@ -77,6 +81,7 @@ class BigWinOverlay extends StatefulWidget {
     super.key,
     required this.amount,
     required this.tier,
+    required this.soundEnabled,
     required this.onComplete,
     this.duration = const Duration(seconds: 12),
     this.instantAmount = false,
@@ -88,7 +93,10 @@ class BigWinOverlay extends StatefulWidget {
 
 class _BigWinOverlayState extends State<BigWinOverlay>
     with TickerProviderStateMixin {
+  static const _celebrationSound = 'audio/Items/Win_Sounds.wav';
+
   late final AnimationController _ctrl;
+  late final AudioPlayer _celebrationPlayer;
   late final Animation<double> _scaleAnim;
   late final Animation<double> _fadeAnim;
   late final List<_Coin> _coins;
@@ -125,6 +133,7 @@ class _BigWinOverlayState extends State<BigWinOverlay>
   @override
   void initState() {
     super.initState();
+    _celebrationPlayer = AudioPlayer();
     _ctrl = AnimationController(vsync: this, duration: widget.duration);
 
     // Keep the original pop and breathing speed; the longer overlay
@@ -132,12 +141,16 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     const popInMs = 384.0;
     const breathPhaseMs = 576.0;
     final totalMs = widget.duration.inMilliseconds.toDouble();
-    final breathPhaseCount =
-        max(0, ((totalMs - popInMs) / breathPhaseMs).floor());
+    final breathPhaseCount = max(
+      0,
+      ((totalMs - popInMs) / breathPhaseMs).floor(),
+    );
     final scaleItems = <TweenSequenceItem<double>>[
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: popInMs,
       ),
     ];
@@ -170,17 +183,18 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     final fadeHoldMs = max(0.0, totalMs - fadeInMs - fadeOutMs);
     _fadeAnim = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: fadeInMs,
       ),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: fadeHoldMs),
       TweenSequenceItem(
-        tween: ConstantTween<double>(1.0),
-        weight: fadeHoldMs,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: fadeOutMs,
       ),
     ]).animate(_ctrl);
@@ -203,6 +217,10 @@ class _BigWinOverlayState extends State<BigWinOverlay>
       );
     });
 
+    if (widget.soundEnabled) {
+      unawaited(_startCelebrationSound());
+    }
+
     _ctrl.forward().then((_) {
       if (mounted) _completeOnce();
     });
@@ -216,33 +234,45 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     );
     _amountPopScale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.3)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 1.3,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 18,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.3, end: 1.18)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween<double>(
+          begin: 1.3,
+          end: 1.18,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 13,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.18, end: 1.3)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween<double>(
+          begin: 1.18,
+          end: 1.3,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 13,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.3, end: 1.18)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween<double>(
+          begin: 1.3,
+          end: 1.18,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 13,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.18, end: 1.3)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween<double>(
+          begin: 1.18,
+          end: 1.3,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 13,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.3, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 1.3,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 30,
       ),
     ]).animate(_amountPopCtrl);
@@ -272,6 +302,7 @@ class _BigWinOverlayState extends State<BigWinOverlay>
   void _completeOnce() {
     if (_completed) return;
     _completed = true;
+    unawaited(_stopCelebrationSound());
     widget.onComplete();
   }
 
@@ -285,7 +316,38 @@ class _BigWinOverlayState extends State<BigWinOverlay>
   }
 
   @override
+  void didUpdateWidget(BigWinOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.soundEnabled == oldWidget.soundEnabled) return;
+    if (widget.soundEnabled) {
+      unawaited(_startCelebrationSound());
+    } else {
+      unawaited(_stopCelebrationSound());
+    }
+  }
+
+  Future<void> _startCelebrationSound() async {
+    try {
+      await _celebrationPlayer.setAudioContext(AppAudioContext.game);
+      await _celebrationPlayer.setReleaseMode(ReleaseMode.stop);
+      await _celebrationPlayer.play(AssetSource(_celebrationSound));
+    } catch (_) {
+      // Audio failures should not interrupt the win celebration.
+    }
+  }
+
+  Future<void> _stopCelebrationSound() async {
+    try {
+      await _celebrationPlayer.stop();
+    } catch (_) {
+      // The player may already be torn down while the overlay exits.
+    }
+  }
+
+  @override
   void dispose() {
+    unawaited(_stopCelebrationSound());
+    unawaited(_celebrationPlayer.dispose());
     _ctrl.dispose();
     _amountPopCtrl.dispose();
     super.dispose();
@@ -312,9 +374,8 @@ class _BigWinOverlayState extends State<BigWinOverlay>
                   CustomPaint(
                     painter: _CoinsPainter(
                       coins: _coins,
-                      progress: _ctrl.value *
-                          widget.duration.inMilliseconds /
-                          3200.0,
+                      progress:
+                          _ctrl.value * widget.duration.inMilliseconds / 3200.0,
                     ),
                   ),
                   Center(
@@ -474,7 +535,6 @@ class _AmountBanner extends StatelessWidget {
   }
 }
 
-
 class _Coin {
   /// Horizontal column the coin falls in, normalized 0..1.
   final double x;
@@ -560,9 +620,7 @@ class _CoinsPainter extends CustomPainter {
               _faceTop.withValues(alpha: alpha),
               _faceBottom.withValues(alpha: alpha),
             ],
-          ).createShader(
-            Rect.fromCircle(center: centre, radius: r * 0.86),
-          ),
+          ).createShader(Rect.fromCircle(center: centre, radius: r * 0.86)),
       );
 
       // Inner ring etched into the face for the stamped look.
@@ -590,10 +648,7 @@ class _CoinsPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(
-        canvas,
-        Offset(cx - tp.width / 2, cy - tp.height / 2),
-      );
+      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
 
       // Top-left specular highlight to read as a 3D coin.
       canvas.drawCircle(
@@ -605,6 +660,5 @@ class _CoinsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CoinsPainter old) =>
-      old.progress != progress;
+  bool shouldRepaint(covariant _CoinsPainter old) => old.progress != progress;
 }

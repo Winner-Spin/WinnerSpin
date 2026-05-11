@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 
 class AutoPlaySettingsScreen extends StatefulWidget {
@@ -46,7 +47,10 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
         children: [
           Positioned.fill(
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Container(color: Colors.transparent),
             ),
           ),
@@ -151,7 +155,10 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(
@@ -174,7 +181,12 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
         final disabled =
             widget.viewModel.isBusy || widget.viewModel.isAutoSpinning;
         return GestureDetector(
-          onTap: disabled ? null : _startAutoPlay,
+          onTap: disabled
+              ? null
+              : () {
+                  UiClickSound.play();
+                  _startAutoPlay();
+                },
           child: Opacity(
             opacity: disabled ? 0.55 : 1,
             child: Container(

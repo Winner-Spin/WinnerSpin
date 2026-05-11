@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../audio/ui_click_sound.dart';
+
 /// The big SPIN call-to-action. Stateful so it owns its own press-down
 /// scale animation. Disabled visual is shown when [busy] is true or when
 /// [affordable] is false.
@@ -35,9 +37,10 @@ class _SpinButtonState extends State<SpinButton>
       duration: const Duration(milliseconds: 120),
       reverseDuration: const Duration(milliseconds: 120),
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.88,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -54,6 +57,7 @@ class _SpinButtonState extends State<SpinButton>
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
         _controller.reverse();
+        UiClickSound.play();
         widget.onPressed();
       },
       onTapCancel: () => _controller.reverse(),
@@ -67,7 +71,11 @@ class _SpinButtonState extends State<SpinButton>
           decoration: BoxDecoration(
             gradient: _disabled
                 ? LinearGradient(
-                    colors: [Colors.grey.shade600, Colors.grey.shade600, Colors.grey.shade700],
+                    colors: [
+                      Colors.grey.shade600,
+                      Colors.grey.shade600,
+                      Colors.grey.shade700,
+                    ],
                   )
                 : const LinearGradient(
                     begin: Alignment.topCenter,
@@ -83,7 +91,9 @@ class _SpinButtonState extends State<SpinButton>
             border: Border.all(
               color: widget.busy
                   ? Colors.grey.shade400
-                  : const Color(0xFFE8F5E9).withValues(alpha: 0.6), // Inner reflection
+                  : const Color(
+                      0xFFE8F5E9,
+                    ).withValues(alpha: 0.6), // Inner reflection
               width: 1.5,
             ),
             boxShadow: [
@@ -103,10 +113,7 @@ class _SpinButtonState extends State<SpinButton>
             ],
           ),
           child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: _label(),
-            ),
+            child: FittedBox(fit: BoxFit.scaleDown, child: _label()),
           ),
         ),
       ),
@@ -114,8 +121,12 @@ class _SpinButtonState extends State<SpinButton>
   }
 
   Widget _label() {
-    final textColor = widget.busy ? Colors.grey.shade300 : const Color(0xFFFFF8E1); // Creamy yellow
-    final textShadow = widget.busy ? Colors.transparent : const Color(0xFF003300); // Dark green shadow
+    final textColor = widget.busy
+        ? Colors.grey.shade300
+        : const Color(0xFFFFF8E1); // Creamy yellow
+    final textShadow = widget.busy
+        ? Colors.transparent
+        : const Color(0xFF003300); // Dark green shadow
 
     if (widget.busy) {
       return Row(

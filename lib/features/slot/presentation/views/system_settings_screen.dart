@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/custom_switch.dart';
 
@@ -34,7 +35,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         children: [
           Positioned.fill(
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Container(color: Colors.transparent),
             ),
           ),
@@ -267,7 +271,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(
@@ -292,7 +299,12 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   Widget _buildExitButton() {
     return GestureDetector(
-      onTap: _isExiting ? null : _exitGame,
+      onTap: _isExiting
+          ? null
+          : () {
+              UiClickSound.play();
+              _exitGame();
+            },
       child: AnimatedOpacity(
         opacity: _isExiting ? 0.55 : 1,
         duration: const Duration(milliseconds: 120),
@@ -328,6 +340,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   Widget _buildGameHistory() {
     return GestureDetector(
       onTap: () {
+        UiClickSound.play();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => GameHistoryScreen(viewModel: widget.viewModel),
@@ -560,8 +573,14 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             alignment: Alignment.centerLeft,
             child: GestureDetector(
               onTap: _isSelecting
-                  ? () => setState(_selectedHistoryIds.clear)
-                  : () => Navigator.of(context).pop(),
+                  ? () {
+                      UiClickSound.play();
+                      setState(_selectedHistoryIds.clear);
+                    }
+                  : () {
+                      UiClickSound.play();
+                      Navigator.of(context).pop();
+                    },
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(
@@ -576,7 +595,10 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: _deleteSelectedEntries,
+                onTap: () {
+                  UiClickSound.play();
+                  _deleteSelectedEntries();
+                },
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Icon(
@@ -621,8 +643,16 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
         : Colors.white.withValues(alpha: 0.55);
 
     return GestureDetector(
-      onTap: _isSelecting ? () => _toggleEntrySelection(entry.id) : null,
-      onLongPress: () => _toggleEntrySelection(entry.id),
+      onTap: _isSelecting
+          ? () {
+              UiClickSound.play();
+              _toggleEntrySelection(entry.id);
+            }
+          : null,
+      onLongPress: () {
+        UiClickSound.play();
+        _toggleEntrySelection(entry.id);
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(

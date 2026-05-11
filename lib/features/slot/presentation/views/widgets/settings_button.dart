@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../audio/ui_click_sound.dart';
+
 class SettingsButton extends StatefulWidget {
   final VoidCallback? onTap;
   final double width;
@@ -43,7 +45,12 @@ class _SettingsButtonState extends State<SettingsButton> {
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+      onTap: widget.onTap == null
+          ? null
+          : () {
+              UiClickSound.play();
+              widget.onTap?.call();
+            },
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
         alignment: Alignment.centerRight,

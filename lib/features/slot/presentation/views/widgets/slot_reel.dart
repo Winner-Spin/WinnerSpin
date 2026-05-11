@@ -66,6 +66,7 @@ class SlotReel extends StatefulWidget {
   final VoidCallback? onDropInStart;
 
   final bool pulseScattersOnLanding;
+  final bool soundEffectsEnabled;
 
   final SlotReelController? controller;
 
@@ -86,6 +87,7 @@ class SlotReel extends StatefulWidget {
     this.onComplete,
     this.onDropInStart,
     this.pulseScattersOnLanding = false,
+    this.soundEffectsEnabled = true,
   });
 
   @override
@@ -471,6 +473,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     isFading: widget.fadingPaths.contains(items[i]),
                     itemH: itemH,
                     speedMultiplier: widget.speedMultiplier,
+                    soundEnabled: widget.soundEffectsEnabled,
                   ),
                 );
               }),

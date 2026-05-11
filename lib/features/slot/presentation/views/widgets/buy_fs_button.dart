@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../audio/ui_click_sound.dart';
+
 /// CTA that purchases a Free Spins round at 100× the base bet. Disabled
 /// while busy, in an existing FS round, balance is short, or the pool
 /// guard refuses (see GameViewModel.canBuyFreeSpins).
@@ -23,7 +25,11 @@ class BuyFsButton extends StatelessWidget {
     final Color glow;
 
     if (disabled) {
-      gradient = [Colors.grey.shade600, Colors.grey.shade600, Colors.grey.shade700];
+      gradient = [
+        Colors.grey.shade600,
+        Colors.grey.shade600,
+        Colors.grey.shade700,
+      ];
       borderColor = Colors.grey.shade400;
       glow = Colors.transparent;
     } else {
@@ -37,13 +43,20 @@ class BuyFsButton extends StatelessWidget {
       glow = const Color(0xFFFF1A8C).withValues(alpha: 0.5);
     }
 
-    final textColor = disabled ? Colors.grey.shade300 : const Color(0xFFFFF8E1); // Creamy yellow
+    final textColor = disabled
+        ? Colors.grey.shade300
+        : const Color(0xFFFFF8E1); // Creamy yellow
     final textShadow = disabled
         ? Colors.transparent
         : const Color(0xFF660033); // Dark pink shadow
 
     return GestureDetector(
-      onTap: disabled ? null : onTap,
+      onTap: disabled
+          ? null
+          : () {
+              UiClickSound.play();
+              onTap();
+            },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -56,7 +69,11 @@ class BuyFsButton extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: disabled ? borderColor : const Color(0xFFFFB3D9).withValues(alpha: 0.6), // Inner top reflection effect
+            color: disabled
+                ? borderColor
+                : const Color(
+                    0xFFFFB3D9,
+                  ).withValues(alpha: 0.6), // Inner top reflection effect
             width: 1.5,
           ),
           boxShadow: glow == Colors.transparent

@@ -7,6 +7,7 @@ import '../../../../core/format/money_format.dart';
 
 import '../../domain/models/cluster_win.dart';
 import '../../domain/models/symbol_registry.dart';
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
@@ -155,6 +156,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       (_) => SlotReelController(),
     );
     WidgetsBinding.instance.addObserver(this);
+    UiClickSound.enabled = _viewModel.soundEffects;
+    unawaited(UiClickSound.preload());
     _viewModel.addListener(_onViewModelChange);
     // The ViewModel itself doesn't notify after `awardWin` — that
     // path only fires on the balance controller. Listen there too so
@@ -238,6 +241,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _onViewModelChange() {
+    UiClickSound.enabled = _viewModel.soundEffects;
     _handleLogout(context);
     _trackSpinTransitions();
     _trackLingeringCluster();
@@ -344,6 +348,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // does so big-win celebrations stay compact on the fastest
         // pacing setting.
         instantAmount: _viewModel.speedMultiplier >= 3,
+        soundEnabled: _viewModel.soundEffects,
         onComplete: () {
           if (_bigWinEntry == entry) {
             setState(() => _bigWinEntry = null);
@@ -992,8 +997,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             // stop tap is exempted inside RespinButton, so
                             // the player can always abort an active autoplay
                             // run even while a celebration is on screen.
-                            spinning:
-                                _viewModel.isBusy || _isCelebrationActive,
+                            spinning: _viewModel.isBusy || _isCelebrationActive,
                             disabled: _isBigWinShowing,
                             autoSpinsRemaining: autoActive
                                 ? _viewModel.autoSpinsRemaining
@@ -1141,37 +1145,44 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Widget _buildSlotGrid() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Row(
-        children: List.generate(GameViewModel.columns, (col) {
-          return Expanded(
-            // Per-column RepaintBoundary so a reel's drop animation
-            // doesn't invalidate sibling columns or the grid frame.
-            child: RepaintBoundary(
-              child: SlotReel(
-                columnIndex: col,
-                controller: _reelControllers[col],
-                // Pass column lists by reference; List.generate
-                // here was producing fresh refs every rebuild.
-                previousItems: _viewModel.previousGrid[col],
-                targetItems: _viewModel.grid[col],
-                spinning: _viewModel.isSpinning,
-                fadingPaths: _viewModel.fadingPaths,
-                clearedPositions: _viewModel.clearedPositions,
-                speedMultiplier: _viewModel.speedMultiplier,
-                pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
-                onComplete: col == GameViewModel.columns - 1
-                    ? () => _viewModel.onSpinComplete()
-                    : null,
-                // Only the first column triggers the residue wipe; the
-                // grid controller no-ops if it's already empty so the
-                // other columns calling later is harmless either way.
-                onDropInStart: col == 0
-                    ? () => _viewModel.clearMultiplierResidues()
-                    : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: List.generate(GameViewModel.columns, (col) {
+            return Expanded(
+              // Per-column RepaintBoundary so a reel's drop animation
+              // doesn't invalidate sibling columns or the grid frame.
+              child: RepaintBoundary(
+                child: SlotReel(
+                  columnIndex: col,
+                  controller: _reelControllers[col],
+                  // Pass column lists by reference; List.generate
+                  // here was producing fresh refs every rebuild.
+                  previousItems: _viewModel.previousGrid[col],
+                  targetItems: _viewModel.grid[col],
+                  spinning: _viewModel.isSpinning,
+                  fadingPaths: _viewModel.fadingPaths,
+                  clearedPositions: _viewModel.clearedPositions,
+                  speedMultiplier: _viewModel.speedMultiplier,
+                  soundEffectsEnabled: _viewModel.soundEffects,
+                  pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
+                  onComplete: col == GameViewModel.columns - 1
+                      ? () => _viewModel.onSpinComplete()
+                      : null,
+                  // Only the first column triggers the residue wipe; the
+                  // grid controller no-ops if it's already empty so the
+                  // other columns calling later is harmless either way.
+                  onDropInStart: col == 0
+                      ? () => _viewModel.clearMultiplierResidues()
+                      : null,
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -1256,6 +1267,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           gridHeight: screenH * 0.32,
           baseStyle: _statusBaseStyle,
           accentStyle: _statusKazancStyle,
+          soundEnabled: _viewModel.soundEffects,
           onMultiplierLifted: (col, row) {
             _viewModel.gridCtrl.clearMultiplierPosition(col, row);
           },
@@ -1358,6 +1370,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             gridHeight: screenH * 0.32,
             baseStyle: _statusBaseStyle,
             accentStyle: _statusKazancStyle,
+            soundEnabled: _viewModel.soundEffects,
             onMultiplierLifted: (col, row) {
               _viewModel.gridCtrl.clearMultiplierPosition(col, row);
             },

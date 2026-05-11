@@ -171,10 +171,7 @@ class _PulsingValue extends StatefulWidget {
   final int value;
   final TextStyle style;
 
-  const _PulsingValue({
-    required this.value,
-    required this.style,
-  });
+  const _PulsingValue({required this.value, required this.style});
 
   @override
   State<_PulsingValue> createState() => _PulsingValueState();
@@ -193,13 +190,17 @@ class _PulsingValueState extends State<_PulsingValue>
     _ctrl = AnimationController(vsync: this, duration: _pulseDuration);
     _scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.5)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 1.5,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 45,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.5, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 1.5,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 55,
       ),
     ]).animate(_ctrl);

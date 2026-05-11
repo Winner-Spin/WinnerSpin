@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/data/repositories/firebase_auth_repository.dart';
+import '../audio/ui_click_sound.dart';
 import '../../data/repositories/firestore_pool_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
@@ -67,6 +69,8 @@ class GameHistoryEntry {
 /// ViewModel notifies for state it owns directly: spinning/tumbling
 /// flags, auto-spin, speed, and user-profile fields.
 class GameViewModel extends ChangeNotifier {
+  static const double _ambientMusicVolume = 0.48;
+
   GameViewModel({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
@@ -82,9 +86,11 @@ class GameViewModel extends ChangeNotifier {
 
   Future<void> _initMusic() async {
     _isMusicInitialized = true;
+    await _audioPlayer.setAudioContext(AppAudioContext.game);
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    await _audioPlayer.setVolume(_ambientMusicVolume);
     if (_ambientMusic) {
-      await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
+      await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
     }
   }
 
@@ -277,6 +283,7 @@ class GameViewModel extends ChangeNotifier {
       if (!_isMusicInitialized) {
         _initMusic();
       } else {
+        _audioPlayer.setVolume(_ambientMusicVolume);
         _audioPlayer.resume();
       }
     } else {
@@ -289,6 +296,8 @@ class GameViewModel extends ChangeNotifier {
   bool get soundEffects => _soundEffects;
   void setSoundEffects(bool value) {
     _soundEffects = value;
+    UiClickSound.enabled = value;
+    if (value) unawaited(UiClickSound.preload());
     notifyListeners();
   }
 
@@ -569,7 +578,6 @@ class GameViewModel extends ChangeNotifier {
       }
     }
 
-
     // Round ended? Clear the FS-source flags.
     if (!isInFreeSpins) {
       _anteCtrl.clearRoundFlag();
@@ -738,6 +746,7 @@ class GameViewModel extends ChangeNotifier {
   void onAppResumed() {
     // Resume music if it should be playing
     if (_ambientMusic) {
+      _audioPlayer.setVolume(_ambientMusicVolume);
       _audioPlayer.resume();
     }
   }

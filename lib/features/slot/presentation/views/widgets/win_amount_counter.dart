@@ -46,9 +46,10 @@ class _WinAmountCounterState extends State<WinAmountCounter>
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: widget.duration);
-    _anim = Tween<double>(begin: widget.from, end: widget.to).animate(
-      CurvedAnimation(parent: _ctrl, curve: widget.curve),
-    );
+    _anim = Tween<double>(
+      begin: widget.from,
+      end: widget.to,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
     _ctrl.addListener(_onTick);
     if (widget.forceComplete) {
       _displayed = widget.to;
@@ -68,9 +69,10 @@ class _WinAmountCounterState extends State<WinAmountCounter>
   void didUpdateWidget(covariant WinAmountCounter old) {
     super.didUpdateWidget(old);
     if (old.to != widget.to) {
-      _anim = Tween<double>(begin: _displayed, end: widget.to).animate(
-        CurvedAnimation(parent: _ctrl, curve: widget.curve),
-      );
+      _anim = Tween<double>(
+        begin: _displayed,
+        end: widget.to,
+      ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
       _ctrl
         ..duration = widget.duration
         ..forward(from: 0);

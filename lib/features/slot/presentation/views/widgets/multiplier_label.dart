@@ -58,9 +58,7 @@ class MultiplierLabel extends StatelessWidget {
   static const double _defaultLabelXOffset = -0.12;
   static const double _defaultLabelYOffset = -0.04;
 
-  static const Map<int, double> _labelXOffset = {
-    2: _defaultLabelXOffset,
-  };
+  static const Map<int, double> _labelXOffset = {2: _defaultLabelXOffset};
 
   static double labelXOffsetFor(int value) =>
       _labelXOffset[value] ?? _defaultLabelXOffset;

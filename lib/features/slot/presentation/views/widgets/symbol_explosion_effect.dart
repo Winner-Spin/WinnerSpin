@@ -77,15 +77,17 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
           ? const Color(0xFFFFFF00) // Bright yellow
           : const Color(0xFFFFAB40); // Orange accent
 
-      _particles.add(_Particle(
-        x: 0.5,
-        y: 0.5,
-        vx: cos(angle) * speed,
-        vy: sin(angle) * speed,
-        life: 1.0,
-        color: pColor.withValues(alpha: _random.nextDouble() * 0.5 + 0.5),
-        size: _random.nextDouble() * 6 + 2,
-      ));
+      _particles.add(
+        _Particle(
+          x: 0.5,
+          y: 0.5,
+          vx: cos(angle) * speed,
+          vy: sin(angle) * speed,
+          life: 1.0,
+          color: pColor.withValues(alpha: _random.nextDouble() * 0.5 + 0.5),
+          size: _random.nextDouble() * 6 + 2,
+        ),
+      );
     }
   }
 

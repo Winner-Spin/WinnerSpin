@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../audio/ui_click_sound.dart';
 import '../game_rules_screen.dart';
 
 class InfoButton extends StatefulWidget {
@@ -46,20 +47,26 @@ class _InfoButtonState extends State<InfoButton> {
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap ??
-          () {
-            Navigator.of(context).push(
-              PageRouteBuilder(
-                opaque: false,
-                barrierDismissible: true,
-                pageBuilder: (_, __, ___) => GameRulesScreen(betAmount: widget.betAmount),
-                transitionsBuilder: (_, anim, __, child) {
-                  return FadeTransition(opacity: anim, child: child);
-                },
-                transitionDuration: const Duration(milliseconds: 250),
-              ),
-            );
-          },
+      onTap: () {
+        UiClickSound.play();
+        final action =
+            widget.onTap ??
+            () {
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  opaque: false,
+                  barrierDismissible: true,
+                  pageBuilder: (_, __, ___) =>
+                      GameRulesScreen(betAmount: widget.betAmount),
+                  transitionsBuilder: (_, anim, __, child) {
+                    return FadeTransition(opacity: anim, child: child);
+                  },
+                  transitionDuration: const Duration(milliseconds: 250),
+                ),
+              );
+            };
+        action();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
         alignment: Alignment.centerLeft,
@@ -137,12 +144,7 @@ class InfoIconPainter extends CustomPainter {
     final stemBot = h * 0.92;
     final stemWidth = w * 0.30;
     final stemRect = RRect.fromRectAndRadius(
-      Rect.fromLTRB(
-        cx - stemWidth / 2,
-        stemTop,
-        cx + stemWidth / 2,
-        stemBot,
-      ),
+      Rect.fromLTRB(cx - stemWidth / 2, stemTop, cx + stemWidth / 2, stemBot),
       Radius.circular(stemWidth / 2),
     );
     canvas.drawRRect(stemRect, paint);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:winner_spin/features/slot/presentation/audio/ui_click_sound.dart';
 
 /// Custom Image Button with Scale Animation
 class AnimatedImageButton extends StatefulWidget {
@@ -32,9 +33,10 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
       duration: const Duration(milliseconds: 100),
       reverseDuration: const Duration(milliseconds: 100),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.90).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.90,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -49,16 +51,14 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
         _controller.reverse();
+        UiClickSound.play();
         widget.onTap();
       },
       onTapCancel: () => _controller.reverse(),
       child: AnimatedBuilder(
         animation: _scaleAnimation,
         builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          );
+          return Transform.scale(scale: _scaleAnimation.value, child: child);
         },
         child: Stack(
           alignment: Alignment.center,

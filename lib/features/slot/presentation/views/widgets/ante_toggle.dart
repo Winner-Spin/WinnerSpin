@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../../widgets/particle_effect.dart';
+import '../../audio/ui_click_sound.dart';
 
 /// Pill that toggles Ante Bet ("Çifte Şans"). When ON, the player pays
 /// 1.25× per base spin and the FS trigger rate doubles. Disabled while
@@ -26,7 +27,11 @@ class AnteToggle extends StatelessWidget {
     final Color glow;
 
     if (disabled) {
-      gradient = [Colors.grey.shade700, Colors.grey.shade700, Colors.grey.shade800];
+      gradient = [
+        Colors.grey.shade700,
+        Colors.grey.shade700,
+        Colors.grey.shade800,
+      ];
       borderColor = Colors.grey.shade500;
       textColor = Colors.grey.shade400;
       textShadow = Colors.transparent;
@@ -56,7 +61,12 @@ class AnteToggle extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: disabled ? null : onTap,
+      onTap: disabled
+          ? null
+          : () {
+              UiClickSound.play();
+              onTap();
+            },
       child: ParticleEffect(
         active: active,
         child: AnimatedContainer(
@@ -71,7 +81,11 @@ class AnteToggle extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: disabled ? borderColor : const Color(0xFFE8F5E9).withValues(alpha: 0.6), // Inner top reflection effect
+              color: disabled
+                  ? borderColor
+                  : const Color(
+                      0xFFE8F5E9,
+                    ).withValues(alpha: 0.6), // Inner top reflection effect
               width: 1.5,
             ),
             boxShadow: glow == Colors.transparent
@@ -98,7 +112,11 @@ class AnteToggle extends StatelessWidget {
                 size: 16,
                 color: textColor,
                 shadows: [
-                  Shadow(color: textShadow, offset: const Offset(0, 1), blurRadius: 1)
+                  Shadow(
+                    color: textShadow,
+                    offset: const Offset(0, 1),
+                    blurRadius: 1,
+                  ),
                 ],
               ),
               const SizedBox(width: 6),
@@ -113,12 +131,30 @@ class AnteToggle extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.8,
-                      shadows: disabled ? [] : [
-                        Shadow(color: textShadow, offset: const Offset(0, 1.5), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(0, -1), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(1, 0), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(-1, 0), blurRadius: 1),
-                      ],
+                      shadows: disabled
+                          ? []
+                          : [
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(0, 1.5),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(0, -1),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(1, 0),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(-1, 0),
+                                blurRadius: 1,
+                              ),
+                            ],
                     ),
                   ),
                   Text(
@@ -128,12 +164,30 @@ class AnteToggle extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
-                      shadows: disabled ? [] : [
-                        Shadow(color: textShadow, offset: const Offset(0, 1.5), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(0, -1), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(1, 0), blurRadius: 1),
-                        Shadow(color: textShadow, offset: const Offset(-1, 0), blurRadius: 1),
-                      ],
+                      shadows: disabled
+                          ? []
+                          : [
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(0, 1.5),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(0, -1),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(1, 0),
+                                blurRadius: 1,
+                              ),
+                              Shadow(
+                                color: textShadow,
+                                offset: const Offset(-1, 0),
+                                blurRadius: 1,
+                              ),
+                            ],
                     ),
                   ),
                 ],
@@ -160,7 +214,13 @@ class AnteToggle extends StatelessWidget {
                               fontSize: 14,
                               height: 1.1,
                               fontWeight: FontWeight.w900,
-                              shadows: [Shadow(color: textShadow, offset: const Offset(0, 1), blurRadius: 1)],
+                              shadows: [
+                                Shadow(
+                                  color: textShadow,
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 1,
+                                ),
+                              ],
                             ),
                           ),
                           TextSpan(
@@ -170,7 +230,13 @@ class AnteToggle extends StatelessWidget {
                               fontSize: 14,
                               height: 1.1,
                               fontWeight: FontWeight.w900,
-                              shadows: [Shadow(color: textShadow, offset: const Offset(0, 1), blurRadius: 1)],
+                              shadows: [
+                                Shadow(
+                                  color: textShadow,
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 1,
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -180,7 +246,9 @@ class AnteToggle extends StatelessWidget {
                     Text(
                       active ? 'ON' : 'OFF',
                       style: GoogleFonts.outfit(
-                        color: active ? Colors.greenAccent : Colors.grey.shade300,
+                        color: active
+                            ? Colors.greenAccent
+                            : Colors.grey.shade300,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),

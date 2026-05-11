@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/format/money_format.dart';
+import '../../audio/ui_click_sound.dart';
 
 /// Glossy candy-style "DOUBLE CHANCE" button. Same multi-layer construction
 /// as [BuyFeatureButton] but in a green-and-gold palette and with an
@@ -67,6 +68,7 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
           ? null
           : (_) {
               _pressCtrl.reverse();
+              UiClickSound.play();
               widget.onTap();
             },
       onTapCancel: disabled ? null : () => _pressCtrl.reverse(),
@@ -78,242 +80,242 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
           // toggle slide don't re-paint every gradient on each frame.
           child: RepaintBoundary(
             child: Container(
-            width: w,
-            height: h,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF7BCC55),
-                  Color(0xFF3DA838),
-                  Color(0xFF156A24),
+              width: w,
+              height: h,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(radius),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF7BCC55),
+                    Color(0xFF3DA838),
+                    Color(0xFF156A24),
+                  ],
+                  stops: [0.0, 0.5, 1.0],
+                ),
+                border: Border.all(color: const Color(0xFF0E5320), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF052D11).withValues(alpha: 0.55),
+                    blurRadius: 22,
+                    offset: const Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFFC8FFB8).withValues(alpha: 0.40),
+                    blurRadius: 20,
+                    offset: const Offset(0, -3),
+                  ),
                 ],
-                stops: [0.0, 0.5, 1.0],
               ),
-              border: Border.all(color: const Color(0xFF0E5320), width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF052D11).withValues(alpha: 0.55),
-                  blurRadius: 22,
-                  offset: const Offset(0, 12),
-                ),
-                BoxShadow(
-                  color: const Color(0xFFC8FFB8).withValues(alpha: 0.40),
-                  blurRadius: 20,
-                  offset: const Offset(0, -3),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(radius - 2),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(0.0, -0.35),
-                          radius: 0.95,
-                          colors: [
-                            const Color(0xFFE8FFE0).withValues(alpha: 0.42),
-                            const Color(0xFFE8FFE0).withValues(alpha: 0.16),
-                            const Color(0xFFE8FFE0).withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.45, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    top: h * 0.10,
-                    left: w * 0.09,
-                    child: Container(
-                      width: w * 0.20,
-                      height: h * 0.18,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(h),
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0.85),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.85],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    top: h * 0.04,
-                    left: w * 0.36,
-                    child: Container(
-                      width: w * 0.28,
-                      height: h * 0.20,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(h),
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0.40),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.95],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    top: h * 0.04,
-                    right: w * 0.06,
-                    child: Container(
-                      width: w * 0.40,
-                      height: h * 0.42,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(h),
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFFC8FFB8).withValues(alpha: 0.78),
-                            const Color(0xFFA5FF80).withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.95],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: h * 0.50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            const Color(0xFF052D11).withValues(alpha: 0.45),
-                            const Color(0xFF052D11).withValues(alpha: 0.18),
-                            const Color(0xFF052D11).withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.45, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        margin: const EdgeInsets.all(2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(radius - 2),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(radius - 2),
-                          border: Border.all(
-                            color: const Color(
-                              0xFFD8FFC0,
-                            ).withValues(alpha: 0.85),
-                            width: 1.6,
+                          gradient: RadialGradient(
+                            center: const Alignment(0.0, -0.35),
+                            radius: 0.95,
+                            colors: [
+                              const Color(0xFFE8FFE0).withValues(alpha: 0.42),
+                              const Color(0xFFE8FFE0).withValues(alpha: 0.16),
+                              const Color(0xFFE8FFE0).withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.45, 1.0],
                           ),
                         ),
                       ),
                     ),
-                  ),
 
-                  Positioned.fill(
-                    child: IgnorePointer(
+                    Positioned(
+                      top: h * 0.10,
+                      left: w * 0.09,
                       child: Container(
-                        margin: const EdgeInsets.all(4),
+                        width: w * 0.20,
+                        height: h * 0.18,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(radius - 4),
-                          border: Border.all(
-                            color: const Color(
-                              0xFFA5E590,
-                            ).withValues(alpha: 0.8),
-                            width: 1,
+                          borderRadius: BorderRadius.circular(h),
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0.85),
+                              Colors.white.withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.85],
                           ),
                         ),
                       ),
                     ),
-                  ),
 
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: w * 0.06,
-                      vertical: h * 0.02,
+                    Positioned(
+                      top: h * 0.04,
+                      left: w * 0.36,
+                      child: Container(
+                        width: w * 0.28,
+                        height: h * 0.20,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(h),
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0.40),
+                              Colors.white.withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.95],
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(top: h * 0.02),
-                          child: SizedBox(
-                            width: w * 0.85,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.only(top: h * 0.03),
-                                    child: _EmbossedText(
-                                      text: 'BET',
-                                      fontSize: h * 0.16,
+
+                    Positioned(
+                      top: h * 0.04,
+                      right: w * 0.06,
+                      child: Container(
+                        width: w * 0.40,
+                        height: h * 0.42,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(h),
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFC8FFB8).withValues(alpha: 0.78),
+                              const Color(0xFFA5FF80).withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.95],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: h * 0.50,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              const Color(0xFF052D11).withValues(alpha: 0.45),
+                              const Color(0xFF052D11).withValues(alpha: 0.18),
+                              const Color(0xFF052D11).withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.45, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(radius - 2),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFD8FFC0,
+                              ).withValues(alpha: 0.85),
+                              width: 1.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          margin: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(radius - 4),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFA5E590,
+                              ).withValues(alpha: 0.8),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: w * 0.06,
+                        vertical: h * 0.02,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(top: h * 0.02),
+                            child: SizedBox(
+                              width: w * 0.85,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Padding(
+                                      padding: EdgeInsets.only(top: h * 0.03),
+                                      child: _EmbossedText(
+                                        text: 'BET',
+                                        fontSize: h * 0.16,
+                                        strokeWidth: 2.6,
+                                        letterSpacing: 0.5,
+                                        fillColor: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: h * 0.04),
+                                    _EmbossedText(
+                                      text: '₺${formatMoney(widget.betAmount)}',
+                                      fontSize: h * 0.20,
                                       strokeWidth: 2.6,
                                       letterSpacing: 0.5,
-                                      fillColor: Colors.white,
+                                      fillColor: const Color(0xFFFFC93C),
                                     ),
-                                  ),
-                                SizedBox(width: h * 0.04),
-                                _EmbossedText(
-                                  text: '₺${formatMoney(widget.betAmount)}',
-                                  fontSize: h * 0.20,
-                                  strokeWidth: 2.6,
-                                  letterSpacing: 0.5,
-                                  fillColor: const Color(0xFFFFC93C),
+                                  ],
                                 ),
-                                ],
                               ),
                             ),
                           ),
-                        ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _EmbossedText(
-                              text: 'DOUBLE CHANCE',
-                              fontSize: h * 0.13,
-                              strokeWidth: 2.3,
-                              letterSpacing: 0.6,
-                              fillColor: Colors.white,
-                            ),
-                            _EmbossedText(
-                              text: 'TO WIN FEATURE',
-                              fontSize: h * 0.13,
-                              strokeWidth: 2.3,
-                              letterSpacing: 0.6,
-                              fillColor: Colors.white,
-                            ),
-                            SizedBox(height: h * 0.04),
-                            _OnOffCapsule(
-                              isOn: widget.isOn,
-                              height: h * 0.31,
-                            ),
-                          ],
-                        ),
-                      ],
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _EmbossedText(
+                                text: 'DOUBLE CHANCE',
+                                fontSize: h * 0.13,
+                                strokeWidth: 2.3,
+                                letterSpacing: 0.6,
+                                fillColor: Colors.white,
+                              ),
+                              _EmbossedText(
+                                text: 'TO WIN FEATURE',
+                                fontSize: h * 0.13,
+                                strokeWidth: 2.3,
+                                letterSpacing: 0.6,
+                                fillColor: Colors.white,
+                              ),
+                              SizedBox(height: h * 0.04),
+                              _OnOffCapsule(
+                                isOn: widget.isOn,
+                                height: h * 0.31,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           ),
         ),
       ),
@@ -343,27 +345,27 @@ class _OnOffCapsule extends StatelessWidget {
     // doesn't pull the parent button's gradient tree into its repaint.
     return RepaintBoundary(
       child: ClipRRect(
-      borderRadius: BorderRadius.circular(height / 2),
-      // Static gradient instead of a live blur — the blur re-sampled
-      // the parent every frame while the capsule slid.
-      child: Container(
-        width: w,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(height / 2),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withValues(alpha: 0.32),
-              Colors.black.withValues(alpha: 0.22),
-            ],
+        borderRadius: BorderRadius.circular(height / 2),
+        // Static gradient instead of a live blur — the blur re-sampled
+        // the parent every frame while the capsule slid.
+        child: Container(
+          width: w,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(height / 2),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.32),
+                Colors.black.withValues(alpha: 0.22),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.30),
+              width: 1.2,
+            ),
           ),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.30),
-            width: 1.2,
-          ),
-        ),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -402,9 +404,7 @@ class _OnOffCapsule extends StatelessWidget {
               AnimatedAlign(
                 duration: animDuration,
                 curve: animCurve,
-                alignment: isOn
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
+                alignment: isOn ? Alignment.centerRight : Alignment.centerLeft,
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: pad),
                   child: Container(
@@ -522,10 +522,7 @@ class _SolidArrowPainter extends CustomPainter {
   final Color color;
   final bool reversed;
 
-  const _SolidArrowPainter({
-    required this.color,
-    this.reversed = false,
-  });
+  const _SolidArrowPainter({required this.color, this.reversed = false});
 
   @override
   void paint(Canvas canvas, Size size) {

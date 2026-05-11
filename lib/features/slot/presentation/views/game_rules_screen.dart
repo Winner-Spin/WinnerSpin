@@ -5,6 +5,7 @@ import 'package:lottie/lottie.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../../domain/models/slot_symbol.dart';
 import '../../domain/enums/symbol_tier.dart';
+import '../audio/ui_click_sound.dart';
 import 'widgets/multiplier_bomb_animation.dart';
 import 'widgets/multiplier_label.dart';
 
@@ -38,7 +39,10 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           // Dimmed backdrop without blur
           Positioned.fill(
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Container(color: Colors.transparent),
             ),
           ),
@@ -133,7 +137,10 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(

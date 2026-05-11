@@ -70,7 +70,10 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   }
 
   void _spawnEffects(
-    List<ClusterWin> wins, double gridW, double gridH, int speed,
+    List<ClusterWin> wins,
+    double gridW,
+    double gridH,
+    int speed,
   ) {
     for (final win in wins) {
       double sumC = 0, sumR = 0;
@@ -91,25 +94,29 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       for (int i = 0; i < 30; i++) {
         final angle = _rng.nextDouble() * 2 * pi;
         final v = (_rng.nextDouble() * 2.5 + 0.8) * speed;
-        particles.add(_Particle(
-          vx: cos(angle) * v,
-          vy: sin(angle) * v,
-          size: _rng.nextDouble() * 5 + 2,
-          color: _rng.nextBool()
-              ? const Color(0xFFFFFF00)
-              : const Color(0xFFFFAB40),
-        ));
+        particles.add(
+          _Particle(
+            vx: cos(angle) * v,
+            vy: sin(angle) * v,
+            size: _rng.nextDouble() * 5 + 2,
+            color: _rng.nextBool()
+                ? const Color(0xFFFFFF00)
+                : const Color(0xFFFFAB40),
+          ),
+        );
       }
 
       final durationMs = (1200 ~/ speed).clamp(350, 1200);
-      _effects.add(_WinEffect(
-        cx: cx,
-        cy: cy,
-        amount: win.amount,
-        particles: particles,
-        totalMs: durationMs,
-        startTime: DateTime.now(),
-      ));
+      _effects.add(
+        _WinEffect(
+          cx: cx,
+          cy: cy,
+          amount: win.amount,
+          particles: particles,
+          totalMs: durationMs,
+          startTime: DateTime.now(),
+        ),
+      );
     }
 
     // Ensure ticker is running.
@@ -231,7 +238,8 @@ class _EffectPainter extends CustomPainter {
         scale = 1.0;
       }
 
-      final text = '₺${e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}';
+      final text =
+          '₺${e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}';
 
       // Draw text outline (dark stroke for readability)
       final strokeStyle = style.copyWith(

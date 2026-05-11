@@ -6,14 +6,14 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 
 import 'app/app.dart';
+import 'core/audio/app_audio_context.dart';
 import 'features/slot/presentation/views/widgets/multiplier_bomb_animation.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await AppAudioContext.configure();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   // Warm the Lottie cache in the background — the bomb composition is

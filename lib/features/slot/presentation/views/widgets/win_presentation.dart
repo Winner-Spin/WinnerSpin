@@ -46,6 +46,7 @@ class WinPresentation extends StatefulWidget {
 
   /// Forwards to [WinSequenceBar.formulaOnly] — see there.
   final bool formulaOnly;
+  final bool soundEnabled;
 
   /// Optional externally-supplied flight target. If provided, the
   /// multiplier collect flights aim at this key's render rect instead
@@ -67,6 +68,7 @@ class WinPresentation extends StatefulWidget {
     this.onMultiplierLifted,
     this.controller,
     this.formulaOnly = false,
+    this.soundEnabled = true,
     this.flightTargetKey,
   });
 
@@ -92,6 +94,7 @@ class _WinPresentationState extends State<WinPresentation> {
   // notify (each post-land sum update would otherwise re-trigger the
   // same multiplier into an infinite loop).
   int _flyingForIndex = -1;
+  bool _bombSoundPlayedForSpin = false;
 
   @override
   void initState() {
@@ -132,6 +135,7 @@ class _WinPresentationState extends State<WinPresentation> {
 
     _presentedSpin = result;
     _flyingForIndex = -1;
+    _bombSoundPlayedForSpin = false;
 
     final hasBase = result.baseWin > 0;
     final hasMultipliers = result.finalMultipliers.isNotEmpty;
@@ -238,7 +242,9 @@ class _WinPresentationState extends State<WinPresentation> {
       cellCenter: start,
       cellSize: cellSize,
       multiplierValue: landing.value,
+      soundEnabled: widget.soundEnabled && !_bombSoundPlayedForSpin,
       onBlast: () {
+        _bombSoundPlayedForSpin = true;
         if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
     );
