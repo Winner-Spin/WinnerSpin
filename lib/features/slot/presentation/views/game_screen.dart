@@ -52,6 +52,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   ClusterWin? _lingeringCluster;
   bool _wasBusy = false;
 
+  // Tracks the cascade tumbling flag so the lingering cluster pay
+  // line can auto-clear after the cascade fully ends — gives the
+  // last cluster's payout a brief beat on screen before the FS info
+  // row flips back to FREE SPINS LEFT.
+  bool _wasTumbling = false;
+  Timer? _lingeringClusterTimer;
+
   // FS-round running total. Accumulates each spin's awarded win so
   // the top Kazanç readout climbs through the round instead of
   // resetting to zero on every new reel.
@@ -308,10 +315,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         instantAmount: _viewModel.speedMultiplier >= 3,
         onComplete: () {
           if (_bigWinEntry == entry) {
-            setState(() {
-              _bigWinEntry = null;
-              _celebrationLocked = false;
-            });
+            setState(() => _bigWinEntry = null);
+            _releaseCelebrationLock();
           }
           entry.remove();
         },
@@ -334,9 +339,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _commitPendingFsWin();
       _winCtrl.reset();
       _bigWinShownThisSpin = false;
+      // Drop the previous spin's lock state without touching the FS
+      // consume — the consume for THIS spin was just queued by spin()
+      // and must wait for this spin's own celebration to settle. The
+      // viewmodel's own _pendingFsConsume flag stays set on the new
+      // spin; the unlock just clears local screen state.
       if (_celebrationLocked) {
         setState(() => _celebrationLocked = false);
       }
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = null;
       if (_lingeringCluster != null) {
         setState(() => _lingeringCluster = null);
       }
@@ -368,7 +380,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             result != null &&
             result.totalWin > 0;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
-          setState(() => _celebrationLocked = false);
+          _releaseCelebrationLock();
         }
       });
     }
@@ -424,13 +436,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _trackLingeringCluster() {
     final activeExplosions = _viewModel.activeExplosions;
-    if (activeExplosions.isEmpty) return;
-    final best = activeExplosions.reduce(
-      (a, b) => a.amount >= b.amount ? a : b,
-    );
-    if (!identical(_lingeringCluster, best)) {
-      setState(() => _lingeringCluster = best);
+    final isTumbling = _viewModel.isTumbling;
+
+    if (activeExplosions.isNotEmpty) {
+      // Active cluster on screen — kill any pending auto-clear so the
+      // hold timer doesn't fire while a fresh cluster is being shown.
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = null;
+      final best = activeExplosions.reduce(
+        (a, b) => a.amount >= b.amount ? a : b,
+      );
+      if (!identical(_lingeringCluster, best)) {
+        setState(() => _lingeringCluster = best);
+      }
+    } else if (_wasTumbling && !isTumbling && _lingeringCluster != null) {
+      // Cascade just finished — let the final cluster's payout linger
+      // for a beat, then flip the FS info row back to FREE SPINS LEFT
+      // and commit the FS counter consume so the displayed remaining
+      // count updates the instant the cluster pay line steps off
+      // (the FS chrome itself stays through the rest of the
+      // celebration via the round-hold flag).
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = Timer(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        setState(() => _lingeringCluster = null);
+        _viewModel.commitPendingFsConsume();
+      });
     }
+    _wasTumbling = isTumbling;
   }
 
   @override
@@ -455,6 +488,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _bigWinEntry?.remove();
     _bigWinEntry = null;
     _freeSpinTransitionTimer?.cancel();
+    _lingeringClusterTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
@@ -489,9 +523,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // instant the final count-up reaches its target. The big-win
         // overlay (if running) still keeps it locked through its own
         // _bigWinEntry check.
-        if (_celebrationLocked) {
-          setState(() => _celebrationLocked = false);
-        }
+        _releaseCelebrationLock();
       }
     }
     _lastWinCtrlPhase = phase;
@@ -565,9 +597,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             // total before triggering the next reel.
             Future.delayed(const Duration(milliseconds: 700), () {
               if (!mounted) return;
-              if (_celebrationLocked) {
-                setState(() => _celebrationLocked = false);
-              }
+              _releaseCelebrationLock();
             });
           },
         ),
@@ -596,10 +626,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _releaseLockAfterFsCountUp() {
     Future.delayed(const Duration(milliseconds: 700), () {
       if (!mounted) return;
-      if (_celebrationLocked) {
-        setState(() => _celebrationLocked = false);
-      }
+      _releaseCelebrationLock();
     });
+  }
+
+  /// Drops [_celebrationLocked], commits any deferred FS counter
+  /// consume left over from the spin (catch-up path for spins without
+  /// a tumble cascade), and releases the FS round-hold so
+  /// [isInFreeSpins] falls back to the raw active-counter check. The
+  /// hold release is what actually flips the chrome off the screen on
+  /// the last FS spin — by deferring it until every celebration
+  /// timeline has unwound the FS UI never tears down mid-sequence.
+  void _releaseCelebrationLock() {
+    if (_celebrationLocked) {
+      setState(() => _celebrationLocked = false);
+    }
+    _viewModel.commitPendingFsConsume();
+    _viewModel.releaseFsRoundHold();
   }
 
   void _handleLogout(BuildContext context) {
