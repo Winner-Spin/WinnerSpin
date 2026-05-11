@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import 'register_screen.dart';
@@ -46,104 +48,102 @@ class _LoginScreenState extends State<LoginScreen> {
               final double screenH = constraints.maxHeight;
               final double screenW = constraints.maxWidth;
 
-          return Stack(
-            children: [
-              // Background
-              Positioned.fill(
-                child: Image.asset(
-                  'lib/images/login_screen/background_1.png',
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                ),
-              ),
-
-              // Music Button
-              Positioned(
-                top: screenH * 0.125,
-                right: screenW * 0.07,
-                child: AnimatedImageButton(
-                  imagePath: 'lib/images/login_screen/music_button.png',
-                  width: 46,
-                  isStrikeThrough: _viewModel.isMusicMuted,
-                  onTap: () {
-                    _viewModel.toggleMusic();
-                  },
-                ),
-              ),
-
-              // Email Input Field
-              Positioned(
-                top: screenH * 0.48,
-                left: screenW * 0.15,
-                right: screenW * 0.15,
-                child: _buildCustomTextField(
-                  context: context,
-                  controller: _viewModel.emailController,
-                  icon: Icons.email,
-                  hint: 'Email',
-                  backgroundImage:
-                      'lib/images/login_screen/email_button1_cropped.png',
-                ),
-              ),
-
-              // Password Input Field
-              Positioned(
-                top: screenH * 0.58,
-                left: screenW * 0.15,
-                right: screenW * 0.15,
-                child: _buildCustomTextField(
-                  context: context,
-                  controller: _viewModel.passwordController,
-                  icon: Icons.lock,
-                  hint: 'Password',
-                  obscureText: true,
-                  backgroundImage:
-                      'lib/images/login_screen/password_button_cropped.png',
-                ),
-              ),
-
-              // Login Button (or loading spinner)
-              Positioned(
-                top: screenH * 0.70,
-                left: screenW * 0.25,
-                right: screenW * 0.25,
-                child: Center(
-                  child: _viewModel.isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
-                      : AnimatedImageButton(
-                          imagePath:
-                              'lib/images/login_screen/login_button_final.png',
-                          width: 180,
-                          onTap: () {
-                            _viewModel.login();
-                          },
-                        ),
-                ),
-              ),
-
-              // Sign Up Button
-              Positioned(
-                bottom: screenH * 0.165,
-                left: screenW * 0.10,
-                right: screenW * 0.10,
-                child: Center(
-                  child: AnimatedImageButton(
-                    imagePath:
-                        'lib/images/login_screen/signup_button_final.png',
-                    width: 250,
-                    onTap: () => _navigateToSignUp(context),
+              return Stack(
+                children: [
+                  // Background
+                  Positioned.fill(
+                    child: Image.asset(
+                      'lib/images/login_screen/background_1.png',
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
-                ),
-              ),
-            ],
-          );
+
+                  // Music Button
+                  Positioned(
+                    top: screenH * 0.125,
+                    right: screenW * 0.07,
+                    child: AnimatedImageButton(
+                      imagePath: 'lib/images/login_screen/music_button.png',
+                      width: 46,
+                      isStrikeThrough: _viewModel.isMusicMuted,
+                      onTap: () {
+                        _viewModel.toggleMusic();
+                      },
+                    ),
+                  ),
+
+                  // Email Input Field
+                  Positioned(
+                    top: screenH * 0.48,
+                    left: screenW * 0.15,
+                    right: screenW * 0.15,
+                    child: _buildCustomTextField(
+                      context: context,
+                      controller: _viewModel.emailController,
+                      icon: Icons.email,
+                      hint: 'Email',
+                      backgroundImage:
+                          'lib/images/login_screen/email_button1_cropped.png',
+                    ),
+                  ),
+
+                  // Password Input Field
+                  Positioned(
+                    top: screenH * 0.58,
+                    left: screenW * 0.15,
+                    right: screenW * 0.15,
+                    child: _buildCustomTextField(
+                      context: context,
+                      controller: _viewModel.passwordController,
+                      icon: Icons.lock,
+                      hint: 'Password',
+                      obscureText: true,
+                      backgroundImage:
+                          'lib/images/login_screen/password_button_cropped.png',
+                    ),
+                  ),
+
+                  // Login Button (or loading spinner)
+                  Positioned(
+                    top: screenH * 0.70,
+                    left: screenW * 0.25,
+                    right: screenW * 0.25,
+                    child: Center(
+                      child: _viewModel.isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : AnimatedImageButton(
+                              imagePath:
+                                  'lib/images/login_screen/login_button_final.png',
+                              width: 180,
+                              onTap: () {
+                                _viewModel.login();
+                              },
+                            ),
+                    ),
+                  ),
+
+                  // Sign Up Button
+                  Positioned(
+                    bottom: screenH * 0.165,
+                    left: screenW * 0.10,
+                    right: screenW * 0.10,
+                    child: Center(
+                      child: AnimatedImageButton(
+                        imagePath:
+                            'lib/images/login_screen/signup_button_final.png',
+                        width: 250,
+                        onTap: () => _navigateToSignUp(context),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ); // LayoutBuilder
         },
-      ); // LayoutBuilder
-     },
-    ), // AnimatedBuilder
-   ); // Scaffold
+      ), // AnimatedBuilder
+    ); // Scaffold
   }
 
   // ─── NAVIGATION (View responsibility) ───────────────────────
@@ -183,10 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -217,22 +214,22 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: GoogleFonts.nunito(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
+                hintStyle: GoogleFonts.nunito(
+                  color: const Color(0xFFFFF0C2).withValues(alpha: 0.74),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  shadows: const [
                     Shadow(
-                      color: Colors.black45,
+                      color: Color(0x99000000),
                       offset: Offset(0, 1),
-                      blurRadius: 2,
+                      blurRadius: 3,
                     ),
                   ],
                 ),

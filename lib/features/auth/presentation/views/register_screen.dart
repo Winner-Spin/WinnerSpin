@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../../../core/widgets/animated_image_button.dart';
 import '../viewmodels/register_viewmodel.dart';
 import 'login_screen.dart';
@@ -227,22 +229,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: GoogleFonts.nunito(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
+                hintStyle: GoogleFonts.nunito(
+                  color: const Color(0xFFFFF0C2).withValues(alpha: 0.74),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  shadows: const [
                     Shadow(
-                      color: Colors.black45,
+                      color: Color(0x99000000),
                       offset: Offset(0, 1),
-                      blurRadius: 2,
+                      blurRadius: 3,
                     ),
                   ],
                 ),
