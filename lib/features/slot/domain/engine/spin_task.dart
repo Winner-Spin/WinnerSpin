@@ -8,6 +8,7 @@ class SpinTaskInput {
   final bool isFreeSpins;
   final bool anteBet;
   final bool buyFs;
+  final bool forceFsTrigger;
 
   const SpinTaskInput({
     required this.pool,
@@ -15,6 +16,7 @@ class SpinTaskInput {
     this.isFreeSpins = false,
     this.anteBet = false,
     this.buyFs = false,
+    this.forceFsTrigger = false,
   });
 }
 
@@ -35,6 +37,7 @@ SpinTaskOutput runSlotSpinTask(SpinTaskInput input) {
     isFreeSpins: input.isFreeSpins,
     anteBet: input.anteBet,
     buyFs: input.buyFs,
+    forceFsTrigger: input.forceFsTrigger,
   );
   return SpinTaskOutput(result: result, pool: input.pool);
 }

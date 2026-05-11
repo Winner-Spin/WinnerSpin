@@ -430,9 +430,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 null;
         // FS rounds always run the TUMBLE WIN → Kazanç flight + the
         // top-row count-up after every winning spin, so the lock must
-        // hold past phase=done until the count-up settles.
-        final hasFsFlight =
-            _viewModel.isInFreeSpins && result != null && result.totalWin > 0;
+        // hold past phase=done until the count-up settles. The buy
+        // CTA's trigger spin is the one exception — its win lands on
+        // balance (not the FS accumulator) so there's no flight to
+        // wait on and the lock can drop the moment the cascade ends.
+        final hasFsFlight = _viewModel.isInFreeSpins &&
+            result != null &&
+            result.totalWin > 0 &&
+            !_viewModel.isCurrentSpinFromBuy;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
           _releaseCelebrationLock();
         }
@@ -453,6 +458,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _wasInFs = isInFs;
 
     if (!isInFs) return;
+    // The buy CTA's trigger spin awards FS but its own win goes to
+    // balance, not the accumulator — skip the flight setup so the
+    // round starts with KAZANÇ at zero and the respin button releases
+    // as soon as the cascade settles.
+    if (_viewModel.isCurrentSpinFromBuy) return;
 
     final lastWin = _viewModel.lastWin;
     if (lastWin > 0 && _lastSeenLastWin == 0) {

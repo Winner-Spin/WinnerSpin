@@ -41,6 +41,7 @@ class SlotEngine {
     bool isFreeSpins = false,
     bool anteBet = false,
     bool buyFs = false,
+    bool forceFsTrigger = false,
   }) {
     final mode = pool.currentMode;
     final weights = WeightedRandom.buildAdjustedWeights(mode, isFreeSpins);
@@ -77,7 +78,12 @@ class SlotEngine {
           isAnte: anteBet && !isRetriggerAttempt,
         ) &&
         maxAllowedWin >= (3.25 * betAmount);
-    final bool triggersFs = canAffordFs && (engineRng.nextDouble() < fsRate);
+    // The buy CTA pays its own pool fee up front, so the rate roll and
+    // pool guard are bypassed when [forceFsTrigger] is true — the
+    // engine guarantees a scatter-bearing grid regardless of pool
+    // health and the buy's recovery-mode handling lives downstream.
+    final bool triggersFs =
+        forceFsTrigger || (canAffordFs && (engineRng.nextDouble() < fsRate));
 
     // FS rounds boost hit rate so the round feels lucky.
     final double effectiveHitRate = isFreeSpins
@@ -92,13 +98,19 @@ class SlotEngine {
     }
 
     // Rejection sampling: try natural cascades up to 50 times; reject any
-    // that exceed the budget and keep retrying.
+    // that exceed the budget and keep retrying. A forced trigger (buy
+    // CTA) accepts the first scatter-bearing winning grid regardless of
+    // budget so the FS round is always granted even on a depleted pool.
+    SpinResult? lastForcedFallback;
     for (int attempt = 0; attempt < 50; attempt++) {
       final initialGrid = GridGenerator.generateWinning(weights, mode, spinMaxMults, forceScatters: triggersFs, isFreeSpins: isFreeSpins);
       final simResult = TumbleSimulator.run(initialGrid, weights, betAmount,
           safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult;
+      }
+      if (forceFsTrigger && simResult.freeSpinsTriggered) {
+        lastForcedFallback = simResult;
       }
     }
 
@@ -111,6 +123,17 @@ class SlotEngine {
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult;
       }
+      if (forceFsTrigger && simResult.freeSpinsTriggered) {
+        lastForcedFallback = simResult;
+      }
+    }
+
+    // Forced-trigger path can't be allowed to silently drop the scatter
+    // grid into a non-triggering safe fallback — if every attempt
+    // exceeded the per-mode cap, return the most recent scatter-bearing
+    // result so the buy still grants the FS round it was paid for.
+    if (forceFsTrigger && lastForcedFallback != null) {
+      return lastForcedFallback;
     }
 
     // Hard fail-safe: if even the bounded fallback can't fit, return a safe grid.
