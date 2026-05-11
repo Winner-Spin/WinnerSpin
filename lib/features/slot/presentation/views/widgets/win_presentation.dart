@@ -206,11 +206,11 @@ class _WinPresentationState extends State<WinPresentation> {
 
   Future<void> _flyActiveMultiplier() async {
     final result = widget.spinResult;
-    final idx = _controller.activeIndex;
+    final landedIdx = _controller.activeIndex;
     if (result == null) return;
-    if (idx < 0 || idx >= result.finalMultipliers.length) return;
+    if (landedIdx < 0 || landedIdx >= result.finalMultipliers.length) return;
 
-    final landing = result.finalMultipliers[idx];
+    final landing = result.finalMultipliers[landedIdx];
     final start = _cellCenter(landing.column, landing.row);
     final end = _flightTargetCenter();
     final cellW = widget.gridWidth / widget.columns;
@@ -219,12 +219,6 @@ class _WinPresentationState extends State<WinPresentation> {
     // inside the multiplier symbol's cell at start.
     final cellSize = cellW < cellH ? cellW : cellH;
 
-    // The cell shows the bomb frozen on frame 0; this overlay plays the
-    // full Lottie timeline (fuse → blast → tail) on top. We don't await
-    // the whole timeline — we kick off the bomb in parallel, then wait
-    // only until the blast moment fires so the multiplier value can lift
-    // off in sync with the explosion. The smoke tail keeps playing
-    // alongside the collect flight.
     // Wipe the resting bomb sprite from the grid the instant the
     // overlay launches — otherwise the cell's frozen bomb sits behind
     // the playing Lottie all through the fuse and blast frames, which
@@ -232,6 +226,14 @@ class _WinPresentationState extends State<WinPresentation> {
     // to the blast moment finally fires.
     widget.onMultiplierLifted?.call(landing.column, landing.row);
 
+    // The cell shows the bomb frozen on frame 0; this overlay plays the
+    // full Lottie timeline (fuse → blast → tail) on top. Two hand-offs:
+    //   • onBlast (start of blast) — kicks the multiplier sprite off
+    //     toward the bar.
+    //   • bombFuture completion (end of blast) — advances the active
+    //     index so the next bomb's fuse starts in parallel with this
+    //     sprite's flight, instead of waiting for the sprite to merge
+    //     into the bar first.
     final blastCompleter = Completer<void>();
     final bombFuture = MultiplierBombAnimation.play(
       context: context,
@@ -242,6 +244,16 @@ class _WinPresentationState extends State<WinPresentation> {
         if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
     );
+    unawaited(
+      bombFuture.then((_) async {
+        // Brief beat between bombs so the chain reads as a sequence
+        // rather than a single overlapping detonation. Without this
+        // pause the next fuse kicks the instant the previous blast
+        // ends, which feels too tightly stacked.
+        await Future.delayed(WinPresentationController.interMultiplierGap);
+        if (mounted) _controller.onBombBlastComplete();
+      }),
+    );
 
     await blastCompleter.future;
     if (!mounted) return;
@@ -250,26 +262,23 @@ class _WinPresentationState extends State<WinPresentation> {
     // approach threshold (~70% of the flight) — well before the asset
     // has fully faded. The bar pulse and the asset's last 30% of fade
     // overlap, reading as a single merge instead of "lands then
-    // pulses". Collect runs in parallel with the bomb's smoke tail.
-    await Future.wait([
-      bombFuture,
-      MultiplierCollectAnimation.play(
-        context: context,
-        start: start,
-        end: end,
-        value: landing.value,
-        cellSize: cellSize * 0.67,
-        // End size at the bar tracks the bar's text height — the value
-        // shrinks to about a regular symbol slot in the running-sum text.
-        endSize: 30,
-        settleDuration: WinPresentationController.multiplierSettleDuration,
-        flightDuration: WinPresentationController.multiplierFlightDuration,
-        onApproaching: () {
-          if (!mounted) return;
-          _controller.onMultiplierLanded();
-        },
-      ),
-    ]);
+    // pulses".
+    await MultiplierCollectAnimation.play(
+      context: context,
+      start: start,
+      end: end,
+      value: landing.value,
+      cellSize: cellSize * 0.67,
+      // End size at the bar tracks the bar's text height — the value
+      // shrinks to about a regular symbol slot in the running-sum text.
+      endSize: 30,
+      settleDuration: WinPresentationController.multiplierSettleDuration,
+      flightDuration: WinPresentationController.multiplierFlightDuration,
+      onApproaching: () {
+        if (!mounted) return;
+        _controller.onMultiplierLanded(landedIdx);
+      },
+    );
   }
 
   @override

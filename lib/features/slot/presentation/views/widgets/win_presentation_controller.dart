@@ -115,29 +115,43 @@ class WinPresentationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Called by the view when the current multiplier's flight reaches
-  /// the bar. Updates [runningSum], schedules the next multiplier or
-  /// advances to the final phase.
-  void onMultiplierLanded() {
+  /// Called by the view the moment a multiplier's bomb finishes its
+  /// blast. Advances the active index so the next bomb's fuse can
+  /// start in parallel with the just-blasted multiplier's sprite
+  /// still flying up to the bar — bombs chain on blast-end rather
+  /// than waiting for the previous sprite to merge into the running
+  /// sum. No-op for the last multiplier (no next bomb to start).
+  void onBombBlastComplete() {
     if (_phase != WinPresentationPhase.multiplierCollecting) return;
-    if (_activeIndex < 0 || _activeIndex >= _multipliers.length) return;
+    if (_activeIndex < 0) return;
+    final hasMore = _activeIndex < _multipliers.length - 1;
+    if (!hasMore) return;
+    _activeIndex++;
+    _phaseTimer?.cancel();
+    notifyListeners();
+  }
 
-    _runningSum += _multipliers[_activeIndex];
+  /// Called by the view when a multiplier's sprite reaches the bar.
+  /// [landedIndex] identifies which multiplier just merged in (the
+  /// active index may already be ahead of it on a chained sequence
+  /// where the next bomb has started before this sprite landed).
+  /// Updates [runningSum]; the last sprite landing schedules the
+  /// transition into the final-count phase.
+  void onMultiplierLanded(int landedIndex) {
+    if (_phase != WinPresentationPhase.multiplierCollecting) return;
+    if (landedIndex < 0 || landedIndex >= _multipliers.length) return;
+
+    _runningSum += _multipliers[landedIndex];
     notifyListeners();
 
-    final hasMore = _activeIndex < _multipliers.length - 1;
-    final delay = hasMore
-        ? (postLandPulse + interMultiplierGap)
-        : (postLandPulse + formulaToFinalGap);
-
-    _phaseTimer?.cancel();
-    _phaseTimer = Timer(delay, () {
-      if (hasMore) {
-        _startNextMultiplier();
-      } else {
-        _enterFinalPhase();
-      }
-    });
+    final isLast = landedIndex == _multipliers.length - 1;
+    if (isLast) {
+      _phaseTimer?.cancel();
+      _phaseTimer = Timer(
+        postLandPulse + formulaToFinalGap,
+        _enterFinalPhase,
+      );
+    }
   }
 
   void _enterFinalPhase() {
