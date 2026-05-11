@@ -404,7 +404,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     border: Border.all(color: Colors.white24, width: 1.5),
                   ),
                   child: Text(
-                    '${formatMoney(bet)} \$', // Using $ to match the screenshot
+                    '₺${formatMoney(bet)}',
                     style: GoogleFonts.barlowCondensed(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -698,21 +698,21 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'NEW BALANCE',
-                    value: '${formatMoney(entry.newBalance)} \$',
+                    value: '₺${formatMoney(entry.newBalance)}',
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'BET',
-                    value: '${formatMoney(entry.bet)} \$',
+                    value: '₺${formatMoney(entry.bet)}',
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'WIN',
-                    value: '${formatMoney(entry.winAmount)} \$',
+                    value: '₺${formatMoney(entry.winAmount)}',
                     valueColor: winColor,
                   ),
                 ),

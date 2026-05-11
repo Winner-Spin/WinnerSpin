@@ -267,8 +267,8 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
   /// Bottom description text explaining the payout mechanics.
   Widget _buildRulesDescription() {
     return Text(
-      'Symbols pay anywhere on the screen. At the end of a spin, '
-      'the total count of the same symbol on the screen determines the win value.',
+      'Symbols pay anywhere on the 6x5 grid. Each tumble checks the total '
+      'number of matching regular symbols on the screen and pays when 8 or more are present.',
       textAlign: TextAlign.center,
       style: GoogleFonts.nunito(
         fontSize: 12.5,
@@ -299,30 +299,39 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         _buildText('This is the SCATTER symbol.'),
-        _buildText('The SCATTER symbol appears on all reels.'),
-        _buildText('SCATTER pays in any position.'),
+        _buildText('SCATTER can land anywhere on the grid.'),
+        _buildText(
+          'SCATTER pays by total count after all tumbles are complete.',
+        ),
         const SizedBox(height: 16),
-        _buildSectionTitle('ANTE BET'),
+        _buildSectionTitle('DOUBLE CHANCE'),
         _buildText(
-          'The player has the option to choose a bet multiplier. Depending on the selected bet type, the game behaves differently. Possible values:',
+          'Double Chance increases the cost of a base spin to 1.25x the selected bet.',
         ),
         _buildText(
-          '20x bet multiplier: grants the ability to BUY FREE SPINS ROUND by paying a value equal to 100x total bet.',
+          'When Double Chance is active, the chance of naturally triggering FREE SPINS is doubled.',
+        ),
+        _buildText('BUY FEATURE is disabled while Double Chance is active.'),
+
+        const SizedBox(height: 16),
+        _buildSectionTitle('BUY FEATURE'),
+        _buildText(
+          'BUY FEATURE starts a FREE SPINS round immediately for 100x the selected bet.',
         ),
         _buildText(
-          '25x bet multiplier: the chance of naturally winning free spins doubles. More SCATTER symbols appear on the reels. BUY FREE SPINS FEATURE is disabled.',
+          'Bought FREE SPINS rounds start with 10 free spins and use the same tumble and multiplier rules.',
         ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('TUMBLE FEATURE'),
         _buildText(
-          'TUMBLE FEATURE means that after each spin, winning combinations are paid and winning symbols disappear. Remaining symbols fall to the bottom of the screen and empty positions are replaced with symbols coming from above.',
+          'After a winning tumble, all winning regular symbols pop and disappear. The remaining symbols fall down and empty positions are filled from above.',
         ),
         _buildText(
           'Tumbling continues until no new combination appears as a result of a tumble. There is no limit to the number of possible tumbles.',
         ),
         _buildText(
-          'All wins are added to the player\'s balance after all tumbles from a base spin have been played.',
+          'All tumble wins from the spin are added together before any final multiplier is applied.',
         ),
 
         const SizedBox(height: 16),
@@ -332,7 +341,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         ),
         _buildText('The round starts with 10 free spins.'),
         _buildText(
-          'During the FREE SPINS ROUND, when 3 or more SCATTER symbols are caught, 5 additional free spins are awarded.',
+          'During FREE SPINS, 3 or more SCATTER symbols award 5 additional free spins.',
         ),
 
         const SizedBox(height: 12),
@@ -341,17 +350,19 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
         _buildTextWithBomb(
           'This is the MULTIPLIER symbol. It',
-          ' only appears on the reels during the FREE SPINS ROUND and remains on the screen until the end of the tumble process.',
+          ' can land in base spins and FREE SPINS. Multipliers stay on the grid until the tumble process ends.',
         ),
         _buildTextWithBomb(
           'When a ',
-          ' symbol lands, it takes a random multiplier value of 2x, 3x, 4x, 5x, 6x, 8x, 10x, 12x, 15x, 20x, 25x, 50x or 100x.',
+          ' symbol lands, it can show 2x, 3x, 5x, 10x, 25x, 50x or 100x.',
         ),
         _buildTextWithBomb(
           'When the tumble process ends, the values of all ',
-          ' symbols on the screen are added together and the total win of the process is multiplied by the final value.',
+          ' symbols left on the screen are added together. If there was a regular symbol win, the tumble win total is multiplied by that sum.',
         ),
-        _buildText('Special reels are in play during FREE SPINS ROUNDS.'),
+        _buildText(
+          'During FREE SPINS, multiplier symbols appear more often. Bought FREE SPINS and Double Chance-triggered rounds may scale the final multiplier value differently.',
+        ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('GAME RULES'),
@@ -360,9 +371,11 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           'Medium volatility games pay regularly and the payout range can vary from low to very high.',
         ),
         _buildText('Symbols pay anywhere.'),
-        _buildText('All wins are multiplied by the base bet.'),
         _buildText(
-          'All values are expressed in terms of actual coin winnings.',
+          'Regular symbol and SCATTER payouts are multiplied by the selected bet.',
+        ),
+        _buildText(
+          'Multiplier symbols do not pay by themselves; they multiply regular tumble wins.',
         ),
         _buildText(
           'When winning with multiple symbols, all wins are added to the total win.',
@@ -371,22 +384,24 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         _buildText(
           'Free spin total winnings history includes the total winnings of the series.',
         ),
-        _buildText(
-          'Maximum RTP of this game is 95.5%\nMinimum RTP of this game is 95.45%',
-        ),
+        _buildText('Target RTP of this game is 96.5%.'),
         _buildText(
           'SPACE and ENTER keys on the keyboard can be used to start and stop the spin.\nMalfunction voids all pays and plays.',
         ),
         const SizedBox(height: 8),
-        _buildText('MINIMUM BET: 0.20 \$\nMAXIMUM BET: 125.00 \$'),
+        _buildText('MINIMUM BET: 10.00 ₺\nMAXIMUM BET: 5000.00 ₺'),
 
         const SizedBox(height: 16),
         _buildSectionTitle('HOW TO PLAY'),
-        _buildText('Click the 🪙 button to open the bet menu.'),
         _buildText(
-          'Select your bet by adjusting the values using the ➕ and ➖ buttons.',
+          'Open BET SETTINGS from the menu to change the selected bet.',
         ),
-        _buildText('Press the SPIN button to play.'),
+        _buildText(
+          'Use the plus and minus controls to choose one of the available bet levels.',
+        ),
+        _buildText(
+          'Press SPIN to play. During FREE SPINS, spins do not charge the balance.',
+        ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('MENU'),
@@ -401,7 +416,9 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         _buildText(
           'BATTERY SAVER: helps reduce the game\'s battery consumption and may help prevent the device from overheating during long gaming sessions.',
         ),
-        _buildText('SOUND: turns sound and music on and off.'),
+        _buildText(
+          'MUSIC and SOUND EFFECTS can be turned on and off separately.',
+        ),
         _buildIconTextRow(Icons.open_in_new, 'opens the game history page.'),
         _buildIconTextRow(Icons.info_outline, 'opens the info page.'),
         _buildText(
@@ -410,7 +427,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
         const SizedBox(height: 16),
         _buildSectionTitle('MENU'),
-        _buildIconTextRow(Icons.autorenew, 'starts the game.'),
+        _buildIconTextRow(Icons.autorenew, 'starts a spin or stops auto spin.'),
         _buildIconTextRow(
           Icons.play_circle_outline,
           'opens the auto play menu.',
@@ -418,18 +435,16 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
         const SizedBox(height: 16),
         _buildSectionTitle('INFO SCREEN'),
-        _buildText(
-          'Drag the pages up and down to navigate between info pages.',
-        ),
+        _buildText('Scroll up and down to read the game rules.'),
         _buildIconTextRow(Icons.close, 'closes the info screen.'),
 
         const SizedBox(height: 16),
         _buildSectionTitle('BET MENU'),
         _buildText(
-          'The bet menu shows the available bet multiplier and the current total bet in both coins and cash.',
+          'BET SETTINGS shows the selected bet and the current total spin cost.',
         ),
         _buildText(
-          'Use the ➕ and ➖ buttons in the BET and COIN VALUE fields to change values.',
+          'Use the plus and minus buttons to move through the available bet levels.',
         ),
       ],
     );
@@ -629,7 +644,7 @@ class _SymbolPayoutCard extends StatelessWidget {
         final multiplier = payouts[threshold]!;
         final payout = multiplier * betAmount;
         final rangeText = symbol.isScatter
-            ? '$threshold'
+            ? _getScatterRangeText(threshold, sortedThresholds)
             : _getRangeText(threshold, sortedThresholds);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 0),
@@ -664,6 +679,12 @@ class _SymbolPayoutCard extends StatelessWidget {
     // Range ends just before the next higher threshold
     final nextHigher = sortedThresholds[idx - 1];
     return '$threshold - ${nextHigher - 1}';
+  }
+
+  String _getScatterRangeText(int threshold, List<int> sortedThresholds) {
+    return sortedThresholds.indexOf(threshold) == 0
+        ? '$threshold+'
+        : '$threshold';
   }
 
   String _formatPayout(double value) {
