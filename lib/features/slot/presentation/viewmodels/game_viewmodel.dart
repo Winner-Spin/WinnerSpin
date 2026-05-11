@@ -178,23 +178,29 @@ class GameViewModel extends ChangeNotifier {
 
   // ── Free spins (delegated to FreeSpinsController) ──
 
-  /// TEMPORARY testing flag — when true the spin always runs in
-  /// free-spin mode so multipliers land far more often (engine boosts
-  /// hit rate + multiplier weights inside FS). Bypasses balance
-  /// charge AND FS counter consumption. Flip back to `false` before
-  /// shipping anything.
-  static const bool kTestForceFreeSpins = true;
-
   int get freeSpinsRemaining => _fsCtrl.remaining;
-  bool get isInFreeSpins => kTestForceFreeSpins || _fsCtrl.isActive;
 
-  /// True only when the buy CTA can fire.
+  /// Held true from the moment an FS spin starts until its full
+  /// post-spin celebration settles. Keeps [isInFreeSpins] reporting
+  /// true on the very last FS spin even after the counter consumes
+  /// to zero, so the FS chrome stays on screen through the multiplier
+  /// collect, flight, and Kazanç count-up. The consume itself fires
+  /// earlier — at the lingering-cluster timer end — so the displayed
+  /// counter updates immediately without holding the chrome flip.
+  bool _fsRoundHoldActive = false;
+
+  bool get isInFreeSpins => _fsCtrl.isActive || _fsRoundHoldActive;
+
+  /// True only when the buy CTA can fire. Pool health is intentionally
+  /// not gated here — the engine still chooses recovery/jackpot/normal
+  /// mode based on pool state, so a buy on an unhealthy pool simply
+  /// runs the FS round in the mode pool dictates instead of being
+  /// blocked at the button level.
   bool get canBuyFreeSpins =>
       !isBusy &&
       !_isAutoSpinning &&
       !isInFreeSpins &&
-      _balanceCtrl.canAfford(buyFeaturePrice) &&
-      SlotEngine.canAffordBuyFs(_pool, betAmount);
+      _balanceCtrl.canAfford(buyFeaturePrice);
 
   /// User-facing buy availability. Mirrors the displayed credit (not
   /// the canonical balance) so the button doesn't go grey while the
@@ -221,6 +227,7 @@ class GameViewModel extends ChangeNotifier {
   PoolState _pool = PoolState();
   SpinResult? _pendingResult;
   double _pendingHistoryBet = 0;
+  bool _pendingFsConsume = false;
   String? _historyUserId;
   final List<GameHistoryEntry> _gameHistory = [];
   List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
@@ -426,12 +433,17 @@ class GameViewModel extends ChangeNotifier {
       _pendingHistoryBet = cost;
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
-    } else if (!kTestForceFreeSpins) {
-      // Real FS round — no charge, so the history entry records a
-      // zero stake. Consume one FS counter. Skipped under the test
-      // flag so testing isn't bottlenecked by an FS counter drain.
+    } else {
+      // FS round — no charge, so the history entry records a zero
+      // stake. The counter consume is deferred (the screen fires it
+      // when the lingering-cluster line clears, so the displayed FS
+      // counter updates as soon as the cluster pay line steps off),
+      // and the round-hold flag keeps [isInFreeSpins] reporting true
+      // on the last FS spin even after the counter hits zero so the
+      // FS chrome holds through the full post-spin celebration.
       _pendingHistoryBet = 0;
-      _fsCtrl.consumeOne();
+      _pendingFsConsume = true;
+      _fsRoundHoldActive = true;
     }
 
     _isSpinning = true;
@@ -557,6 +569,7 @@ class GameViewModel extends ChangeNotifier {
       }
     }
 
+
     // Round ended? Clear the FS-source flags.
     if (!isInFreeSpins) {
       _anteCtrl.clearRoundFlag();
@@ -587,6 +600,29 @@ class GameViewModel extends ChangeNotifier {
         }
       });
     }
+  }
+
+  /// Commits the deferred FS counter consume queued by an FS spin's
+  /// start. The screen calls this when the lingering cluster line
+  /// clears (~1s after the cascade settles) so the displayed counter
+  /// updates immediately, decoupled from the chrome transition which
+  /// stays raised through [_fsRoundHoldActive] until the celebration
+  /// fully unwinds.
+  void commitPendingFsConsume() {
+    if (!_pendingFsConsume) return;
+    _pendingFsConsume = false;
+    _fsCtrl.consumeOne();
+  }
+
+  /// Drops the round-hold flag once the post-spin celebration has
+  /// fully unwound. After this clears, [isInFreeSpins] falls back to
+  /// the raw [FreeSpinsController.isActive] flag — so the FS chrome
+  /// only flips off the screen at the very end of the last FS spin's
+  /// visual sequence, never mid-presentation.
+  void releaseFsRoundHold() {
+    if (!_fsRoundHoldActive) return;
+    _fsRoundHoldActive = false;
+    notifyListeners();
   }
 
   // ── Sign out ──

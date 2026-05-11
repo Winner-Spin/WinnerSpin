@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../../../domain/enums/symbol_tier.dart';
@@ -245,8 +246,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     required bool cleared,
     required bool isScatter,
     required bool isMultiplier,
-    required double landThreshold,
     required int multiplierValue,
+    required double landThreshold,
     required Animation<double> animation,
   }) {
     if (isDropOut && cleared) {
@@ -360,7 +361,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     );
 
     final symbolDef = SymbolRegistry.byPath(assetPath);
-    final bool isScatter = assetPath.contains('cupCake');
+    final bool isScatter = symbolDef?.tier == SymbolTier.scatter;
     final bool isMultiplier = symbolDef?.tier == SymbolTier.multiplier;
     final bool cleared = widget.clearedPositions.contains(
       widget.columnIndex * 100 + index,
@@ -399,8 +400,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
             cleared: cleared,
             isScatter: isScatter,
             isMultiplier: isMultiplier,
-            landThreshold: endFraction,
             multiplierValue: multiplierValue,
+            landThreshold: endFraction,
             animation: _animation!,
           ),
         ),

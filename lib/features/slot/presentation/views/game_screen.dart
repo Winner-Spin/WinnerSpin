@@ -54,6 +54,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   ClusterWin? _lingeringCluster;
   bool _wasBusy = false;
 
+  // Tracks the cascade tumbling flag so the lingering cluster pay
+  // line can auto-clear after the cascade fully ends — gives the
+  // last cluster's payout a brief beat on screen before the FS info
+  // row flips back to FREE SPINS LEFT.
+  bool _wasTumbling = false;
+  Timer? _lingeringClusterTimer;
+
   // FS-round running total. Accumulates each spin's awarded win so
   // the top Kazanç readout climbs through the round instead of
   // resetting to zero on every new reel.
@@ -108,6 +115,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
+
+  // Optimistic lock raised the instant the cascade ends, before the
+  // multiplier collect sequence has actually entered its first phase.
+  // Without it, a single frame slips through where isBusy is false
+  // but the controller is still idle — long enough for the respin
+  // button to flash active before the sequence locks it again. The
+  // lock clears automatically the moment a microtask confirms the
+  // spin won't trigger a celebration, and otherwise stays raised
+  // until the controller reaches [WinPresentationPhase.done].
+  bool _celebrationLocked = false;
+
+  // True while either the multiplier collect sequence is mid-flight or
+  // the big-win celebration overlay is on screen. The respin button
+  // stays locked through both phases so the player can't trigger a
+  // fresh reel before the previous spin's celebration has resolved.
+  bool get _isCelebrationActive {
+    final phase = _winCtrl.phase;
+    final winPresentationActive =
+        phase != WinPresentationPhase.idle &&
+        phase != WinPresentationPhase.done;
+    return winPresentationActive || _bigWinEntry != null || _celebrationLocked;
+  }
 
   // Hot-path text styles resolved once — Google Fonts lookups inside
   // the status text and bottom panel rebuilds were repeating per spin.
@@ -311,15 +340,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       builder: (ctx) => BigWinOverlay(
         amount: amount,
         tier: tier,
+        // Turbo speed skips the count-up the same way the tap path
+        // does so big-win celebrations stay compact on the fastest
+        // pacing setting.
+        instantAmount: _viewModel.speedMultiplier >= 3,
         onComplete: () {
-          if (_bigWinEntry == entry) _bigWinEntry = null;
+          if (_bigWinEntry == entry) {
+            setState(() => _bigWinEntry = null);
+            _releaseCelebrationLock();
+          }
           entry.remove();
           if (mounted) setState(() => _isBigWinShowing = false);
         },
       ),
     );
-    _bigWinEntry = entry;
     overlay.insert(entry);
+    setState(() => _bigWinEntry = entry);
   }
 
   void _trackSpinTransitions() {
@@ -335,9 +371,51 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _commitPendingFsWin();
       _winCtrl.reset();
       _bigWinShownThisSpin = false;
+      // Drop the previous spin's lock state without touching the FS
+      // consume — the consume for THIS spin was just queued by spin()
+      // and must wait for this spin's own celebration to settle. The
+      // viewmodel's own _pendingFsConsume flag stays set on the new
+      // spin; the unlock just clears local screen state.
+      if (_celebrationLocked) {
+        setState(() => _celebrationLocked = false);
+      }
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = null;
       if (_lingeringCluster != null) {
         setState(() => _lingeringCluster = null);
       }
+    }
+    if (!isBusy && _wasBusy) {
+      // Cascade just ended — raise the lock optimistically so the
+      // respin button doesn't flash active in the single frame
+      // between isBusy flipping false and the controller entering
+      // its first phase. A microtask defers the sequence-prediction
+      // check until after the viewmodel finishes assigning
+      // [lastSpinResult], at which point we unlock immediately when
+      // there's nothing to celebrate.
+      setState(() => _celebrationLocked = true);
+      Future.microtask(() {
+        if (!mounted) return;
+        final result = _viewModel.lastSpinResult;
+        final hasSequence =
+            result != null &&
+            result.baseWin > 0 &&
+            result.finalMultipliers.isNotEmpty;
+        final hasBigWin =
+            result != null &&
+            result.totalWin > 0 &&
+            _viewModel.betAmount > 0 &&
+            WinTier.forMultiplier(result.totalWin / _viewModel.betAmount) !=
+                null;
+        // FS rounds always run the TUMBLE WIN → Kazanç flight + the
+        // top-row count-up after every winning spin, so the lock must
+        // hold past phase=done until the count-up settles.
+        final hasFsFlight =
+            _viewModel.isInFreeSpins && result != null && result.totalWin > 0;
+        if (!hasSequence && !hasBigWin && !hasFsFlight) {
+          _releaseCelebrationLock();
+        }
+      });
     }
     _wasBusy = isBusy;
   }
@@ -392,13 +470,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _trackLingeringCluster() {
     final activeExplosions = _viewModel.activeExplosions;
-    if (activeExplosions.isEmpty) return;
-    final best = activeExplosions.reduce(
-      (a, b) => a.amount >= b.amount ? a : b,
-    );
-    if (!identical(_lingeringCluster, best)) {
-      setState(() => _lingeringCluster = best);
+    final isTumbling = _viewModel.isTumbling;
+
+    if (activeExplosions.isNotEmpty) {
+      // Active cluster on screen — kill any pending auto-clear so the
+      // hold timer doesn't fire while a fresh cluster is being shown.
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = null;
+      final best = activeExplosions.reduce(
+        (a, b) => a.amount >= b.amount ? a : b,
+      );
+      if (!identical(_lingeringCluster, best)) {
+        setState(() => _lingeringCluster = best);
+      }
+    } else if (_wasTumbling && !isTumbling && _lingeringCluster != null) {
+      // Cascade just finished — let the final cluster's payout linger
+      // for a beat, then flip the FS info row back to FREE SPINS LEFT
+      // and commit the FS counter consume so the displayed remaining
+      // count updates the instant the cluster pay line steps off
+      // (the FS chrome itself stays through the rest of the
+      // celebration via the round-hold flag).
+      _lingeringClusterTimer?.cancel();
+      _lingeringClusterTimer = Timer(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        setState(() => _lingeringCluster = null);
+        _viewModel.commitPendingFsConsume();
+      });
     }
+    _wasTumbling = isTumbling;
   }
 
   @override
@@ -424,6 +523,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _bigWinEntry = null;
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
+    _lingeringClusterTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
@@ -446,11 +546,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (phase == WinPresentationPhase.done &&
         _lastWinCtrlPhase != WinPresentationPhase.done) {
       if (_viewModel.isInFreeSpins) {
-        // Brief hold so the player can read the multiplied total in
-        // TUMBLE WIN before it lifts off toward the Kazanç row.
+        // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
+        // count-up that follows it) is still to come. Leave
+        // _celebrationLocked raised — the flight's onComplete handler
+        // releases it after the count-up settles.
         Future.delayed(const Duration(milliseconds: 600), () {
           if (mounted) _commitPendingFsWin();
         });
+      } else {
+        // Normal round: no flight follows, so the lock can drop the
+        // instant the final count-up reaches its target. The big-win
+        // overlay (if running) still keeps it locked through its own
+        // _bigWinEntry check.
+        _releaseCelebrationLock();
       }
     }
     _lastWinCtrlPhase = phase;
@@ -493,6 +601,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           _fsAccumulatedWin += amount;
           _pendingFsSpinWin = 0;
         });
+        _releaseLockAfterFsCountUp();
         return;
       }
       late OverlayEntry entry;
@@ -517,6 +626,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               _isFlyingTumble = false;
               _fsAccumulatedWin += amount;
             });
+            // The Kazanç counter now spends ~700ms chasing the new
+            // total. Hold the respin button locked until that
+            // count-up settles so the player can read the round
+            // total before triggering the next reel.
+            Future.delayed(const Duration(milliseconds: 700), () {
+              if (!mounted) return;
+              _releaseCelebrationLock();
+            });
           },
         ),
       );
@@ -533,7 +650,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _fsAccumulatedWin += amount;
         _pendingFsSpinWin = 0;
       });
+      _releaseLockAfterFsCountUp();
     }
+  }
+
+  /// Releases [_celebrationLocked] once the Kazanç counter has had
+  /// enough time to chase the new accumulator total. Used by the FS
+  /// fallback paths where the value is folded in directly (no flying
+  /// sprite carries the lock release on its own onComplete).
+  void _releaseLockAfterFsCountUp() {
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      _releaseCelebrationLock();
+    });
+  }
+
+  /// Drops [_celebrationLocked], commits any deferred FS counter
+  /// consume left over from the spin (catch-up path for spins without
+  /// a tumble cascade), and releases the FS round-hold so
+  /// [isInFreeSpins] falls back to the raw active-counter check. The
+  /// hold release is what actually flips the chrome off the screen on
+  /// the last FS spin — by deferring it until every celebration
+  /// timeline has unwound the FS UI never tears down mid-sequence.
+  void _releaseCelebrationLock() {
+    if (_celebrationLocked) {
+      setState(() => _celebrationLocked = false);
+    }
+    _viewModel.commitPendingFsConsume();
+    _viewModel.releaseFsRoundHold();
   }
 
   void _handleLogout(BuildContext context) {
@@ -813,6 +957,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel,
                     _viewModel.balanceCtrl,
                     _viewModel.fsCtrl,
+                    _winCtrl,
                   ]),
                   builder: (context, _) {
                     final autoActive = _viewModel.isAutoSpinning;
@@ -839,7 +984,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             onTap: autoActive
                                 ? _viewModel.stopAutoSpin
                                 : _viewModel.spin,
-                            spinning: _viewModel.isBusy,
+                            // Hold the spinning state past plain isBusy so the
+                            // manual respin button stays locked through the
+                            // entire post-spin celebration choreography
+                            // (multiplier collect, middle-row count-up, FS
+                            // flight, round-total count-up). Auto-spin's
+                            // stop tap is exempted inside RespinButton, so
+                            // the player can always abort an active autoplay
+                            // run even while a celebration is on screen.
+                            spinning:
+                                _viewModel.isBusy || _isCelebrationActive,
                             disabled: _isBigWinShowing,
                             autoSpinsRemaining: autoActive
                                 ? _viewModel.autoSpinsRemaining
@@ -987,43 +1141,37 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Widget _buildSlotGrid() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: List.generate(GameViewModel.columns, (col) {
-            return Expanded(
-              // Per-column RepaintBoundary so a reel's drop animation
-              // doesn't invalidate sibling columns or the grid frame.
-              child: RepaintBoundary(
-                child: SlotReel(
-                  columnIndex: col,
-                  controller: _reelControllers[col],
-                  // Pass column lists by reference; List.generate
-                  // here was producing fresh refs every rebuild.
-                  previousItems: _viewModel.previousGrid[col],
-                  targetItems: _viewModel.grid[col],
-                  spinning: _viewModel.isSpinning,
-                  fadingPaths: _viewModel.fadingPaths,
-                  clearedPositions: _viewModel.clearedPositions,
-                  speedMultiplier: _viewModel.speedMultiplier,
-                  pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
-                  onComplete: col == GameViewModel.columns - 1
-                      ? () => _viewModel.onSpinComplete()
-                      : null,
-                  // Only the first column triggers the residue wipe; the
-                  // grid controller no-ops if it's already empty so the
-                  // other columns calling later is harmless either way.
-                  onDropInStart: col == 0
-                      ? () => _viewModel.clearMultiplierResidues()
-                      : null,
-                ),
+      child: Row(
+        children: List.generate(GameViewModel.columns, (col) {
+          return Expanded(
+            // Per-column RepaintBoundary so a reel's drop animation
+            // doesn't invalidate sibling columns or the grid frame.
+            child: RepaintBoundary(
+              child: SlotReel(
+                columnIndex: col,
+                controller: _reelControllers[col],
+                // Pass column lists by reference; List.generate
+                // here was producing fresh refs every rebuild.
+                previousItems: _viewModel.previousGrid[col],
+                targetItems: _viewModel.grid[col],
+                spinning: _viewModel.isSpinning,
+                fadingPaths: _viewModel.fadingPaths,
+                clearedPositions: _viewModel.clearedPositions,
+                speedMultiplier: _viewModel.speedMultiplier,
+                pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
+                onComplete: col == GameViewModel.columns - 1
+                    ? () => _viewModel.onSpinComplete()
+                    : null,
+                // Only the first column triggers the residue wipe; the
+                // grid controller no-ops if it's already empty so the
+                // other columns calling later is harmless either way.
+                onDropInStart: col == 0
+                    ? () => _viewModel.clearMultiplierResidues()
+                    : null,
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
