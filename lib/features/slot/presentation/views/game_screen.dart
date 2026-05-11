@@ -180,6 +180,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // gets awarded mid-cascade.
     _viewModel.fsCtrl.addListener(_onViewModelChange);
     _viewModel.fsCtrl.addListener(_onFreeSpinStateChange);
+    // `isInFreeSpins` also reflects the viewmodel's round-hold flag,
+    // which only emits notifications on the viewmodel itself. Without
+    // this listener, `_wasInFreeSpins` would stall on the previous
+    // round's hold being cleared (viewmodel-only notify) and a
+    // subsequent buy-trigger awarding FS would see `_wasInFreeSpins`
+    // still true — skipping the cupcake-burst transition.
+    _viewModel.addListener(_onFreeSpinStateChange);
     _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
 
@@ -607,6 +614,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _viewModel.gridCtrl.removeListener(_onViewModelChange);
     _viewModel.fsCtrl.removeListener(_onViewModelChange);
     _viewModel.fsCtrl.removeListener(_onFreeSpinStateChange);
+    _viewModel.removeListener(_onFreeSpinStateChange);
     _winCtrl.removeListener(_onWinCtrlChange);
     _winCtrl.dispose();
     super.dispose();
