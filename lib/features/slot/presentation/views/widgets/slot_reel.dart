@@ -64,6 +64,8 @@ class SlotReel extends StatefulWidget {
   /// symbol appears.
   final VoidCallback? onDropInStart;
 
+  final bool pulseScattersOnLanding;
+
   final SlotReelController? controller;
 
   final int speedMultiplier;
@@ -82,6 +84,7 @@ class SlotReel extends StatefulWidget {
     this.duration = const Duration(milliseconds: 1200),
     this.onComplete,
     this.onDropInStart,
+    this.pulseScattersOnLanding = false,
   });
 
   @override
@@ -94,6 +97,11 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   /// Custom curve that provides a subtle recoil (bounce) effect.
   /// Prevents the extreme overshoot caused by standard [Curves.easeOutBack].
   static const Curve _heftyBounceCurve = _HeftyBounceCurve();
+
+  static const Duration _scatterPulseSettleDuration = Duration(
+    milliseconds: 1050,
+  );
+  static const double _scatterPulseTriggerProgress = 0.985;
 
   AnimationController? _controller;
   Animation<double>? _animation;
@@ -132,7 +140,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     if (!mounted) return;
 
     int speedMult = widget.speedMultiplier;
-    int dropOutDurationMs = 500 ~/ speedMult;
+    final speedFactor = _effectiveSpeedFactor(speedMult);
+    int dropOutDurationMs = (500 / speedFactor).round();
     int columnDelayMs = speedMult > 1 ? 0 : 100;
     int dropOutDelayMs = widget.columnIndex * columnDelayMs;
 
@@ -169,7 +178,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     await Future.delayed(Duration(milliseconds: totalEmptyWaitMs));
     if (!mounted || _quickStopped) return;
 
-    int dropInDurationMs = 900 ~/ speedMult;
+    int dropInDurationMs = (900 / speedFactor).round();
 
     _controller?.dispose();
     _controller = AnimationController(
@@ -183,6 +192,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     setState(() => _state = ReelState.droppingIn);
 
     await _controller!.forward();
+    if (widget.pulseScattersOnLanding && !_quickStopped) {
+      await Future.delayed(_scatterPulseSettleDuration);
+    }
     _completeSpin();
   }
 
@@ -242,11 +254,11 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     }
 
     final Widget symbolChild;
-    if (!isDropOut && isScatter) {
+    if (!isDropOut && isScatter && widget.pulseScattersOnLanding) {
       symbolChild = _ScatterPulse(
         assetPath: assetPath,
         animation: animation,
-        landThreshold: landThreshold,
+        landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
       );
     } else if (isMultiplier) {
       // Multiplier cells render the bomb (frozen on frame 0) already during
@@ -314,12 +326,13 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   ) {
     int rowCount = GameViewModel.rows;
     int speedMult = widget.speedMultiplier;
+    final speedFactor = _effectiveSpeedFactor(speedMult);
 
     int reverseIndex = (rowCount - 1) - index;
 
     double totalDuration = isDropOut
-        ? (500.0 / speedMult)
-        : (900.0 / speedMult);
+        ? (500.0 / speedFactor)
+        : (900.0 / speedFactor);
     double staggerMs = speedMult > 1 ? 0.0 : (isDropOut ? 28.0 : 30.0);
     double durationVal = totalDuration - (reverseIndex * staggerMs);
 
@@ -338,9 +351,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       endFraction = (0.58 + rowProgress * 0.42).clamp(0.0, 1.0);
     }
 
-    final Curve curveType = isDropOut
-        ? Curves.easeInCubic
-        : _heftyBounceCurve;
+    final Curve curveType = isDropOut ? Curves.easeInCubic : _heftyBounceCurve;
 
     final Curve itemCurve = Interval(
       startDelayFraction,
@@ -351,8 +362,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final symbolDef = SymbolRegistry.byPath(assetPath);
     final bool isScatter = assetPath.contains('cupCake');
     final bool isMultiplier = symbolDef?.tier == SymbolTier.multiplier;
-    final bool cleared = widget.clearedPositions
-        .contains(widget.columnIndex * 100 + index);
+    final bool cleared = widget.clearedPositions.contains(
+      widget.columnIndex * 100 + index,
+    );
     final int multiplierValue = symbolDef?.multiplierValue ?? 5;
 
     return AnimatedBuilder(
@@ -396,6 +408,17 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     );
   }
 
+  double _effectiveSpeedFactor(int speedMultiplier) {
+    switch (speedMultiplier) {
+      case 2:
+        return 1.75;
+      case 3:
+        return 2.55;
+      default:
+        return 1.0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -421,8 +444,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
               // sparks vanish at the column edge and the burst feels truncated.
               clipBehavior: Clip.none,
               children: List.generate(items.length, (i) {
-                final cleared = widget.clearedPositions
-                    .contains(widget.columnIndex * 100 + i);
+                final cleared = widget.clearedPositions.contains(
+                  widget.columnIndex * 100 + i,
+                );
                 if (cleared) {
                   return Positioned(
                     top: i * itemH,
@@ -534,7 +558,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
     // Scale pulse: 1.0 → 1.5 → 1.0 (very noticeable)
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 850),
     );
     _pulseScale = TweenSequence<double>(
       [
@@ -546,7 +570,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
     // Visual effects: glow + burst + sparkles
     _effectController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1050),
     );
 
     // Golden glow: fade in fast, hold, fade out
@@ -571,9 +595,11 @@ class _ScatterPulseState extends State<_ScatterPulse>
     );
 
     widget.animation.addListener(_checkLanding);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLanding());
   }
 
   void _checkLanding() {
+    if (!mounted) return;
     if (!_hasTriggered && widget.animation.value >= widget.landThreshold) {
       _hasTriggered = true;
       _pulseController.forward();

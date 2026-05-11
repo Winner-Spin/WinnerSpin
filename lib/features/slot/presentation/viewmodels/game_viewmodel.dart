@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
+import '../../domain/models/symbol_registry.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../../data/repositories/firestore_pool_repository.dart';
@@ -138,6 +139,9 @@ class GameViewModel extends ChangeNotifier {
   bool _isAutoSpinning = false;
   bool get isAutoSpinning => _isAutoSpinning;
 
+  int _autoSpinsRemaining = 0;
+  int get autoSpinsRemaining => _autoSpinsRemaining;
+
   /// True while any spin or its cascade is still animating.
   bool get isBusy => _isSpinning || _isTumbling;
 
@@ -227,11 +231,25 @@ class GameViewModel extends ChangeNotifier {
   /// reveal.
   SpinResult? _lastSpinResult;
   SpinResult? get lastSpinResult => _lastSpinResult;
+  bool get shouldPulseLandingScatters {
+    final grid = _pendingResult?.initialGrid;
+    if (grid == null) return false;
+
+    final scatterPath = SymbolRegistry.all
+        .firstWhere((s) => s.isScatter)
+        .assetPath;
+    final scatterCount = grid
+        .expand((column) => column)
+        .where((path) => path == scatterPath)
+        .length;
+
+    return scatterCount >= 3;
+  }
 
   // ── Tumble animation timing ──
   /// Window for the winning-cell glow + fade. First half is the gold-glow
   /// celebration, second half is the symbol fade-out — see [TumbleCell].
-  static const Duration _tumbleFadeDuration = Duration(milliseconds: 900);
+  static const Duration _tumbleFadeDuration = Duration(milliseconds: 1750);
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
   // ── Settings ──
@@ -283,16 +301,32 @@ class GameViewModel extends ChangeNotifier {
     });
   }
 
+  void startAutoSpin(int spinCount, {int speedMultiplier = 1}) {
+    if (_isAutoSpinning || isBusy || spinCount <= 0) return;
+    if (!isInFreeSpins && !_balanceCtrl.canAfford(effectiveBetCost)) {
+      _flashInsufficientFundsHint();
+      return;
+    }
+
+    _autoSpinsRemaining = spinCount;
+    _speedMultiplier = speedMultiplier.clamp(1, 3).toInt();
+    _isAutoSpinning = true;
+    notifyListeners();
+    spin();
+  }
+
+  void stopAutoSpin() {
+    if (!_isAutoSpinning && _autoSpinsRemaining == 0) return;
+    _isAutoSpinning = false;
+    _autoSpinsRemaining = 0;
+    notifyListeners();
+  }
+
   void toggleAutoSpin() {
     if (_isAutoSpinning) {
-      _isAutoSpinning = false;
-      notifyListeners();
+      stopAutoSpin();
     } else {
-      if (isBusy) return;
-      if (!isInFreeSpins && !_balanceCtrl.canAfford(effectiveBetCost)) return;
-      _isAutoSpinning = true;
-      notifyListeners();
-      spin();
+      startAutoSpin(100, speedMultiplier: _speedMultiplier);
     }
   }
 
@@ -384,6 +418,7 @@ class GameViewModel extends ChangeNotifier {
       if (!_balanceCtrl.canAfford(cost)) {
         if (_isAutoSpinning) {
           _isAutoSpinning = false;
+          _autoSpinsRemaining = 0;
         }
         _flashInsufficientFundsHint();
         return;
@@ -538,6 +573,14 @@ class GameViewModel extends ChangeNotifier {
     _pendingHistoryBet = 0;
 
     if (_isAutoSpinning) {
+      _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
+      if (_autoSpinsRemaining == 0) {
+        _isAutoSpinning = false;
+        notifyListeners();
+        return;
+      }
+
+      notifyListeners();
       Future.delayed(const Duration(milliseconds: 600), () {
         if (_isAutoSpinning && !isBusy) {
           spin();
