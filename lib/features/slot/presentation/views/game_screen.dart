@@ -172,6 +172,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // the lastWin → FS-accumulator hand-off doesn't get missed.
     _viewModel.balanceCtrl.addListener(_onViewModelChange);
     _viewModel.gridCtrl.addListener(_onViewModelChange);
+    // The Buy CTA's trigger spin flips the FS state on the FS counter
+    // (not the viewmodel itself), so the lastWin → FS-accumulator
+    // hand-off would otherwise miss its window — listen on the FS
+    // controller too so the FS flight queues the moment the round
+    // gets awarded mid-cascade.
+    _viewModel.fsCtrl.addListener(_onViewModelChange);
     _viewModel.fsCtrl.addListener(_onFreeSpinStateChange);
     _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
@@ -431,13 +437,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // FS rounds always run the TUMBLE WIN → Kazanç flight + the
         // top-row count-up after every winning spin, so the lock must
         // hold past phase=done until the count-up settles. The buy
-        // CTA's trigger spin is the one exception — its win lands on
-        // balance (not the FS accumulator) so there's no flight to
-        // wait on and the lock can drop the moment the cascade ends.
+        // CTA's trigger spin is included so the scatter payout flies
+        // up onto the round-total readout where the player can read
+        // it instead of being absorbed silently into balance.
         final hasFsFlight = _viewModel.isInFreeSpins &&
             result != null &&
-            result.totalWin > 0 &&
-            !_viewModel.isCurrentSpinFromBuy;
+            result.totalWin > 0;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
           _releaseCelebrationLock();
         }
@@ -458,11 +463,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _wasInFs = isInFs;
 
     if (!isInFs) return;
-    // The buy CTA's trigger spin awards FS but its own win goes to
-    // balance, not the accumulator — skip the flight setup so the
-    // round starts with KAZANÇ at zero and the respin button releases
-    // as soon as the cascade settles.
-    if (_viewModel.isCurrentSpinFromBuy) return;
 
     final lastWin = _viewModel.lastWin;
     if (lastWin > 0 && _lastSeenLastWin == 0) {
@@ -560,6 +560,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
     _viewModel.gridCtrl.removeListener(_onViewModelChange);
+    _viewModel.fsCtrl.removeListener(_onViewModelChange);
     _viewModel.fsCtrl.removeListener(_onFreeSpinStateChange);
     _winCtrl.removeListener(_onWinCtrlChange);
     _winCtrl.dispose();
