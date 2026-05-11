@@ -61,6 +61,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _wasTumbling = false;
   Timer? _lingeringClusterTimer;
 
+  // Safety net for the celebration lock. The post-spin sequence has
+  // multiple async hand-offs (multiplier collect → flight → count-up
+  // → big-win overlay) that each release the lock when they finish.
+  // If a single hand-off hangs (e.g. an animation callback never
+  // fires), the lock would otherwise stay raised forever and freeze
+  // the respin button. The watchdog force-releases the lock and
+  // commits any deferred FS state if no path released it within a
+  // generous upper bound.
+  Timer? _celebrationLockWatchdog;
+  static const Duration _celebrationLockMaxHold = Duration(seconds: 20);
+
   // FS-round running total. Accumulates each spin's awarded win so
   // the top Kazanç readout climbs through the round instead of
   // resetting to zero on every new reel.
@@ -394,6 +405,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       // [lastSpinResult], at which point we unlock immediately when
       // there's nothing to celebrate.
       setState(() => _celebrationLocked = true);
+      _celebrationLockWatchdog?.cancel();
+      _celebrationLockWatchdog = Timer(_celebrationLockMaxHold, () {
+        if (!mounted) return;
+        if (_celebrationLocked) {
+          // No release path fired in time — clear everything so the
+          // respin button can re-arm. Indicates a hung animation
+          // callback worth investigating further.
+          _releaseCelebrationLock();
+        }
+      });
       Future.microtask(() {
         if (!mounted) return;
         final result = _viewModel.lastSpinResult;
@@ -524,6 +545,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _lingeringClusterTimer?.cancel();
+    _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
@@ -673,6 +695,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   /// the last FS spin — by deferring it until every celebration
   /// timeline has unwound the FS UI never tears down mid-sequence.
   void _releaseCelebrationLock() {
+    _celebrationLockWatchdog?.cancel();
+    _celebrationLockWatchdog = null;
     if (_celebrationLocked) {
       setState(() => _celebrationLocked = false);
     }
