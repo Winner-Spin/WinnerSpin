@@ -24,6 +24,8 @@ import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
 import '../../../auth/presentation/views/login_screen.dart';
+import 'auto_play_settings_screen.dart';
+import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -111,6 +113,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // when this is set so the celebration carries the win to Kazanç
   // on its own. Resets at the start of every spin.
   bool _bigWinShownThisSpin = false;
+  bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
 
   // Optimistic lock raised the instant the cascade ends, before the
@@ -263,6 +266,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _showAutoPlaySettings(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'Auto Play Settings',
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, _, child) =>
+          AutoPlaySettingsScreen(viewModel: _viewModel),
+      transitionBuilder: (context, anim, _, child) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(
+              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   void _trackNormalBigWin() {
     if (_viewModel.isInFreeSpins) return;
     final lastWin = _viewModel.lastWin;
@@ -273,7 +299,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       Future.microtask(() {
         if (!mounted) return;
         final result = _viewModel.lastSpinResult;
-        final hasSequence = result != null &&
+        final hasSequence =
+            result != null &&
             result.baseWin > 0 &&
             result.finalMultipliers.isNotEmpty;
         if (!hasSequence) {
@@ -300,10 +327,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final tier = WinTier.forMultiplier(amount / bet);
     if (tier == null) return;
 
-    _bigWinShownThisSpin = true;
-
     final overlay = _stageOverlayKey.currentState;
     if (overlay == null) return;
+
+    setState(() {
+      _bigWinShownThisSpin = true;
+      _isBigWinShowing = true;
+    });
+
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (ctx) => BigWinOverlay(
@@ -319,6 +350,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             _releaseCelebrationLock();
           }
           entry.remove();
+          if (mounted) setState(() => _isBigWinShowing = false);
         },
       ),
     );
@@ -365,10 +397,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       Future.microtask(() {
         if (!mounted) return;
         final result = _viewModel.lastSpinResult;
-        final hasSequence = result != null &&
+        final hasSequence =
+            result != null &&
             result.baseWin > 0 &&
             result.finalMultipliers.isNotEmpty;
-        final hasBigWin = result != null &&
+        final hasBigWin =
+            result != null &&
             result.totalWin > 0 &&
             _viewModel.betAmount > 0 &&
             WinTier.forMultiplier(result.totalWin / _viewModel.betAmount) !=
@@ -376,9 +410,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // FS rounds always run the TUMBLE WIN → Kazanç flight + the
         // top-row count-up after every winning spin, so the lock must
         // hold past phase=done until the count-up settles.
-        final hasFsFlight = _viewModel.isInFreeSpins &&
-            result != null &&
-            result.totalWin > 0;
+        final hasFsFlight =
+            _viewModel.isInFreeSpins && result != null && result.totalWin > 0;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
           _releaseCelebrationLock();
         }
@@ -411,7 +444,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       Future.microtask(() {
         if (!mounted) return;
         final result = _viewModel.lastSpinResult;
-        final hasSequence = result != null &&
+        final hasSequence =
+            result != null &&
             result.baseWin > 0 &&
             result.finalMultipliers.isNotEmpty;
         if (!hasSequence) {
@@ -487,6 +521,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void dispose() {
     _bigWinEntry?.remove();
     _bigWinEntry = null;
+    _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _lingeringClusterTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -664,9 +699,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         onPointerDown: (_) => _quickStopReels(),
         child: Overlay(
           key: _stageOverlayKey,
-          initialEntries: [
-            OverlayEntry(builder: (context) => _buildStage()),
-          ],
+          initialEntries: [OverlayEntry(builder: (context) => _buildStage())],
         ),
       ),
     );
@@ -678,31 +711,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         final double screenH = constraints.maxHeight;
         final double screenW = constraints.maxWidth;
 
-          // The backdrop is BoxFit.cover'd — when the screen aspect
-          // doesn't match the source aspect, the image gets horizontally
-          // cropped/extended. Compute the inner grid frame's actual
-          // on-screen position so the slot grid lands on the bg's own
-          // cell boundaries regardless of device aspect.
-          const double bgAspect = 1408 / 3040;
-          const double bgInnerLeftRatio = 88 / 1408; // bg's inner-frame left edge
-          const double bgInnerRightRatio = 1319 / 1408; // bg's inner-frame right edge
+        // The backdrop is BoxFit.cover'd — when the screen aspect
+        // doesn't match the source aspect, the image gets horizontally
+        // cropped/extended. Compute the inner grid frame's actual
+        // on-screen position so the slot grid lands on the bg's own
+        // cell boundaries regardless of device aspect.
+        const double bgAspect = 1408 / 3040;
+        const double bgInnerLeftRatio = 88 / 1408; // bg's inner-frame left edge
+        const double bgInnerRightRatio =
+            1319 / 1408; // bg's inner-frame right edge
 
-          final double screenAspect = screenW / screenH;
-          final double bgDisplayW;
-          final double bgLeftOnScreen;
-          if (screenAspect >= bgAspect) {
-            bgDisplayW = screenW;
-            bgLeftOnScreen = 0;
-          } else {
-            bgDisplayW = screenH * bgAspect;
-            bgLeftOnScreen = (screenW - bgDisplayW) / 2;
-          }
-          final double gridLeftPx =
-              bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
-          final double gridRightPx =
-              screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
+        final double screenAspect = screenW / screenH;
+        final double bgDisplayW;
+        final double bgLeftOnScreen;
+        if (screenAspect >= bgAspect) {
+          bgDisplayW = screenW;
+          bgLeftOnScreen = 0;
+        } else {
+          bgDisplayW = screenH * bgAspect;
+          bgLeftOnScreen = (screenW - bgDisplayW) / 2;
+        }
+        final double gridLeftPx =
+            bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
+        final double gridRightPx =
+            screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
 
-          return Stack(
+        return AbsorbPointer(
+          absorbing: _isBigWinShowing,
+          child: Stack(
             children: [
               Positioned.fill(
                 // Backdrop swaps to the FS-mode artwork while a free-spin
@@ -764,10 +800,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               ListenableBuilder(
-                listenable: Listenable.merge([
-                  _viewModel,
-                  _viewModel.fsCtrl,
-                ]),
+                listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
                 builder: (context, _) {
                   // In free-spin rounds the strip splits into three
                   // black bands of the original height: top hosts the
@@ -867,11 +900,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) return const SizedBox.shrink();
+                    if (_viewModel.isInFreeSpins) {
+                      return const SizedBox.shrink();
+                    }
                     return RepaintBoundary(
                       child: BuyFeatureButton(
                         price: _viewModel.buyFeaturePrice,
-                        disabled: !_viewModel.canBuyFreeSpinsForUi ||
+                        disabled:
+                            _isBigWinShowing ||
+                            !_viewModel.canBuyFreeSpinsForUi ||
                             _viewModel.anteBetActive,
                         onTap: _viewModel.buyFreeSpins,
                         width: screenW * 0.39,
@@ -892,12 +929,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) return const SizedBox.shrink();
+                    if (_viewModel.isInFreeSpins) {
+                      return const SizedBox.shrink();
+                    }
                     return RepaintBoundary(
                       child: DoubleChanceButton(
                         betAmount: _viewModel.anteCost,
                         isOn: _viewModel.anteBetActive,
-                        disabled: _viewModel.isBusy || _viewModel.isInFreeSpins,
+                        disabled:
+                            _isBigWinShowing ||
+                            _viewModel.isBusy ||
+                            _viewModel.isInFreeSpins,
                         onTap: _viewModel.toggleAnteBet,
                         width: screenW * 0.39,
                         height: screenW * 0.22,
@@ -910,57 +952,70 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.72,
                 left: 0,
                 right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel.balanceCtrl,
-                        _viewModel.fsCtrl,
-                      ]),
-                      builder: (context, _) => RepaintBoundary(
-                        child: MinusButton(
-                          size: 42,
-                          onTap: _viewModel.decreaseBet,
-                          disabled: !_viewModel.canDecreaseBet ||
-                              _viewModel.isInFreeSpins,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    _viewModel,
+                    _viewModel.balanceCtrl,
+                    _viewModel.fsCtrl,
+                    _winCtrl,
+                  ]),
+                  builder: (context, _) {
+                    final autoActive = _viewModel.isAutoSpinning;
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (!autoActive) ...[
+                          RepaintBoundary(
+                            child: MinusButton(
+                              size: 42,
+                              onTap: _viewModel.decreaseBet,
+                              disabled:
+                                  _isBigWinShowing ||
+                                  !_viewModel.canDecreaseBet ||
+                                  _viewModel.isInFreeSpins,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                        RepaintBoundary(
+                          child: RespinButton(
+                            size: 84,
+                            onTap: autoActive
+                                ? _viewModel.stopAutoSpin
+                                : _viewModel.spin,
+                            // Hold the spinning state past plain isBusy so the
+                            // manual respin button stays locked through the
+                            // entire post-spin celebration choreography
+                            // (multiplier collect, middle-row count-up, FS
+                            // flight, round-total count-up). Auto-spin's
+                            // stop tap is exempted inside RespinButton, so
+                            // the player can always abort an active autoplay
+                            // run even while a celebration is on screen.
+                            spinning:
+                                _viewModel.isBusy || _isCelebrationActive,
+                            disabled: _isBigWinShowing,
+                            autoSpinsRemaining: autoActive
+                                ? _viewModel.autoSpinsRemaining
+                                : null,
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel,
-                        _viewModel.balanceCtrl,
-                        _viewModel.fsCtrl,
-                        _winCtrl,
-                      ]),
-                      builder: (context, _) => RepaintBoundary(
-                        child: RespinButton(
-                          size: 84,
-                          onTap: _viewModel.spin,
-                          spinning:
-                              _viewModel.isBusy || _isCelebrationActive,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel.balanceCtrl,
-                        _viewModel.fsCtrl,
-                      ]),
-                      builder: (context, _) => RepaintBoundary(
-                        child: PlusButton(
-                          size: 42,
-                          onTap: _viewModel.increaseBet,
-                          disabled: !_viewModel.canIncreaseBet ||
-                              _viewModel.isInFreeSpins,
-                        ),
-                      ),
-                    ),
-                  ],
+                        if (!autoActive) ...[
+                          const SizedBox(width: 16),
+                          RepaintBoundary(
+                            child: PlusButton(
+                              size: 42,
+                              onTap: _viewModel.increaseBet,
+                              disabled:
+                                  _isBigWinShowing ||
+                                  !_viewModel.canIncreaseBet ||
+                                  _viewModel.isInFreeSpins,
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ),
               Positioned(
@@ -970,6 +1025,30 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   listenable: _viewModel,
                   builder: (context, _) => InfoButton(
                     betAmount: _viewModel.betAmount,
+                    onTap: _isBigWinShowing
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              PageRouteBuilder(
+                                opaque: false,
+                                barrierDismissible: true,
+                                pageBuilder: (context, animation, child) =>
+                                    GameRulesScreen(
+                                      betAmount: _viewModel.betAmount,
+                                    ),
+                                transitionsBuilder:
+                                    (context, anim, animation, child) {
+                                      return FadeTransition(
+                                        opacity: anim,
+                                        child: child,
+                                      );
+                                    },
+                                transitionDuration: const Duration(
+                                  milliseconds: 250,
+                                ),
+                              ),
+                            );
+                          },
                   ),
                 ),
               ),
@@ -977,26 +1056,40 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.90,
                 right: 0,
                 child: SettingsButton(
-                  onTap: () {
-                    showGeneralDialog(
-                      context: context,
-                      barrierColor: Colors.transparent,
-                      barrierDismissible: true,
-                      barrierLabel: 'Settings',
-                      transitionDuration: const Duration(milliseconds: 250),
-                      pageBuilder: (context, _, __) =>
-                          SystemSettingsScreen(viewModel: _viewModel),
-                      transitionBuilder: (context, anim, _, child) {
-                        return FadeTransition(opacity: anim, child: child);
-                      },
-                    );
-                  },
+                  onTap: _isBigWinShowing
+                      ? null
+                      : () {
+                          showGeneralDialog(
+                            context: context,
+                            barrierColor: Colors.transparent,
+                            barrierDismissible: true,
+                            barrierLabel: 'Settings',
+                            transitionDuration: const Duration(
+                              milliseconds: 250,
+                            ),
+                            pageBuilder: (context, _, child) =>
+                                SystemSettingsScreen(viewModel: _viewModel),
+                            transitionBuilder: (context, anim, _, child) {
+                              return FadeTransition(
+                                opacity: anim,
+                                child: child,
+                              );
+                            },
+                          );
+                        },
                 ),
               ),
               Positioned(
                 top: screenH * 0.90,
                 left: screenW * 0.30,
-                child: const AutoSpinButton(),
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, _) => AutoSpinButton(
+                    onTap: _isBigWinShowing || _viewModel.isAutoSpinning
+                        ? null
+                        : () => _showAutoPlaySettings(context),
+                  ),
+                ),
               ),
               Positioned(
                 top: screenH * 0.90,
@@ -1005,7 +1098,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   listenable: _viewModel,
                   builder: (context, _) => SpeedButton(
                     level: _viewModel.speedMultiplier,
-                    onTap: _viewModel.toggleSpeed,
+                    onTap: _isBigWinShowing ? null : _viewModel.toggleSpeed,
                   ),
                 ),
               ),
@@ -1039,8 +1132,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               if (_showFreeSpinTransition)
                 const Positioned.fill(child: _FreeSpinScatterTransition()),
             ],
-          );
-        },
+          ),
+        );
+      },
     );
   }
 
@@ -1064,6 +1158,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 fadingPaths: _viewModel.fadingPaths,
                 clearedPositions: _viewModel.clearedPositions,
                 speedMultiplier: _viewModel.speedMultiplier,
+                pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
                 onComplete: col == GameViewModel.columns - 1
                     ? () => _viewModel.onSpinComplete()
                     : null,
@@ -1232,7 +1327,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // top of the counter so bombs fire and collect flights aim at the
     // tumble-win anchor. The widget itself is silent — it stays
     // mounted only to drive the controller and the overlays.
-    final showOrchestrator = hasMultiplierSequence &&
+    final showOrchestrator =
+        hasMultiplierSequence &&
         !_viewModel.isBusy &&
         _winCtrl.phase != WinPresentationPhase.done;
 
@@ -1356,10 +1452,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(
-              '₺${formatMoney(result.baseWin)}',
-              style: _statusBaseStyle,
-            ),
+            Text('₺${formatMoney(result.baseWin)}', style: _statusBaseStyle),
             if (showMultiplySign) ...[
               const SizedBox(width: 8),
               Text('×', style: _statusBaseStyle),
@@ -1425,10 +1518,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            '${clusterToShow.positions.length}X',
-            style: infoStyle,
-          ),
+          Text('${clusterToShow.positions.length}X', style: infoStyle),
           const SizedBox(width: 6),
           Image.asset(
             clusterToShow.assetPath,
@@ -1437,10 +1527,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             fit: BoxFit.contain,
           ),
           const SizedBox(width: 6),
-          Text(
-            'PAYS ₺${formatMoney(clusterToShow.amount)}',
-            style: infoStyle,
-          ),
+          Text('PAYS ₺${formatMoney(clusterToShow.amount)}', style: infoStyle),
         ],
       );
     }
@@ -1451,10 +1538,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       children: [
         Text('FREE SPINS LEFT', style: infoStyle),
         const SizedBox(width: 6),
-        Text(
-          '${_viewModel.freeSpinsRemaining}',
-          style: infoStyle,
-        ),
+        Text('${_viewModel.freeSpinsRemaining}', style: infoStyle),
       ],
     );
   }
@@ -1578,10 +1662,7 @@ class _PulsingMultiplierSum extends StatefulWidget {
   final int value;
   final TextStyle style;
 
-  const _PulsingMultiplierSum({
-    required this.value,
-    required this.style,
-  });
+  const _PulsingMultiplierSum({required this.value, required this.style});
 
   @override
   State<_PulsingMultiplierSum> createState() => _PulsingMultiplierSumState();
@@ -1600,13 +1681,17 @@ class _PulsingMultiplierSumState extends State<_PulsingMultiplierSum>
     _ctrl = AnimationController(vsync: this, duration: _pulseDuration);
     _scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.5)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 1.5,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 45,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.5, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 1.5,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 55,
       ),
     ]).animate(_ctrl);
@@ -1700,12 +1785,14 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 55),
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 27),
     ]).animate(_controller);
-    _scale = Tween<double>(begin: 0.25, end: 1.45).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-    _rotation = Tween<double>(begin: -0.16, end: 0.08).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _scale = Tween<double>(
+      begin: 0.25,
+      end: 1.45,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _rotation = Tween<double>(
+      begin: -0.16,
+      end: 0.08,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
   }
 
   @override
@@ -1717,64 +1804,72 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
   List<Widget> _buildCupcakeBurst(BuildContext context) {
     final size = MediaQuery.of(context).size;
     const assetPath = 'lib/images/slot_main_screen/Items/cupCake.png';
-    const specs = [
-      (x: -0.12, y: -0.08, size: 0.38, angle: -0.34, delay: 0.00),
-      (x: 0.18, y: -0.18, size: 0.30, angle: 0.22, delay: 0.06),
-      (x: -0.35, y: 0.14, size: 0.28, angle: 0.38, delay: 0.10),
-      (x: 0.36, y: 0.10, size: 0.32, angle: -0.26, delay: 0.14),
-      (x: 0.02, y: 0.08, size: 0.48, angle: 0.08, delay: 0.02),
-      (x: -0.18, y: 0.34, size: 0.34, angle: -0.18, delay: 0.18),
-      (x: 0.26, y: 0.36, size: 0.27, angle: 0.31, delay: 0.22),
-      (x: -0.02, y: -0.42, size: 0.25, angle: -0.08, delay: 0.16),
-      (x: -0.42, y: -0.24, size: 0.22, angle: -0.52, delay: 0.04),
-      (x: 0.42, y: -0.28, size: 0.24, angle: 0.44, delay: 0.08),
-      (x: -0.48, y: 0.34, size: 0.21, angle: 0.58, delay: 0.20),
-      (x: 0.48, y: 0.30, size: 0.23, angle: -0.46, delay: 0.24),
-      (x: -0.28, y: -0.44, size: 0.19, angle: 0.18, delay: 0.12),
-      (x: 0.30, y: -0.46, size: 0.20, angle: -0.20, delay: 0.18),
-      (x: -0.08, y: 0.48, size: 0.22, angle: 0.36, delay: 0.26),
-      (x: 0.10, y: 0.52, size: 0.18, angle: -0.34, delay: 0.28),
-      (x: -0.54, y: -0.02, size: 0.17, angle: -0.16, delay: 0.15),
-      (x: 0.54, y: -0.04, size: 0.18, angle: 0.24, delay: 0.17),
-      (x: -0.34, y: 0.52, size: 0.16, angle: -0.40, delay: 0.30),
-      (x: 0.36, y: 0.50, size: 0.17, angle: 0.42, delay: 0.32),
-      (x: -0.56, y: -0.34, size: 0.15, angle: 0.26, delay: 0.05),
-      (x: 0.56, y: -0.36, size: 0.16, angle: -0.30, delay: 0.07),
-      (x: -0.58, y: 0.18, size: 0.15, angle: 0.48, delay: 0.21),
-      (x: 0.58, y: 0.16, size: 0.16, angle: -0.52, delay: 0.23),
-      (x: -0.20, y: -0.58, size: 0.15, angle: -0.22, delay: 0.10),
-      (x: 0.20, y: -0.60, size: 0.15, angle: 0.20, delay: 0.13),
-      (x: -0.22, y: 0.64, size: 0.15, angle: 0.54, delay: 0.34),
-      (x: 0.24, y: 0.62, size: 0.15, angle: -0.50, delay: 0.36),
-      (x: -0.46, y: -0.52, size: 0.14, angle: -0.44, delay: 0.11),
-      (x: 0.46, y: -0.54, size: 0.14, angle: 0.46, delay: 0.14),
-    ];
-    return specs
-        .map((spec) {
-          final localProgress =
-              ((_controller.value - spec.delay) / 0.78).clamp(0.0, 1.0);
-          final pop = Curves.easeOutBack.transform(localProgress);
-          final drift = Curves.easeOutCubic.transform(localProgress);
-          return Positioned(
-            left: size.width * (0.5 + spec.x) - (size.width * spec.size / 2),
-            top: size.height * (0.42 + spec.y) - (size.width * spec.size / 2),
+
+    // Dense grid of cupcakes that blankets the entire screen.
+    // We tile a grid from edge to edge and jitter each cell slightly
+    // so the result feels organic rather than mechanical.
+    const int cols = 9;
+    const int rows = 14;
+    const double cellSize = 0.16; // base cupcake size as fraction of width
+
+    final List<Widget> cupcakes = [];
+    int index = 0;
+
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        // Normalised position: -0.5 … 0.5 range centred on screen.
+        final nx = -0.55 + (c / (cols - 1)) * 1.1;
+        final ny = -0.55 + (r / (rows - 1)) * 1.1;
+
+        // Deterministic "random" jitter seeded by index.
+        final jx = ((index * 7 + 3) % 17 - 8) / 100.0;
+        final jy = ((index * 11 + 5) % 19 - 9) / 100.0;
+
+        final x = nx + jx;
+        final y = ny + jy;
+
+        // Size varies per cell for visual richness.
+        final sizeVar =
+            cellSize + ((index * 13 + 7) % 11) / 110.0; // 0.16 – 0.26
+
+        // Rotation jitter.
+        final angle = ((index * 17 + 2) % 23 - 11) / 18.0; // roughly -0.6 … 0.6
+
+        // Cascade delay — ripples outward from centre.
+        final dist = (x * x + y * y);
+        final delay = (dist * 0.55).clamp(0.0, 0.35);
+
+        final localProgress = ((_controller.value - delay) / 0.65).clamp(
+          0.0,
+          1.0,
+        );
+        final pop = Curves.easeOutBack.transform(localProgress);
+        final drift = Curves.easeOutCubic.transform(localProgress);
+
+        cupcakes.add(
+          Positioned(
+            left: size.width * (0.5 + x) - (size.width * sizeVar / 2),
+            top: size.height * (0.46 + y) - (size.width * sizeVar / 2),
             child: Transform.translate(
               offset: Offset(0, (1 - drift) * -90),
               child: Transform.scale(
                 scale: (0.25 + pop * 0.75) * _scale.value.clamp(0.8, 1.12),
                 child: Transform.rotate(
-                  angle: spec.angle + _rotation.value,
+                  angle: angle + _rotation.value,
                   child: Image.asset(
                     assetPath,
-                    width: size.width * spec.size,
+                    width: size.width * sizeVar,
                     filterQuality: FilterQuality.medium,
                   ),
                 ),
               ),
             ),
-          );
-        })
-        .toList(growable: false);
+          ),
+        );
+        index++;
+      }
+    }
+    return cupcakes;
   }
 
   @override

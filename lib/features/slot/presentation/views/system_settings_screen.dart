@@ -18,6 +18,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   // Using GameViewModel for states
 
   final ScrollController _scrollController = ScrollController();
+  bool _isExiting = false;
 
   @override
   void dispose() {
@@ -213,6 +214,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                         ),
                                         const SizedBox(height: 16),
                                         _buildTotalBet(),
+                                        const SizedBox(height: 32),
+                                        Center(child: _buildExitButton()),
                                       ],
                                     ),
                                   ),
@@ -276,6 +279,48 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _exitGame() async {
+    if (_isExiting) return;
+    setState(() => _isExiting = true);
+    Navigator.of(context).pop();
+    await widget.viewModel.signOut();
+  }
+
+  Widget _buildExitButton() {
+    return GestureDetector(
+      onTap: _isExiting ? null : _exitGame,
+      child: AnimatedOpacity(
+        opacity: _isExiting ? 0.55 : 1,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          width: 132,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE5A800),
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Text(
+            _isExiting ? 'EXITING...' : 'EXIT',
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
       ),
     );
   }

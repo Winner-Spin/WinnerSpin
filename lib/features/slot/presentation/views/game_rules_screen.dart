@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../domain/models/symbol_registry.dart';
 import '../../domain/models/slot_symbol.dart';
 import '../../domain/enums/symbol_tier.dart';
+import 'widgets/multiplier_bomb_animation.dart';
+import 'widgets/multiplier_label.dart';
 
 /// Full-screen overlay showing game rules and symbol payout tables.
 /// Opened from the info button on the game screen.
@@ -326,13 +329,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         ),
 
         const SizedBox(height: 12),
-        SizedBox(
-          height: 80,
-          width: 80,
-          child: Image.asset(
-            'lib/images/slot_main_screen/Items/100x_carpan.png',
-          ),
-        ),
+        _buildInfoMultiplierBomb(size: 56),
         const SizedBox(height: 12),
 
         _buildTextWithBomb(
@@ -505,6 +502,35 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
+  Widget _buildInfoMultiplierBomb({required double size}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: [
+          Transform.scale(
+            scale: MultiplierLabel.bombScaleFor(100),
+            child: Lottie.asset(
+              MultiplierBombAnimation.assetPath,
+              fit: BoxFit.contain,
+              animate: false,
+            ),
+          ),
+          Align(
+            alignment: Alignment(MultiplierLabel.labelXOffsetFor(100), 0.22),
+            child: const FractionallySizedBox(
+              widthFactor: 1.0,
+              heightFactor: 0.43,
+              child: MultiplierLabel(value: 100, fit: BoxFit.fitHeight),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextWithBomb(String text1, String text2) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -523,13 +549,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
               alignment: PlaceholderAlignment.middle,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: Image.asset(
-                    'lib/images/slot_main_screen/Items/100x_carpan.png',
-                  ),
-                ),
+                child: _buildInfoMultiplierBomb(size: 20),
               ),
             ),
             TextSpan(text: text2),

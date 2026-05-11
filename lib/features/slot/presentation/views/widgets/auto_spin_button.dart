@@ -31,53 +31,57 @@ class _AutoSpinButtonState extends State<AutoSpinButton> {
   @override
   Widget build(BuildContext context) {
     final radius = widget.height / 2;
+    final disabled = widget.onTap == null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
+      onTapDown: disabled ? null : (_) => _setPressed(true),
+      onTapUp: disabled ? null : (_) => _setPressed(false),
+      onTapCancel: disabled ? null : () => _setPressed(false),
       onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 90),
-        curve: Curves.easeOut,
-        child: RepaintBoundary(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(radius),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
-              child: Container(
-                width: widget.width,
-                height: widget.height,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(radius),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF2B211B).withValues(alpha: 0.58),
-                      const Color(0xFF120C09).withValues(alpha: 0.62),
-                      Colors.black.withValues(alpha: 0.46),
+      child: Opacity(
+        opacity: disabled ? 0.48 : 1,
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 90),
+          curve: Curves.easeOut,
+          child: RepaintBoundary(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
+                child: Container(
+                  width: widget.width,
+                  height: widget.height,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(radius),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF2B211B).withValues(alpha: 0.58),
+                        const Color(0xFF120C09).withValues(alpha: 0.62),
+                        Colors.black.withValues(alpha: 0.46),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.22),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.22),
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: CustomPaint(
-                    size: const Size(22, 22),
-                    painter: AutoSpinIconPainter(
-                      color: Colors.white.withValues(alpha: 0.85),
+                  child: Center(
+                    child: CustomPaint(
+                      size: const Size(22, 22),
+                      painter: AutoSpinIconPainter(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
                     ),
                   ),
                 ),
@@ -123,10 +127,28 @@ class AutoSpinIconPainter extends CustomPainter {
     const topStart = math.pi * 41 / 36;
     const botStart = math.pi * 77 / 36;
 
-    _drawArrow(canvas, strokePaint, fillPaint, ringRect,
-        Offset(cx, cy), ringRadius, stroke, topStart, sweep);
-    _drawArrow(canvas, strokePaint, fillPaint, ringRect,
-        Offset(cx, cy), ringRadius, stroke, botStart, sweep);
+    _drawArrow(
+      canvas,
+      strokePaint,
+      fillPaint,
+      ringRect,
+      Offset(cx, cy),
+      ringRadius,
+      stroke,
+      topStart,
+      sweep,
+    );
+    _drawArrow(
+      canvas,
+      strokePaint,
+      fillPaint,
+      ringRect,
+      Offset(cx, cy),
+      ringRadius,
+      stroke,
+      botStart,
+      sweep,
+    );
 
     final triangleW = w * 0.27;
     final triangleH = w * 0.30;

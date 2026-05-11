@@ -11,6 +11,7 @@ class RespinButton extends StatelessWidget {
   final double opacity;
   final bool disabled;
   final bool spinning;
+  final int? autoSpinsRemaining;
 
   const RespinButton({
     super.key,
@@ -20,22 +21,31 @@ class RespinButton extends StatelessWidget {
     this.opacity = 0.75,
     this.disabled = false,
     this.spinning = false,
+    this.autoSpinsRemaining,
   });
 
   @override
   Widget build(BuildContext context) {
     final iconClr = iconColor ?? const Color(0xFFFAF6EE);
     final iconSize = size * 0.74;
+    final autoRemaining = autoSpinsRemaining;
+    final autoActive = autoRemaining != null;
 
     final button = TranslucentCircleButton(
       size: size,
-      onTap: (disabled || spinning) ? null : onTap,
+      onTap: (disabled || (spinning && !autoActive)) ? null : onTap,
       opacity: opacity,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 160),
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
-        child: spinning
+        child: autoActive
+            ? _AutoStopCountIcon(
+                key: ValueKey<int>(autoRemaining),
+                size: iconSize,
+                count: autoRemaining,
+              )
+            : spinning
             ? _StopIcon(
                 key: const ValueKey('stop'),
                 size: iconSize,
@@ -49,6 +59,59 @@ class RespinButton extends StatelessWidget {
       ),
     );
     return Opacity(opacity: disabled ? 0.65 : 1.0, child: button);
+  }
+}
+
+class _AutoStopCountIcon extends StatelessWidget {
+  final double size;
+  final int count;
+
+  const _AutoStopCountIcon({
+    super.key,
+    required this.size,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final boxSize = size * 0.58;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: boxSize,
+          height: boxSize,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(boxSize * 0.12),
+            border: Border.all(color: const Color(0xFFDC3D3D), width: 3),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: const Color(0xFFFAF6EE),
+                  fontSize: size * 0.28,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

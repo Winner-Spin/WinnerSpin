@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../../../domain/enums/symbol_tier.dart';
@@ -63,6 +65,8 @@ class SlotReel extends StatefulWidget {
   /// symbol appears.
   final VoidCallback? onDropInStart;
 
+  final bool pulseScattersOnLanding;
+
   final SlotReelController? controller;
 
   final int speedMultiplier;
@@ -81,6 +85,7 @@ class SlotReel extends StatefulWidget {
     this.duration = const Duration(milliseconds: 1200),
     this.onComplete,
     this.onDropInStart,
+    this.pulseScattersOnLanding = false,
   });
 
   @override
@@ -93,6 +98,11 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   /// Custom curve that provides a subtle recoil (bounce) effect.
   /// Prevents the extreme overshoot caused by standard [Curves.easeOutBack].
   static const Curve _heftyBounceCurve = _HeftyBounceCurve();
+
+  static const Duration _scatterPulseSettleDuration = Duration(
+    milliseconds: 1050,
+  );
+  static const double _scatterPulseTriggerProgress = 0.985;
 
   AnimationController? _controller;
   Animation<double>? _animation;
@@ -131,7 +141,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     if (!mounted) return;
 
     int speedMult = widget.speedMultiplier;
-    int dropOutDurationMs = 500 ~/ speedMult;
+    final speedFactor = _effectiveSpeedFactor(speedMult);
+    int dropOutDurationMs = (500 / speedFactor).round();
     int columnDelayMs = speedMult > 1 ? 0 : 100;
     int dropOutDelayMs = widget.columnIndex * columnDelayMs;
 
@@ -168,7 +179,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     await Future.delayed(Duration(milliseconds: totalEmptyWaitMs));
     if (!mounted || _quickStopped) return;
 
-    int dropInDurationMs = 900 ~/ speedMult;
+    int dropInDurationMs = (900 / speedFactor).round();
 
     _controller?.dispose();
     _controller = AnimationController(
@@ -182,6 +193,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     setState(() => _state = ReelState.droppingIn);
 
     await _controller!.forward();
+    if (widget.pulseScattersOnLanding && !_quickStopped) {
+      await Future.delayed(_scatterPulseSettleDuration);
+    }
     _completeSpin();
   }
 
@@ -230,15 +244,24 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     required double itemH,
     required bool isDropOut,
     required bool cleared,
+    required bool isScatter,
     required bool isMultiplier,
     required int multiplierValue,
+    required double landThreshold,
+    required Animation<double> animation,
   }) {
     if (isDropOut && cleared) {
       return _buildDustResidue(itemH);
     }
 
     final Widget symbolChild;
-    if (isMultiplier) {
+    if (!isDropOut && isScatter && widget.pulseScattersOnLanding) {
+      symbolChild = _ScatterPulse(
+        assetPath: assetPath,
+        animation: animation,
+        landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
+      );
+    } else if (isMultiplier) {
       // Multiplier cells render the bomb (frozen on frame 0) already during
       // the column-wide drop-in / drop-out so the player never sees a flash
       // of the legacy multiplier sprite morph into a bomb in the static phase.
@@ -304,12 +327,13 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   ) {
     int rowCount = GameViewModel.rows;
     int speedMult = widget.speedMultiplier;
+    final speedFactor = _effectiveSpeedFactor(speedMult);
 
     int reverseIndex = (rowCount - 1) - index;
 
     double totalDuration = isDropOut
-        ? (500.0 / speedMult)
-        : (900.0 / speedMult);
+        ? (500.0 / speedFactor)
+        : (900.0 / speedFactor);
     double staggerMs = speedMult > 1 ? 0.0 : (isDropOut ? 28.0 : 30.0);
     double durationVal = totalDuration - (reverseIndex * staggerMs);
 
@@ -328,9 +352,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       endFraction = (0.58 + rowProgress * 0.42).clamp(0.0, 1.0);
     }
 
-    final Curve curveType = isDropOut
-        ? Curves.easeInCubic
-        : _heftyBounceCurve;
+    final Curve curveType = isDropOut ? Curves.easeInCubic : _heftyBounceCurve;
 
     final Curve itemCurve = Interval(
       startDelayFraction,
@@ -339,9 +361,11 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     );
 
     final symbolDef = SymbolRegistry.byPath(assetPath);
+    final bool isScatter = symbolDef?.tier == SymbolTier.scatter;
     final bool isMultiplier = symbolDef?.tier == SymbolTier.multiplier;
-    final bool cleared = widget.clearedPositions
-        .contains(widget.columnIndex * 100 + index);
+    final bool cleared = widget.clearedPositions.contains(
+      widget.columnIndex * 100 + index,
+    );
     final int multiplierValue = symbolDef?.multiplierValue ?? 5;
 
     return AnimatedBuilder(
@@ -374,12 +398,26 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
             itemH: itemH,
             isDropOut: isDropOut,
             cleared: cleared,
+            isScatter: isScatter,
             isMultiplier: isMultiplier,
             multiplierValue: multiplierValue,
+            landThreshold: endFraction,
+            animation: _animation!,
           ),
         ),
       ),
     );
+  }
+
+  double _effectiveSpeedFactor(int speedMultiplier) {
+    switch (speedMultiplier) {
+      case 2:
+        return 1.75;
+      case 3:
+        return 2.55;
+      default:
+        return 1.0;
+    }
   }
 
   @override
@@ -407,8 +445,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
               // sparks vanish at the column edge and the burst feels truncated.
               clipBehavior: Clip.none,
               children: List.generate(items.length, (i) {
-                final cleared = widget.clearedPositions
-                    .contains(widget.columnIndex * 100 + i);
+                final cleared = widget.clearedPositions.contains(
+                  widget.columnIndex * 100 + i,
+                );
                 if (cleared) {
                   return Positioned(
                     top: i * itemH,
@@ -484,3 +523,223 @@ class _HeftyBounceCurve extends Curve {
   }
 }
 
+/// Wraps a scatter symbol image and plays a scale-up pulse with
+/// golden glow, radial light burst, and sparkle effects once the
+/// drop-in animation crosses [landThreshold].
+class _ScatterPulse extends StatefulWidget {
+  final String assetPath;
+  final Animation<double> animation;
+  final double landThreshold;
+
+  const _ScatterPulse({
+    required this.assetPath,
+    required this.animation,
+    required this.landThreshold,
+  });
+
+  @override
+  State<_ScatterPulse> createState() => _ScatterPulseState();
+}
+
+class _ScatterPulseState extends State<_ScatterPulse>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final AnimationController _effectController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _glowOpacity;
+  late final Animation<double> _burstExpand;
+  late final Animation<double> _burstOpacity;
+  late final Animation<double> _sparkleProgress;
+  bool _hasTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Scale pulse: 1.0 → 1.5 → 1.0 (very noticeable)
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    _pulseScale = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.5), weight: 35),
+        TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.0), weight: 65),
+      ],
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
+
+    // Visual effects: glow + burst + sparkles
+    _effectController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1050),
+    );
+
+    // Golden glow: fade in fast, hold, fade out
+    _glowOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.8), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 50),
+    ]).animate(_effectController);
+
+    // Radial light burst: expand outward
+    _burstExpand = Tween<double>(begin: 0.3, end: 1.5).animate(
+      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
+    );
+    _burstOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 85),
+    ]).animate(_effectController);
+
+    // Sparkle particles progress
+    _sparkleProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
+    );
+
+    widget.animation.addListener(_checkLanding);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLanding());
+  }
+
+  void _checkLanding() {
+    if (!mounted) return;
+    if (!_hasTriggered && widget.animation.value >= widget.landThreshold) {
+      _hasTriggered = true;
+      _pulseController.forward();
+      _effectController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeListener(_checkLanding);
+    _pulseController.dispose();
+    _effectController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Multiple scatters can land in one spin; isolating each pulse as its
+    // own layer keeps the burst+glow+sparkle stack from re-rasterizing the
+    // surrounding reel cells when only this scatter is animating.
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_pulseController, _effectController]),
+        builder: (context, child) {
+          final scale = _pulseScale.value;
+          final glow = _glowOpacity.value;
+          final burst = _burstExpand.value;
+          final burstAlpha = _burstOpacity.value;
+          final sparkle = _sparkleProgress.value;
+
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Layer 1: Radial light burst
+              if (burstAlpha > 0)
+                Positioned.fill(
+                  child: Transform.scale(
+                    scale: burst,
+                    child: Opacity(
+                      opacity: burstAlpha,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFFFD700).withValues(alpha: 0.7),
+                              const Color(0xFFFFD700).withValues(alpha: 0.2),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Layer 2: Sparkle particles
+              if (sparkle > 0 && sparkle < 1)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ScatterSparklePainter(progress: sparkle),
+                  ),
+                ),
+
+              // Layer 3: Golden glow halo behind the symbol. Blur radius
+              // capped at 8 (was 20) — the BoxShadow blur is GPU-expensive
+              // and multiple scatter pulses overlap during FS triggers.
+              if (glow > 0)
+                Positioned.fill(
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFFFFD700,
+                          ).withValues(alpha: glow * 0.6),
+                          blurRadius: 8,
+                          spreadRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Layer 4: The scatter image itself (with scale)
+              Transform.scale(scale: scale, child: child),
+            ],
+          );
+        },
+        child: Image.asset(
+          widget.assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.low,
+          gaplessPlayback: true,
+          cacheWidth: 256,
+        ),
+      ),
+    );
+  }
+}
+
+/// Paints small sparkle particles radiating outward from the center.
+class _ScatterSparklePainter extends CustomPainter {
+  final double progress;
+  _ScatterSparklePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = size.width * 0.55;
+    final rng = 42; // fixed seed for consistent pattern
+
+    for (int i = 0; i < 12; i++) {
+      final angle = (i * 30.0 + rng) * (3.14159 / 180.0);
+      final dist = maxRadius * progress * (0.6 + (i % 3) * 0.2);
+      final pos = Offset(
+        center.dx + dist * math.cos(angle),
+        center.dy + dist * math.sin(angle),
+      );
+
+      // Sparkle fades out as it travels
+      final alpha = ((1.0 - progress) * 0.9).clamp(0.0, 1.0);
+      final sparkleSize = 2.5 * (1.0 - progress * 0.5);
+
+      final paint = Paint()
+        ..color = Color.lerp(
+          const Color(0xFFFFD700),
+          const Color(0xFFFFFFFF),
+          (i % 2 == 0) ? 0.0 : 0.5,
+        )!.withValues(alpha: alpha);
+
+      canvas.drawCircle(pos, sparkleSize, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScatterSparklePainter old) => old.progress != progress;
+}

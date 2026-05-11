@@ -40,11 +40,11 @@ class MultiplierBombAnimation {
     final completer = Completer<void>();
     late final OverlayEntry entry;
 
-    // The resting bomb on the cell is rendered at cellSize * the
-    // per-value bomb scale, so the overlay has to match that scale —
-    // otherwise the bomb visually shrinks to its base footprint at
-    // the moment the overlay takes over and explodes there.
-    final renderSize = cellSize * MultiplierLabel.bombScaleFor(multiplierValue);
+    // Keep the resting bomb's visible body matched to the grid cell, but
+    // give the blast a much larger transparent canvas so the Lottie explosion
+    // doesn't read as if it is clipped inside a square cell.
+    final bombSize = cellSize * MultiplierLabel.bombScaleFor(multiplierValue);
+    final renderSize = bombSize * 2.25;
 
     entry = OverlayEntry(
       builder: (context) => Positioned(
@@ -53,13 +53,19 @@ class MultiplierBombAnimation {
         width: renderSize,
         height: renderSize,
         child: IgnorePointer(
-          child: _BombPlayer(
-            multiplierValue: multiplierValue,
-            onBlast: onBlast,
-            onComplete: () {
-              if (entry.mounted) entry.remove();
-              if (!completer.isCompleted) completer.complete();
-            },
+          child: Center(
+            child: SizedBox(
+              width: bombSize,
+              height: bombSize,
+              child: _BombPlayer(
+                multiplierValue: multiplierValue,
+                onBlast: onBlast,
+                onComplete: () {
+                  if (entry.mounted) entry.remove();
+                  if (!completer.isCompleted) completer.complete();
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -178,23 +184,37 @@ class _BombPlayerState extends State<_BombPlayer>
         // opacity — fade was muting the colourful explosion. The
         // overlay still cuts off at _blastEndProgress so the smoke
         // tail doesn't linger behind the rising sprite.
-        Lottie.asset(
-          MultiplierBombAnimation.assetPath,
-          controller: _ctrl,
-          fit: BoxFit.contain,
-          onLoaded: (composition) {
-            _ctrl
-              ..duration = composition.duration
-              ..forward().then((_) {
-                if (!mounted || _bombEnded) return;
-                _bombEnded = true;
-                if (!_blastFired) {
-                  _blastFired = true;
-                  widget.onBlast?.call();
-                }
-                widget.onComplete();
-              });
+        AnimatedBuilder(
+          animation: _ctrl,
+          builder: (context, child) {
+            final blastT =
+                ((_ctrl.value - MultiplierBombAnimation._blastProgress) /
+                        (MultiplierBombAnimation._blastEndProgress -
+                            MultiplierBombAnimation._blastProgress))
+                    .clamp(0.0, 1.0);
+            final scale = 1.0 + Curves.easeOutCubic.transform(blastT) * 0.55;
+            return Transform.scale(scale: scale, child: child);
           },
+          child: ClipOval(
+            child: Lottie.asset(
+              MultiplierBombAnimation.assetPath,
+              controller: _ctrl,
+              fit: BoxFit.contain,
+              onLoaded: (composition) {
+                _ctrl
+                  ..duration = composition.duration
+                  ..forward().then((_) {
+                    if (!mounted || _bombEnded) return;
+                    _bombEnded = true;
+                    if (!_blastFired) {
+                      _blastFired = true;
+                      widget.onBlast?.call();
+                    }
+                    widget.onComplete();
+                  });
+              },
+            ),
+          ),
         ),
         // Multiplier label rides in the same overlay, on top of the
         // bomb. The fade above only dims the Lottie, so the label
@@ -260,8 +280,7 @@ class _DustResiduePainter extends CustomPainter {
   // stable angle / length without using dart:math Random (which would
   // change every paint and look noisy).
   double _h(int seed, int i) =>
-      (math.sin(seed * 12.9898 + i * 78.233) * 43758.5453) %
-          1.0;
+      (math.sin(seed * 12.9898 + i * 78.233) * 43758.5453) % 1.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -306,21 +325,16 @@ class _DustResiduePainter extends CustomPainter {
     for (var i = 0; i < 36; i++) {
       final angle = i * 2.399963229728653 + 0.7;
       final dist = radius * (0.30 + _h(53, i) * 0.70);
-      final point = center +
-          Offset(math.cos(angle) * dist, math.sin(angle) * dist);
+      final point =
+          center + Offset(math.cos(angle) * dist, math.sin(angle) * dist);
       final dotRadius = shortest * (0.008 + _h(67, i) * 0.012);
       final color = _palette[(i * 5) % _palette.length];
 
       // Soft halo so the dot doesn't read as a hard pixel.
       final glow = Paint()
         ..shader = RadialGradient(
-          colors: [
-            color.withValues(alpha: 0.50),
-            color.withValues(alpha: 0.0),
-          ],
-        ).createShader(
-          Rect.fromCircle(center: point, radius: dotRadius * 2.6),
-        );
+          colors: [color.withValues(alpha: 0.50), color.withValues(alpha: 0.0)],
+        ).createShader(Rect.fromCircle(center: point, radius: dotRadius * 2.6));
       canvas.drawCircle(point, dotRadius * 2.6, glow);
       canvas.drawCircle(
         point,
@@ -339,29 +353,30 @@ class _DustResiduePainter extends CustomPainter {
     double width,
     Color color,
   ) {
-    final p1 = center +
-        Offset(math.cos(angle) * innerR, math.sin(angle) * innerR);
-    final p2 = center +
-        Offset(math.cos(angle) * outerR, math.sin(angle) * outerR);
+    final p1 =
+        center + Offset(math.cos(angle) * innerR, math.sin(angle) * innerR);
+    final p2 =
+        center + Offset(math.cos(angle) * outerR, math.sin(angle) * outerR);
     final paint = Paint()
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round
-      ..shader = LinearGradient(
-        colors: [
-          _coreColor.withValues(alpha: 0.55),
-          color.withValues(alpha: 0.65),
-          color.withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.4, 1.0],
-        begin: const Alignment(-1, 0),
-        end: const Alignment(1, 0),
-        transform: GradientRotation(angle),
-      ).createShader(
-        Rect.fromPoints(
-          center.translate(-outerR, -outerR),
-          center.translate(outerR, outerR),
-        ),
-      );
+      ..shader =
+          LinearGradient(
+            colors: [
+              _coreColor.withValues(alpha: 0.55),
+              color.withValues(alpha: 0.65),
+              color.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.4, 1.0],
+            begin: const Alignment(-1, 0),
+            end: const Alignment(1, 0),
+            transform: GradientRotation(angle),
+          ).createShader(
+            Rect.fromPoints(
+              center.translate(-outerR, -outerR),
+              center.translate(outerR, outerR),
+            ),
+          );
     canvas.drawLine(p1, p2, paint);
   }
 
