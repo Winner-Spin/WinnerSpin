@@ -79,6 +79,17 @@ class RegisterViewModel extends ChangeNotifier {
     }
   }
 
+  /// Clears the currently surfaced error message — the register
+  /// screen calls this after the in-screen error indicator has been
+  /// on screen long enough for the player to read it, so a fresh
+  /// register attempt doesn't have to re-render against a stale
+  /// error.
+  void clearError() {
+    if (_errorMessage == null) return;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   /// Resets the registrationSuccess flag after navigation is handled.
   void resetRegistrationSuccess() {
     _registrationSuccess = false;
