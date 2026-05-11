@@ -63,15 +63,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     super.dispose();
   }
 
-  void _toggleGlass() {
-    if (_glassCtrl.status == AnimationStatus.completed ||
-        _glassCtrl.status == AnimationStatus.forward) {
-      _glassCtrl.reverse();
-    } else {
-      _glassCtrl.forward();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final radius = widget.height * 0.32;
@@ -91,7 +82,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
           onTapDown: (_) => _pressCtrl.forward(),
           onTapUp: (_) {
             _pressCtrl.reverse();
-            _toggleGlass();
             widget.onTap?.call();
           },
           onTapCancel: () => _pressCtrl.reverse(),

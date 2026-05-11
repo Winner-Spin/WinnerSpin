@@ -25,6 +25,7 @@ import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 import 'auto_play_settings_screen.dart';
+import 'buy_freespins_confirm_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
 
@@ -335,6 +336,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _lastSeenLastWinNormal = lastWin;
   }
 
+  /// Pops a confirmation overlay over the slot screen instead of
+  /// charging the Buy FS fee on first tap — keeps the player from
+  /// dropping ₺10k on a stray press. Confirming runs the actual
+  /// buy; cancelling just closes the dialog.
+  void _promptBuyFreeSpinsConfirm() {
+    if (!_viewModel.canBuyFreeSpinsForUi) return;
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, _, _) => BuyFreeSpinsConfirmScreen(
+          spinCount: 10,
+          price: _viewModel.buyFeaturePrice,
+          onConfirm: _viewModel.buyFreeSpins,
+        ),
+        transitionsBuilder: (_, anim, _, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  }
+
   void _maybeShowBigWin(double amount) {
     if (!mounted) return;
     if (_bigWinShownThisSpin || _bigWinEntry != null) return;
@@ -396,6 +420,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (_celebrationLocked) {
         setState(() => _celebrationLocked = false);
       }
+      // A pending watchdog from the previous spin would otherwise stay
+      // armed across the new spin's setup — cancel it so the next
+      // cascade end gets a fresh timer rather than racing the stale
+      // one for the unlock callback.
+      _celebrationLockWatchdog?.cancel();
+      _celebrationLockWatchdog = null;
       _lingeringClusterTimer?.cancel();
       _lingeringClusterTimer = null;
       if (_lingeringCluster != null) {
@@ -430,17 +460,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             result.finalMultipliers.isNotEmpty;
         final hasBigWin =
             result != null &&
+            !_viewModel.isCurrentSpinFromBuy &&
             result.totalWin > 0 &&
             _viewModel.betAmount > 0 &&
             WinTier.forMultiplier(result.totalWin / _viewModel.betAmount) !=
                 null;
         // FS rounds always run the TUMBLE WIN → Kazanç flight + the
         // top-row count-up after every winning spin, so the lock must
-        // hold past phase=done until the count-up settles. The buy
-        // CTA's trigger spin is included so the scatter payout flies
-        // up onto the round-total readout where the player can read
-        // it instead of being absorbed silently into balance.
-        final hasFsFlight = _viewModel.isInFreeSpins &&
+        // hold past phase=done until the count-up settles. Buy-trigger
+        // spins are the exception: their payout folds directly into
+        // KazanÃ§ so the FS-entry burst stays unobstructed and the first
+        // real free spin can be started immediately.
+        final hasFsFlight =
+            _viewModel.isInFreeSpins &&
+            !_viewModel.isCurrentSpinFromBuy &&
             result != null &&
             result.totalWin > 0;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
@@ -466,35 +499,47 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     final lastWin = _viewModel.lastWin;
     if (lastWin > 0 && _lastSeenLastWin == 0) {
-      setState(() => _pendingFsSpinWin = lastWin);
-      // The viewmodel notifies via balanceCtrl from inside awardWin,
-      // but the new `lastSpinResult` is assigned a couple of lines
-      // later — reading it synchronously here would still see the
-      // previous spin's data. A microtask defers the hasSequence
-      // check until that assignment has run.
-      Future.microtask(() {
-        if (!mounted) return;
-        final result = _viewModel.lastSpinResult;
-        final hasSequence =
-            result != null &&
-            result.baseWin > 0 &&
-            result.finalMultipliers.isNotEmpty;
-        if (!hasSequence) {
-          // No multiplier collect to wait on — give the player a
-          // brief beat to read the TUMBLE WIN value, then fly it
-          // up. Multiplier spins instead wait for phase=done from
-          // [_onWinCtrlChange] before triggering the flight. The
-          // big-win overlay pops alongside the flight kick-off so
-          // the celebration starts the moment the value visibly
-          // begins moving.
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) {
-              _maybeShowBigWin(lastWin);
-              _commitPendingFsWin();
-            }
-          });
-        }
-      });
+      if (_viewModel.isCurrentSpinFromBuy) {
+        // Buy CTA's trigger spin: skip the TUMBLE WIN → Kazanç flight
+        // entirely. The FS-entry cupcake burst overlay would otherwise
+        // be covered by the flight sprite mid-animation (the flight
+        // overlay sits above the burst in the stage stack), and the
+        // burst is the player's main visual cue that the round has
+        // started. Folding the payout straight into the round-total
+        // readout lets the burst play uninterrupted and unlocks the
+        // respin button immediately for the first real FS spin.
+        setState(() => _fsAccumulatedWin = lastWin);
+      } else {
+        setState(() => _pendingFsSpinWin = lastWin);
+        // The viewmodel notifies via balanceCtrl from inside awardWin,
+        // but the new `lastSpinResult` is assigned a couple of lines
+        // later — reading it synchronously here would still see the
+        // previous spin's data. A microtask defers the hasSequence
+        // check until that assignment has run.
+        Future.microtask(() {
+          if (!mounted) return;
+          final result = _viewModel.lastSpinResult;
+          final hasSequence =
+              result != null &&
+              result.baseWin > 0 &&
+              result.finalMultipliers.isNotEmpty;
+          if (!hasSequence) {
+            // No multiplier collect to wait on — give the player a
+            // brief beat to read the TUMBLE WIN value, then fly it
+            // up. Multiplier spins instead wait for phase=done from
+            // [_onWinCtrlChange] before triggering the flight. The
+            // big-win overlay pops alongside the flight kick-off so
+            // the celebration starts the moment the value visibly
+            // begins moving.
+            Future.delayed(const Duration(milliseconds: 600), () {
+              if (mounted) {
+                _maybeShowBigWin(lastWin);
+                _commitPendingFsWin();
+              }
+            });
+          }
+        });
+      }
     }
     _lastSeenLastWin = lastWin;
   }
@@ -579,13 +624,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (phase == WinPresentationPhase.done &&
         _lastWinCtrlPhase != WinPresentationPhase.done) {
       if (_viewModel.isInFreeSpins) {
-        // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
-        // count-up that follows it) is still to come. Leave
-        // _celebrationLocked raised — the flight's onComplete handler
-        // releases it after the count-up settles.
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) _commitPendingFsWin();
-        });
+        if (_viewModel.isCurrentSpinFromBuy) {
+          _releaseCelebrationLock();
+        } else {
+          // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
+          // count-up that follows it) is still to come. Leave
+          // _celebrationLocked raised — the flight's onComplete handler
+          // releases it after the count-up settles.
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) _commitPendingFsWin();
+          });
+        }
       } else {
         // Normal round: no flight follows, so the lock can drop the
         // instant the final count-up reaches its target. The big-win
@@ -945,7 +994,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             _isBigWinShowing ||
                             !_viewModel.canBuyFreeSpinsForUi ||
                             _viewModel.anteBetActive,
-                        onTap: _viewModel.buyFreeSpins,
+                        onTap: _promptBuyFreeSpinsConfirm,
                         width: screenW * 0.39,
                         height: screenW * 0.22,
                       ),
@@ -1027,8 +1076,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             // stop tap is exempted inside RespinButton, so
                             // the player can always abort an active autoplay
                             // run even while a celebration is on screen.
-                            spinning:
-                                _viewModel.isBusy || _isCelebrationActive,
+                            spinning: _viewModel.isBusy || _isCelebrationActive,
                             disabled: _isBigWinShowing,
                             autoSpinsRemaining: autoActive
                                 ? _viewModel.autoSpinsRemaining
