@@ -128,7 +128,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
 
                   Positioned(
-                    top: screenH * 0.71,
+                    bottom: screenH * 0.14,
+                    left: screenW * 0.15,
+                    right: screenW * 0.15,
+                    child: Center(
+                      child: AnimatedImageButton(
+                        imagePath: 'lib/images/register_screen/image.png',
+                        width: 540,
+                        height: 90,
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  Positioned(
+                    top: screenH * 0.695,
                     left: screenW * 0.21,
                     right: screenW * 0.21,
                     child: Center(
@@ -139,27 +160,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 _viewModel.register();
                               },
                             ),
-                    ),
-                  ),
-
-                  Positioned(
-                    bottom: screenH * 0.015,
-                    left: screenW * 0.15,
-                    right: screenW * 0.15,
-                    child: Center(
-                      child: AnimatedImageButton(
-                        imagePath: 'lib/images/register_screen/image.png',
-                        width: 580,
-                        height: 260,
-                        onTap: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                 ],
