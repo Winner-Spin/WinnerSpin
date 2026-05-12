@@ -112,17 +112,18 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                   Positioned(
                     top: screenH * 0.34,
-                    left: screenW * 0.14,
-                    right: screenW * 0.14,
+                    left: screenW * 0.13,
+                    right: screenW * 0.13,
                     child: _buildCustomTextField(
                       context: context,
                       controller: _viewModel.nameController,
                       icon: Icons.star,
                       hint: 'Username',
                       backgroundImage:
-                          'lib/images/register_screen/ad_soyad_button_dark.png',
-                      leadingSpace: 60,
+                          'lib/images/register_screen/Ad_Soyad_button.png',
+                      leadingSpace: 64,
                       contentPadding: const EdgeInsets.only(top: 4),
+                      backgroundScaleY: 1.58,
                     ),
                   ),
 
@@ -305,16 +306,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     bool obscureText = false,
     double leadingSpace = 64,
     EdgeInsetsGeometry contentPadding = EdgeInsets.zero,
+    double backgroundScaleY = 1,
   }) {
-    return Container(
-      height: 60,
+    final fieldContent = Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(backgroundImage),
-          fit: BoxFit.fill,
-        ),
-      ),
       child: Row(
         children: [
           SizedBox(width: leadingSpace),
@@ -349,6 +344,40 @@ class _RegisterScreenState extends State<RegisterScreen>
           ),
           const SizedBox(width: 16),
         ],
+      ),
+    );
+
+    if (backgroundScaleY == 1) {
+      return Container(
+        height: 60,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(backgroundImage),
+            fit: BoxFit.fill,
+          ),
+        ),
+        child: fieldContent,
+      );
+    }
+
+    return SizedBox(
+      height: 60,
+      child: ClipRect(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Transform.scale(
+                scaleY: backgroundScaleY,
+                child: Image.asset(
+                  backgroundImage,
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+            Positioned.fill(child: fieldContent),
+          ],
+        ),
       ),
     );
   }
