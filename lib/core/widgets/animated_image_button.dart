@@ -6,6 +6,7 @@ class AnimatedImageButton extends StatefulWidget {
   final VoidCallback onTap;
   final String imagePath;
   final double width;
+  final double? height;
   final bool isStrikeThrough;
 
   const AnimatedImageButton({
@@ -13,6 +14,7 @@ class AnimatedImageButton extends StatefulWidget {
     required this.onTap,
     required this.imagePath,
     required this.width,
+    this.height,
     this.isStrikeThrough = false,
   });
 
@@ -66,7 +68,9 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
             Image.asset(
               widget.imagePath,
               width: widget.width,
+              height: widget.height,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
             if (widget.isStrikeThrough)
               Transform.rotate(

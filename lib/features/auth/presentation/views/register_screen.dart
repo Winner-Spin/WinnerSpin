@@ -143,13 +143,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
 
                   Positioned(
-                    bottom: screenH * 0.12,
+                    bottom: screenH * 0.015,
                     left: screenW * 0.15,
                     right: screenW * 0.15,
                     child: Center(
                       child: AnimatedImageButton(
                         imagePath: 'lib/images/register_screen/image.png',
-                        width: 250,
+                        width: 580,
+                        height: 260,
                         onTap: () {
                           Navigator.pushReplacement(
                             context,
