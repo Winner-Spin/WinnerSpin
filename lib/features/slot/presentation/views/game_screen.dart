@@ -1821,8 +1821,8 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     // Dense grid of cupcakes that blankets the entire screen.
     // We tile a grid from edge to edge and jitter each cell slightly
     // so the result feels organic rather than mechanical.
-    const int cols = 9;
-    const int rows = 14;
+    const int cols = 13;
+    const int rows = 20;
     const double cellSize = 0.16; // base cupcake size as fraction of width
 
     final List<Widget> cupcakes = [];
