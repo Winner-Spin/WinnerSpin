@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 
 class AutoPlaySettingsScreen extends StatefulWidget {
@@ -13,6 +16,10 @@ class AutoPlaySettingsScreen extends StatefulWidget {
 }
 
 class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
+  static const Color _panelColor = Color(0xFFF0CDE6);
+  static const Color _panelAccent = Color(0xFFE2BED8);
+  static const Color _textColor = Color(0xFF2C2530);
+
   static const List<int> _spinCounts = [
     10,
     20,
@@ -45,43 +52,53 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(color: Colors.transparent),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: GestureDetector(
+                onTap: () {
+                  UiClickSound.play();
+                  Navigator.of(context).pop();
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
           ),
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 18),
                 Expanded(
                   child: Align(
                     alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.48,
+                        maxWidth: MediaQuery.of(context).size.width * 0.92,
+                        maxHeight: MediaQuery.of(context).size.height * 0.46,
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.93),
+                          color: _panelColor,
+                          borderRadius: BorderRadius.circular(26),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 20,
-                              spreadRadius: 2,
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 28,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: ClipRRect(
+                          borderRadius: BorderRadius.circular(26),
                           child: Column(
                             children: [
                               _buildHeader(context),
                               Expanded(
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    76,
-                                    20,
+                                    22,
+                                    42,
+                                    22,
                                     24,
                                   ),
                                   child: Column(
@@ -94,7 +111,7 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
                                         style: GoogleFonts.barlowCondensed(
                                           fontSize: 24,
                                           fontWeight: FontWeight.w900,
-                                          color: Colors.white,
+                                          color: _textColor,
                                         ),
                                       ),
                                       const SizedBox(height: 16),
@@ -112,7 +129,7 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
               ],
             ),
           ),
@@ -123,42 +140,41 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+      height: 74,
+      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6D7EB),
+        border: Border(
+          bottom: BorderSide(color: _textColor.withValues(alpha: 0.10)),
+        ),
+      ),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'AUTOMATIC PLAY SETTINGS',
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFFE5A800),
-                  letterSpacing: 1.2,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.8),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text(
+            'AUTO SPIN',
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              color: _textColor,
+              letterSpacing: 1.2,
+            ),
           ),
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.close,
-                  size: 30,
-                  color: Colors.white.withValues(alpha: 0.82),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _panelAccent.withValues(alpha: 0.88),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.close, size: 30, color: _textColor),
               ),
             ),
           ),
@@ -174,7 +190,12 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
         final disabled =
             widget.viewModel.isBusy || widget.viewModel.isAutoSpinning;
         return GestureDetector(
-          onTap: disabled ? null : _startAutoPlay,
+          onTap: disabled
+              ? null
+              : () {
+                  UiClickSound.play();
+                  _startAutoPlay();
+                },
           child: Opacity(
             opacity: disabled ? 0.55 : 1,
             child: Container(
@@ -218,7 +239,7 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: const Color(0xFF00C76A),
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.34),
+              inactiveTrackColor: _textColor.withValues(alpha: 0.18),
               trackHeight: 3,
               thumbColor: const Color(0xFF00C76A),
               overlayColor: const Color(0xFF00C76A).withValues(alpha: 0.18),
@@ -244,7 +265,7 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
             style: GoogleFonts.barlowCondensed(
               fontSize: 24,
               fontWeight: FontWeight.w900,
-              color: Colors.white,
+              color: _textColor,
             ),
           ),
         ),

@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/widgets/money_text.dart';
+import '../../audio/ui_click_sound.dart';
+
 /// Row of [+ / current bet / -] controls.
 class BetControls extends StatelessWidget {
   final double betAmount;
@@ -58,11 +61,14 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
   Timer? _periodicTimer;
 
   void _startTimer() {
+    UiClickSound.play();
     widget.onTap(); // Tetiklemeyi anında yap
     if (!widget.enableLongPress) return;
 
     _initialDelayTimer = Timer(const Duration(milliseconds: 400), () {
-      _periodicTimer = Timer.periodic(const Duration(milliseconds: 80), (timer) {
+      _periodicTimer = Timer.periodic(const Duration(milliseconds: 80), (
+        timer,
+      ) {
         widget.onTap();
       });
     });
@@ -101,7 +107,9 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
             stops: [0.0, 0.4, 1.0],
           ),
           border: Border.all(
-            color: const Color(0xFFF3E5F5).withValues(alpha: 0.6), // Inner reflection
+            color: const Color(
+              0xFFF3E5F5,
+            ).withValues(alpha: 0.6), // Inner reflection
             width: 1.5,
           ),
           boxShadow: [
@@ -118,9 +126,18 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
             ),
           ],
         ),
-        child: Icon(widget.icon, color: Colors.white, size: 22, shadows: const [
-          Shadow(color: Color(0xFF311B92), offset: Offset(0, 1), blurRadius: 1),
-        ]),
+        child: Icon(
+          widget.icon,
+          color: Colors.white,
+          size: 22,
+          shadows: const [
+            Shadow(
+              color: Color(0xFF311B92),
+              offset: Offset(0, 1),
+              blurRadius: 1,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -148,7 +165,9 @@ class _BetDisplay extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFFE1BEE7).withValues(alpha: 0.6), // Inner reflection
+          color: const Color(
+            0xFFE1BEE7,
+          ).withValues(alpha: 0.6), // Inner reflection
           width: 1.5,
         ),
         boxShadow: [
@@ -168,28 +187,48 @@ class _BetDisplay extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'BAHİS',
+            'BET',
             style: GoogleFonts.outfit(
               color: const Color(0xFFF3E5F5),
               fontSize: 10,
               fontWeight: FontWeight.w800,
               letterSpacing: 2,
               shadows: const [
-                Shadow(color: Color(0xFF311B92), offset: Offset(0, 1), blurRadius: 1),
+                Shadow(
+                  color: Color(0xFF311B92),
+                  offset: Offset(0, 1),
+                  blurRadius: 1,
+                ),
               ],
             ),
           ),
-          Text(
-            '₺${amount.toStringAsFixed(0)}',
+          MoneyText(
+            text: amount.toStringAsFixed(0),
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w900,
               shadows: const [
-                Shadow(color: Color(0xFF311B92), offset: Offset(0, 1.5), blurRadius: 1),
-                Shadow(color: Color(0xFF311B92), offset: Offset(0, -1), blurRadius: 1),
-                Shadow(color: Color(0xFF311B92), offset: Offset(1, 0), blurRadius: 1),
-                Shadow(color: Color(0xFF311B92), offset: Offset(-1, 0), blurRadius: 1),
+                Shadow(
+                  color: Color(0xFF311B92),
+                  offset: Offset(0, 1.5),
+                  blurRadius: 1,
+                ),
+                Shadow(
+                  color: Color(0xFF311B92),
+                  offset: Offset(0, -1),
+                  blurRadius: 1,
+                ),
+                Shadow(
+                  color: Color(0xFF311B92),
+                  offset: Offset(1, 0),
+                  blurRadius: 1,
+                ),
+                Shadow(
+                  color: Color(0xFF311B92),
+                  offset: Offset(-1, 0),
+                  blurRadius: 1,
+                ),
               ],
             ),
           ),

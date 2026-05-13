@@ -1,10 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 
+import '../../../../core/widgets/money_text.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../../domain/models/slot_symbol.dart';
 import '../../domain/enums/symbol_tier.dart';
+import '../audio/ui_click_sound.dart';
 import 'widgets/multiplier_bomb_animation.dart';
 import 'widgets/multiplier_label.dart';
 
@@ -21,6 +25,10 @@ class GameRulesScreen extends StatefulWidget {
 }
 
 class _GameRulesScreenState extends State<GameRulesScreen> {
+  static const Color _panelColor = Color(0xFFF0CDE6);
+  static const Color _panelAccent = Color(0xFFE2BED8);
+  static const Color _textColor = Color(0xFF2C2530);
+
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -35,37 +43,45 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Dimmed backdrop without blur
           Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(color: Colors.transparent),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: GestureDetector(
+                onTap: () {
+                  UiClickSound.play();
+                  Navigator.of(context).pop();
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
           ),
-          // Content card
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 18),
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.81,
+                        maxWidth: MediaQuery.of(context).size.width * 0.92,
+                        maxHeight: MediaQuery.of(context).size.height * 0.84,
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.93),
+                          color: _panelColor,
+                          borderRadius: BorderRadius.circular(26),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 20,
-                              spreadRadius: 2,
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 28,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: ClipRRect(
+                          borderRadius: BorderRadius.circular(26),
                           child: Column(
                             children: [
                               _buildHeader(context),
@@ -73,18 +89,18 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                                 child: RawScrollbar(
                                   controller: _scrollController,
                                   thumbVisibility: true,
-                                  thumbColor: Colors.white.withValues(
-                                    alpha: 0.3,
+                                  thumbColor: _textColor.withValues(
+                                    alpha: 0.25,
                                   ),
                                   thickness: 4,
                                   radius: const Radius.circular(8),
                                   child: SingleChildScrollView(
                                     controller: _scrollController,
                                     padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      10,
+                                      18,
+                                      20,
+                                      18,
+                                      18,
                                     ),
                                     child: Column(
                                       children: [
@@ -105,7 +121,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
               ],
             ),
           ),
@@ -117,30 +133,41 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
   /// Header with title and close button.
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+      height: 74,
+      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6D7EB),
+        border: Border(
+          bottom: BorderSide(color: _textColor.withValues(alpha: 0.10)),
+        ),
+      ),
       child: Stack(
         alignment: Alignment.center,
         children: [
           Text(
-            'GAME RULES',
+            'OYUN KURALLARI',
             style: GoogleFonts.barlowCondensed(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              color: _textColor,
               letterSpacing: 1.2,
             ),
           ),
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.close,
-                  size: 30,
-                  color: Colors.white.withValues(alpha: 0.82),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _panelAccent.withValues(alpha: 0.88),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.close, size: 30, color: _textColor),
               ),
             ),
           ),
@@ -260,13 +287,13 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
   /// Bottom description text explaining the payout mechanics.
   Widget _buildRulesDescription() {
     return Text(
-      'Symbols pay anywhere on the screen. At the end of a spin, '
-      'the total count of the same symbol on the screen determines the win value.',
+      'Symbols pay anywhere on the 6x5 grid. Each tumble checks the total '
+      'number of matching regular symbols on the screen and pays when 8 or more are present.',
       textAlign: TextAlign.center,
       style: GoogleFonts.nunito(
         fontSize: 12.5,
         fontWeight: FontWeight.w600,
-        color: Colors.white,
+        color: _textColor.withValues(alpha: 0.88),
         height: 1.3,
       ),
     );
@@ -292,30 +319,39 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         _buildText('This is the SCATTER symbol.'),
-        _buildText('The SCATTER symbol appears on all reels.'),
-        _buildText('SCATTER pays in any position.'),
+        _buildText('SCATTER can land anywhere on the grid.'),
+        _buildText(
+          'SCATTER pays by total count after all tumbles are complete.',
+        ),
         const SizedBox(height: 16),
-        _buildSectionTitle('ANTE BET'),
+        _buildSectionTitle('DOUBLE CHANCE'),
         _buildText(
-          'The player has the option to choose a bet multiplier. Depending on the selected bet type, the game behaves differently. Possible values:',
+          'Double Chance increases the cost of a base spin to 1.25x the selected bet.',
         ),
         _buildText(
-          '20x bet multiplier: grants the ability to BUY FREE SPINS ROUND by paying a value equal to 100x total bet.',
+          'When Double Chance is active, the chance of naturally triggering FREE SPINS is doubled.',
+        ),
+        _buildText('BUY FEATURE is disabled while Double Chance is active.'),
+
+        const SizedBox(height: 16),
+        _buildSectionTitle('BUY FEATURE'),
+        _buildText(
+          'BUY FEATURE starts a FREE SPINS round immediately for 100x the selected bet.',
         ),
         _buildText(
-          '25x bet multiplier: the chance of naturally winning free spins doubles. More SCATTER symbols appear on the reels. BUY FREE SPINS FEATURE is disabled.',
+          'Bought FREE SPINS rounds start with 10 free spins and use the same tumble and multiplier rules.',
         ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('TUMBLE FEATURE'),
         _buildText(
-          'TUMBLE FEATURE means that after each spin, winning combinations are paid and winning symbols disappear. Remaining symbols fall to the bottom of the screen and empty positions are replaced with symbols coming from above.',
+          'After a winning tumble, all winning regular symbols pop and disappear. The remaining symbols fall down and empty positions are filled from above.',
         ),
         _buildText(
           'Tumbling continues until no new combination appears as a result of a tumble. There is no limit to the number of possible tumbles.',
         ),
         _buildText(
-          'All wins are added to the player\'s balance after all tumbles from a base spin have been played.',
+          'All tumble wins from the spin are added together before any final multiplier is applied.',
         ),
 
         const SizedBox(height: 16),
@@ -325,7 +361,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         ),
         _buildText('The round starts with 10 free spins.'),
         _buildText(
-          'During the FREE SPINS ROUND, when 3 or more SCATTER symbols are caught, 5 additional free spins are awarded.',
+          'During FREE SPINS, 3 or more SCATTER symbols award 5 additional free spins.',
         ),
 
         const SizedBox(height: 12),
@@ -334,17 +370,19 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
         _buildTextWithBomb(
           'This is the MULTIPLIER symbol. It',
-          ' only appears on the reels during the FREE SPINS ROUND and remains on the screen until the end of the tumble process.',
+          ' can land in base spins and FREE SPINS. Multipliers stay on the grid until the tumble process ends.',
         ),
         _buildTextWithBomb(
           'When a ',
-          ' symbol lands, it takes a random multiplier value of 2x, 3x, 4x, 5x, 6x, 8x, 10x, 12x, 15x, 20x, 25x, 50x or 100x.',
+          ' symbol lands, it can show 2x, 3x, 5x, 10x, 25x, 50x or 100x.',
         ),
         _buildTextWithBomb(
           'When the tumble process ends, the values of all ',
-          ' symbols on the screen are added together and the total win of the process is multiplied by the final value.',
+          ' symbols left on the screen are added together. If there was a regular symbol win, the tumble win total is multiplied by that sum.',
         ),
-        _buildText('Special reels are in play during FREE SPINS ROUNDS.'),
+        _buildText(
+          'During FREE SPINS, multiplier symbols appear more often. Bought FREE SPINS and Double Chance-triggered rounds may scale the final multiplier value differently.',
+        ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('GAME RULES'),
@@ -353,9 +391,11 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           'Medium volatility games pay regularly and the payout range can vary from low to very high.',
         ),
         _buildText('Symbols pay anywhere.'),
-        _buildText('All wins are multiplied by the base bet.'),
         _buildText(
-          'All values are expressed in terms of actual coin winnings.',
+          'Regular symbol and SCATTER payouts are multiplied by the selected bet.',
+        ),
+        _buildText(
+          'Multiplier symbols do not pay by themselves; they multiply regular tumble wins.',
         ),
         _buildText(
           'When winning with multiple symbols, all wins are added to the total win.',
@@ -364,22 +404,24 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         _buildText(
           'Free spin total winnings history includes the total winnings of the series.',
         ),
-        _buildText(
-          'Maximum RTP of this game is 95.5%\nMinimum RTP of this game is 95.45%',
-        ),
+        _buildText('Target RTP of this game is 96.5%.'),
         _buildText(
           'SPACE and ENTER keys on the keyboard can be used to start and stop the spin.\nMalfunction voids all pays and plays.',
         ),
         const SizedBox(height: 8),
-        _buildText('MINIMUM BET: 0.20 \$\nMAXIMUM BET: 125.00 \$'),
+        _buildBetLimitsText(),
 
         const SizedBox(height: 16),
         _buildSectionTitle('HOW TO PLAY'),
-        _buildText('Click the 🪙 button to open the bet menu.'),
         _buildText(
-          'Select your bet by adjusting the values using the ➕ and ➖ buttons.',
+          'Open BET SETTINGS from the menu to change the selected bet.',
         ),
-        _buildText('Press the SPIN button to play.'),
+        _buildText(
+          'Use the plus and minus controls to choose one of the available bet levels.',
+        ),
+        _buildText(
+          'Press SPIN to play. During FREE SPINS, spins do not charge the balance.',
+        ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('MENU'),
@@ -394,16 +436,18 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         _buildText(
           'BATTERY SAVER: helps reduce the game\'s battery consumption and may help prevent the device from overheating during long gaming sessions.',
         ),
-        _buildText('SOUND: turns sound and music on and off.'),
+        _buildText(
+          'MUSIC and SOUND EFFECTS can be turned on and off separately.',
+        ),
         _buildIconTextRow(Icons.open_in_new, 'opens the game history page.'),
         _buildIconTextRow(Icons.info_outline, 'opens the info page.'),
         _buildText(
-          'CREDIT and BET labels show the current balance and the current total bet. Click the labels to switch between coin view and money view.',
+          'CREDIT and BET labels show the current virtual balance and the current total virtual bet. Click the labels to switch between compact and detailed coin display.',
         ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('MENU'),
-        _buildIconTextRow(Icons.autorenew, 'starts the game.'),
+        _buildIconTextRow(Icons.autorenew, 'starts a spin or stops auto spin.'),
         _buildIconTextRow(
           Icons.play_circle_outline,
           'opens the auto play menu.',
@@ -411,18 +455,16 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
         const SizedBox(height: 16),
         _buildSectionTitle('INFO SCREEN'),
-        _buildText(
-          'Drag the pages up and down to navigate between info pages.',
-        ),
+        _buildText('Scroll up and down to read the game rules.'),
         _buildIconTextRow(Icons.close, 'closes the info screen.'),
 
         const SizedBox(height: 16),
         _buildSectionTitle('BET MENU'),
         _buildText(
-          'The bet menu shows the available bet multiplier and the current total bet in both coins and cash.',
+          'BET SETTINGS shows the selected bet and the current total spin cost.',
         ),
         _buildText(
-          'Use the ➕ and ➖ buttons in the BET and COIN VALUE fields to change values.',
+          'Use the plus and minus buttons to move through the available bet levels.',
         ),
       ],
     );
@@ -435,7 +477,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: _textColor.withValues(alpha: 0.34),
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -448,7 +490,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
               style: GoogleFonts.barlowCondensed(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: _textColor,
                 letterSpacing: 1.0,
               ),
             ),
@@ -459,7 +501,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                 5,
                 (index) => const Icon(
                   Icons.flash_on,
-                  color: Color(0xFFFFD700), // Gold/Yellow color
+                  color: Color(0xFFD19A00),
                   size: 16,
                 ),
               ),
@@ -479,7 +521,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         style: GoogleFonts.barlowCondensed(
           fontSize: 17,
           fontWeight: FontWeight.w800,
-          color: Colors.white,
+          color: _textColor,
           letterSpacing: 1.0,
         ),
       ),
@@ -495,10 +537,40 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         style: GoogleFonts.nunito(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
-          color: Colors.white.withValues(alpha: 0.9),
+          color: _textColor.withValues(alpha: 0.88),
           height: 1.3,
         ),
       ),
+    );
+  }
+
+  Widget _buildBetLimitsText() {
+    final style = GoogleFonts.nunito(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: _textColor.withValues(alpha: 0.88),
+      height: 1.3,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        children: [
+          _buildMoneyLine('MINIMUM BET:', '10.00', style),
+          _buildMoneyLine('MAXIMUM BET:', '5000.00', style),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMoneyLine(String label, String amount, TextStyle style) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: style),
+        const SizedBox(width: 4),
+        MoneyText(text: amount, style: style),
+      ],
     );
   }
 
@@ -540,7 +612,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           style: GoogleFonts.nunito(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.9),
+            color: _textColor.withValues(alpha: 0.88),
             height: 1.3,
           ),
           children: [
@@ -565,7 +637,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 18),
+          Icon(icon, color: _textColor, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -574,7 +646,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
               style: GoogleFonts.nunito(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.9),
+                color: _textColor.withValues(alpha: 0.88),
                 height: 1.3,
               ),
             ),
@@ -622,7 +694,7 @@ class _SymbolPayoutCard extends StatelessWidget {
         final multiplier = payouts[threshold]!;
         final payout = multiplier * betAmount;
         final rangeText = symbol.isScatter
-            ? '$threshold'
+            ? _getScatterRangeText(threshold, sortedThresholds)
             : _getRangeText(threshold, sortedThresholds);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 0),
@@ -659,14 +731,22 @@ class _SymbolPayoutCard extends StatelessWidget {
     return '$threshold - ${nextHigher - 1}';
   }
 
+  String _getScatterRangeText(int threshold, List<int> sortedThresholds) {
+    return sortedThresholds.indexOf(threshold) == 0
+        ? '$threshold+'
+        : '$threshold';
+  }
+
   String _formatPayout(double value) {
     // Format with two decimals, using comma as decimal separator
     final parts = value.toStringAsFixed(2).split('.');
-    return '${parts[0]},${parts[1]} ₺';
+    return '${parts[0]},${parts[1]}';
   }
 }
 
 class _PayoutRow extends StatelessWidget {
+  static const Color _textColor = Color(0xFF2C2530);
+
   final String range;
   final String value;
 
@@ -683,17 +763,17 @@ class _PayoutRow extends StatelessWidget {
           style: GoogleFonts.barlowCondensed(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.85),
+            color: _textColor.withValues(alpha: 0.90),
             height: 1.2,
           ),
         ),
         const SizedBox(width: 4),
-        Text(
-          value,
+        MoneyText(
+          text: value,
           style: GoogleFonts.barlowCondensed(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.85),
+            color: _textColor.withValues(alpha: 0.90),
             height: 1.2,
           ),
         ),

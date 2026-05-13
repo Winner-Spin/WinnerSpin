@@ -189,11 +189,12 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
         final double size;
         if (!_settle.isCompleted) {
           final s = _settleT.value;
-          size = widget.startSize *
+          size =
+              widget.startSize *
               (widget.punchScale + (1.0 - widget.punchScale) * s);
         } else {
-          size = widget.startSize +
-              (widget.endSize - widget.startSize) * flightT;
+          size =
+              widget.startSize + (widget.endSize - widget.startSize) * flightT;
         }
 
         final opacity = !_settle.isCompleted
@@ -353,34 +354,34 @@ class _SettleEffectPainter extends CustomPainter {
     haloAlpha = haloAlpha.clamp(0.0, 1.0);
 
     final haloPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFFFE082).withValues(alpha: 0.65 * haloAlpha),
-          const Color(0xFFFF80AB).withValues(alpha: 0.40 * haloAlpha),
-          const Color(0x00FF80AB),
-        ],
-        stops: const [0.0, 0.55, 1.0],
-      ).createShader(Rect.fromCircle(
-        center: Offset(cx, cy),
-        radius: maxRadius * 0.95,
-      ));
+      ..shader =
+          RadialGradient(
+            colors: [
+              const Color(0xFFFFE082).withValues(alpha: 0.65 * haloAlpha),
+              const Color(0xFFFF80AB).withValues(alpha: 0.40 * haloAlpha),
+              const Color(0x00FF80AB),
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ).createShader(
+            Rect.fromCircle(center: Offset(cx, cy), radius: maxRadius * 0.95),
+          );
     canvas.drawCircle(Offset(cx, cy), maxRadius * 0.95, haloPaint);
 
     // Central white flash — punchy, decays fast.
     final flashAlpha = (1.0 - progress * 1.6).clamp(0.0, 1.0);
     if (flashAlpha > 0) {
       final flashPaint = Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.95 * flashAlpha),
-            Colors.white.withValues(alpha: 0.55 * flashAlpha),
-            const Color(0x00FFFFFF),
-          ],
-          stops: const [0.0, 0.35, 1.0],
-        ).createShader(Rect.fromCircle(
-          center: Offset(cx, cy),
-          radius: maxRadius * 0.7,
-        ));
+        ..shader =
+            RadialGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.95 * flashAlpha),
+                Colors.white.withValues(alpha: 0.55 * flashAlpha),
+                const Color(0x00FFFFFF),
+              ],
+              stops: const [0.0, 0.35, 1.0],
+            ).createShader(
+              Rect.fromCircle(center: Offset(cx, cy), radius: maxRadius * 0.7),
+            );
       canvas.drawCircle(Offset(cx, cy), maxRadius * 0.7, flashPaint);
     }
 
@@ -393,18 +394,18 @@ class _SettleEffectPainter extends CustomPainter {
       final radius = s.size * (1.0 - progress * 0.4);
 
       final glow = Paint()
-        ..shader = RadialGradient(
-          colors: [
-            s.color.withValues(alpha: fade * 0.85),
-            s.color.withValues(alpha: 0),
-          ],
-        ).createShader(
-          Rect.fromCircle(center: Offset(px, py), radius: radius * 2.2),
-        );
+        ..shader =
+            RadialGradient(
+              colors: [
+                s.color.withValues(alpha: fade * 0.85),
+                s.color.withValues(alpha: 0),
+              ],
+            ).createShader(
+              Rect.fromCircle(center: Offset(px, py), radius: radius * 2.2),
+            );
       canvas.drawCircle(Offset(px, py), radius * 2.2, glow);
 
-      final core = Paint()
-        ..color = Colors.white.withValues(alpha: fade * 0.95);
+      final core = Paint()..color = Colors.white.withValues(alpha: fade * 0.95);
       canvas.drawCircle(Offset(px, py), radius * 0.55, core);
     }
   }

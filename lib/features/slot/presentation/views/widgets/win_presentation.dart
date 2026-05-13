@@ -46,6 +46,8 @@ class WinPresentation extends StatefulWidget {
 
   /// Forwards to [WinSequenceBar.formulaOnly] — see there.
   final bool formulaOnly;
+  final bool soundEnabled;
+  final bool vibrationEnabled;
 
   /// Optional externally-supplied flight target. If provided, the
   /// multiplier collect flights aim at this key's render rect instead
@@ -67,6 +69,8 @@ class WinPresentation extends StatefulWidget {
     this.onMultiplierLifted,
     this.controller,
     this.formulaOnly = false,
+    this.soundEnabled = true,
+    this.vibrationEnabled = false,
     this.flightTargetKey,
   });
 
@@ -240,6 +244,7 @@ class _WinPresentationState extends State<WinPresentation> {
       cellCenter: start,
       cellSize: cellSize,
       multiplierValue: landing.value,
+      soundEnabled: widget.soundEnabled,
       onBlast: () {
         if (!blastCompleter.isCompleted) blastCompleter.complete();
       },
@@ -291,6 +296,7 @@ class _WinPresentationState extends State<WinPresentation> {
         accentStyle: widget.accentStyle,
         sumAnchorKey: _sumAnchorKey,
         formulaOnly: widget.formulaOnly,
+        vibrationEnabled: widget.vibrationEnabled,
       ),
     );
   }

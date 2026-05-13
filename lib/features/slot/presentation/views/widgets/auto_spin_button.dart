@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../audio/ui_click_sound.dart';
+
 class AutoSpinButton extends StatefulWidget {
   final VoidCallback? onTap;
   final double width;
@@ -38,7 +40,12 @@ class _AutoSpinButtonState extends State<AutoSpinButton> {
       onTapDown: disabled ? null : (_) => _setPressed(true),
       onTapUp: disabled ? null : (_) => _setPressed(false),
       onTapCancel: disabled ? null : () => _setPressed(false),
-      onTap: widget.onTap,
+      onTap: disabled
+          ? null
+          : () {
+              UiClickSound.play();
+              widget.onTap?.call();
+            },
       child: Opacity(
         opacity: disabled ? 0.48 : 1,
         child: AnimatedScale(

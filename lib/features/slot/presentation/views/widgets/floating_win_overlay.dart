@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/widgets/money_text.dart';
 import '../../../domain/models/cluster_win.dart';
 
 /// Overlay that renders explosion particles and floating win amounts
@@ -70,7 +71,10 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   }
 
   void _spawnEffects(
-    List<ClusterWin> wins, double gridW, double gridH, int speed,
+    List<ClusterWin> wins,
+    double gridW,
+    double gridH,
+    int speed,
   ) {
     for (final win in wins) {
       double sumC = 0, sumR = 0;
@@ -91,25 +95,29 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       for (int i = 0; i < 30; i++) {
         final angle = _rng.nextDouble() * 2 * pi;
         final v = (_rng.nextDouble() * 2.5 + 0.8) * speed;
-        particles.add(_Particle(
-          vx: cos(angle) * v,
-          vy: sin(angle) * v,
-          size: _rng.nextDouble() * 5 + 2,
-          color: _rng.nextBool()
-              ? const Color(0xFFFFFF00)
-              : const Color(0xFFFFAB40),
-        ));
+        particles.add(
+          _Particle(
+            vx: cos(angle) * v,
+            vy: sin(angle) * v,
+            size: _rng.nextDouble() * 5 + 2,
+            color: _rng.nextBool()
+                ? const Color(0xFFFFFF00)
+                : const Color(0xFFFFAB40),
+          ),
+        );
       }
 
       final durationMs = (1200 ~/ speed).clamp(350, 1200);
-      _effects.add(_WinEffect(
-        cx: cx,
-        cy: cy,
-        amount: win.amount,
-        particles: particles,
-        totalMs: durationMs,
-        startTime: DateTime.now(),
-      ));
+      _effects.add(
+        _WinEffect(
+          cx: cx,
+          cy: cy,
+          amount: win.amount,
+          particles: particles,
+          totalMs: durationMs,
+          startTime: DateTime.now(),
+        ),
+      );
     }
 
     // Ensure ticker is running.
@@ -231,11 +239,14 @@ class _EffectPainter extends CustomPainter {
         scale = 1.0;
       }
 
-      final text = '₺${e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}';
+      final text = e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+      final fontSize = (style.fontSize ?? 28) * scale;
+      final symbolSize = Size(fontSize * 0.74, fontSize * 1.04);
+      final symbolSpacing = 1.5 * scale;
 
       // Draw text outline (dark stroke for readability)
       final strokeStyle = style.copyWith(
-        fontSize: (style.fontSize ?? 28) * scale,
+        fontSize: fontSize,
         foreground: Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 4.0
@@ -244,7 +255,7 @@ class _EffectPainter extends CustomPainter {
       );
 
       final fillStyle = style.copyWith(
-        fontSize: (style.fontSize ?? 28) * scale,
+        fontSize: fontSize,
         color: style.color?.withValues(alpha: textOpacity),
         shadows: [
           Shadow(
@@ -265,7 +276,28 @@ class _EffectPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final textX = e.cx - strokeTp.width / 2;
+      final contentWidth = symbolSize.width + symbolSpacing + strokeTp.width;
+      final startX = e.cx - contentWidth / 2;
+      final symbolY = textY + (strokeTp.height - symbolSize.height) / 2 + 1.1;
+      final textX = startX + symbolSize.width + symbolSpacing;
+
+      canvas.save();
+      canvas.translate(startX, symbolY);
+      MoneySymbolPainter(
+        style: strokeStyle,
+        lineYOffset: 1.45,
+        lineTopExtend: 0.9,
+      ).paint(canvas, symbolSize);
+      canvas.restore();
+
+      canvas.save();
+      canvas.translate(startX, symbolY);
+      MoneySymbolPainter(
+        style: fillStyle.copyWith(shadows: const []),
+        lineYOffset: 1.45,
+        lineTopExtend: 0.9,
+      ).paint(canvas, symbolSize);
+      canvas.restore();
 
       strokeTp.paint(canvas, Offset(textX, textY));
       fillTp.paint(canvas, Offset(textX, textY));

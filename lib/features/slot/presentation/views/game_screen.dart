@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/format/money_format.dart';
+import '../../../../core/widgets/money_text.dart';
 
 import '../../domain/models/cluster_win.dart';
 import '../../domain/models/symbol_registry.dart';
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
@@ -106,10 +112,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // sees a distinct entry moment instead of an instant backdrop swap.
   bool _wasInFreeSpins = false;
   bool _showFreeSpinTransition = false;
+  Object? _lastFreeSpinAwardPopupResult;
   Timer? _freeSpinTransitionTimer;
+  OverlayEntry? _freeSpinWinPopupEntry;
+  int _fsAwardedThisRound = 0;
+  _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
+  bool _fsSummaryPopupVisible = false;
 
   // True while the tumble-win sprite is in flight toward the Kazanç
-  // readout. The middle band drops to ₺0 for the duration so the
+  // readout. The middle band drops to zero for the duration so the
   // value visually leaves TUMBLE WIN as it arrives at Kazanç. Once
   // the sprite lands the flag flips back, restoring the multiplied
   // total in the middle so the player still sees the spin's win
@@ -167,6 +178,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       (_) => SlotReelController(),
     );
     WidgetsBinding.instance.addObserver(this);
+    UiClickSound.enabled = _viewModel.soundEffects;
+    unawaited(UiClickSound.preload());
     _viewModel.addListener(_onViewModelChange);
     // The ViewModel itself doesn't notify after `awardWin` — that
     // path only fires on the balance controller. Listen there too so
@@ -206,6 +219,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
         context,
       );
+      precacheImage(
+        const AssetImage(
+          'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png',
+        ),
+        context,
+      );
+      unawaited(_maybeShowFirstLaunchDisclaimer());
     });
 
     final softShadow = [
@@ -262,7 +282,48 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<File> _firstLaunchDisclaimerFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/first_launch_disclaimer_seen.txt');
+  }
+
+  Future<void> _maybeShowFirstLaunchDisclaimer() async {
+    try {
+      final file = await _firstLaunchDisclaimerFile();
+      if (await file.exists()) return;
+      if (!mounted) return;
+      await showGeneralDialog<void>(
+        context: context,
+        barrierColor: Colors.transparent,
+        barrierDismissible: false,
+        barrierLabel: 'Disclaimer',
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, _, child) => _FirstLaunchDisclaimerDialog(
+          onOkay: () async {
+            UiClickSound.play();
+            await file.writeAsString('seen');
+            if (context.mounted) Navigator.of(context).pop();
+          },
+        ),
+        transitionBuilder: (context, anim, _, child) {
+          return FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.96, end: 1).animate(
+                CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+              ),
+              child: child,
+            ),
+          );
+        },
+      );
+    } catch (_) {
+      // If local persistence is unavailable, avoid blocking gameplay.
+    }
+  }
+
   void _onViewModelChange() {
+    UiClickSound.enabled = _viewModel.soundEffects;
     _handleLogout(context);
     _trackSpinTransitions();
     _trackLingeringCluster();
@@ -272,16 +333,61 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onFreeSpinStateChange() {
     final isInFreeSpins = _viewModel.isInFreeSpins;
+    final result = _viewModel.lastSpinResult;
+    final isNewAward =
+        result != null &&
+        result.freeSpinsTriggered &&
+        !identical(result, _lastFreeSpinAwardPopupResult);
+
     if (isInFreeSpins && !_wasInFreeSpins) {
-      _freeSpinTransitionTimer?.cancel();
-      setState(() => _showFreeSpinTransition = true);
-      _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          setState(() => _showFreeSpinTransition = false);
-        }
-      });
+      _lastFreeSpinAwardPopupResult = result;
+      final isRetrigger = result?.isRetrigger == true;
+      _startFreeSpinAwardTransition(
+        isRetrigger ? 5 : 10,
+        isRetrigger: isRetrigger,
+        winAmount: result?.totalWin ?? 0,
+      );
+    } else if (isInFreeSpins && isNewAward && result.isRetrigger) {
+      _lastFreeSpinAwardPopupResult = result;
+      _startFreeSpinAwardTransition(
+        5,
+        isRetrigger: true,
+        winAmount: result.totalWin,
+      );
     }
     _wasInFreeSpins = isInFreeSpins;
+  }
+
+  void _startFreeSpinAwardTransition(
+    int popupValue, {
+    required bool isRetrigger,
+    double winAmount = 0,
+  }) {
+    _freeSpinTransitionTimer?.cancel();
+    _fsAwardedThisRound = isRetrigger
+        ? _fsAwardedThisRound + popupValue
+        : popupValue;
+
+    if (isRetrigger) {
+      setState(() => _showFreeSpinTransition = false);
+      _pendingFreeSpinAwardPopup = _PendingFreeSpinAward(
+        value: popupValue,
+        winAmount: winAmount,
+      );
+      return;
+    }
+
+    setState(() => _showFreeSpinTransition = true);
+    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() => _showFreeSpinTransition = false);
+        _showFreeSpinWinPopup(
+          value: popupValue,
+          isRetrigger: false,
+          winAmount: winAmount,
+        );
+      }
+    });
   }
 
   void _quickStopReels() {
@@ -289,6 +395,79 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     for (final controller in _reelControllers) {
       controller.quickStop();
     }
+  }
+
+  void _showFreeSpinWinPopup({
+    required int value,
+    required bool isRetrigger,
+    required double winAmount,
+  }) {
+    _freeSpinWinPopupEntry?.remove();
+    _freeSpinWinPopupEntry = null;
+
+    final overlay = _stageOverlayKey.currentState;
+    if (overlay == null) return;
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _FreeSpinWinPopup(
+        value: value,
+        isRetrigger: isRetrigger,
+        winAmount: winAmount,
+        onDismiss: () {
+          if (_freeSpinWinPopupEntry == entry) {
+            _freeSpinWinPopupEntry = null;
+          }
+          entry.remove();
+        },
+      ),
+    );
+    _freeSpinWinPopupEntry = entry;
+    overlay.insert(entry);
+  }
+
+  void _showPendingFreeSpinAwardPopup() {
+    final pending = _pendingFreeSpinAwardPopup;
+    if (pending == null || _freeSpinWinPopupEntry != null) return;
+    _pendingFreeSpinAwardPopup = null;
+    _showFreeSpinWinPopup(
+      value: pending.value,
+      isRetrigger: true,
+      winAmount: pending.winAmount,
+    );
+  }
+
+  void _showFreeSpinSummaryPopup() {
+    if (_fsSummaryPopupVisible) return;
+    final overlay = _stageOverlayKey.currentState;
+    if (overlay == null) {
+      _viewModel.releaseFsRoundHold();
+      return;
+    }
+
+    _freeSpinWinPopupEntry?.remove();
+    _freeSpinWinPopupEntry = null;
+    _pendingFreeSpinAwardPopup = null;
+
+    setState(() => _fsSummaryPopupVisible = true);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _FreeSpinSummaryPopup(
+        totalWin: _fsAccumulatedWin,
+        totalFreeSpins: _fsAwardedThisRound,
+        onDismiss: () {
+          if (_freeSpinWinPopupEntry == entry) {
+            _freeSpinWinPopupEntry = null;
+          }
+          entry.remove();
+          if (!mounted) return;
+          setState(() => _fsSummaryPopupVisible = false);
+          _viewModel.releaseFsRoundHold();
+        },
+      ),
+    );
+    _freeSpinWinPopupEntry = entry;
+    overlay.insert(entry);
   }
 
   void _showAutoPlaySettings(BuildContext context) {
@@ -392,6 +571,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // does so big-win celebrations stay compact on the fastest
         // pacing setting.
         instantAmount: _viewModel.speedMultiplier >= 3,
+        soundEnabled: _viewModel.soundEffects,
+        vibrationEnabled: _viewModel.vibration,
         onComplete: () {
           if (_bigWinEntry == entry) {
             setState(() => _bigWinEntry = null);
@@ -498,6 +679,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       setState(() {
         _fsAccumulatedWin = 0;
         _pendingFsSpinWin = 0;
+        _fsAwardedThisRound = 0;
+        _fsSummaryPopupVisible = false;
       });
     }
     _wasInFs = isInFs;
@@ -604,6 +787,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void dispose() {
     _bigWinEntry?.remove();
     _bigWinEntry = null;
+    _freeSpinWinPopupEntry?.remove();
+    _freeSpinWinPopupEntry = null;
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _lingeringClusterTimer?.cancel();
@@ -670,7 +855,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     // Capture the start (TUMBLE WIN) and end (Kazanç) screen
-    // positions before the layout flips — once the band drops to ₺0
+    // positions before the layout flips — once the band drops to zero
     // the anchor's render rect would describe the shrunken text.
     final startBox =
         _tumbleWinAnchorKey.currentContext?.findRenderObject() as RenderBox?;
@@ -769,7 +954,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       setState(() => _celebrationLocked = false);
     }
     _viewModel.commitPendingFsConsume();
+    if (_viewModel.isInFreeSpins && _viewModel.freeSpinsRemaining == 0) {
+      _showFreeSpinSummaryPopup();
+      return;
+    }
     _viewModel.releaseFsRoundHold();
+    _showPendingFreeSpinAwardPopup();
   }
 
   void _handleLogout(BuildContext context) {
@@ -1002,6 +1192,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             _isBigWinShowing ||
                             !_viewModel.canBuyFreeSpinsForUi ||
                             _viewModel.anteBetActive,
+                        vibrationEnabled: _viewModel.vibration,
                         onTap: _promptBuyFreeSpinsConfirm,
                         width: screenW * 0.39,
                         height: screenW * 0.22,
@@ -1032,6 +1223,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             _isBigWinShowing ||
                             _viewModel.isBusy ||
                             _viewModel.isInFreeSpins,
+                        vibrationEnabled: _viewModel.vibration,
                         onTap: _viewModel.toggleAnteBet,
                         width: screenW * 0.39,
                         height: screenW * 0.22,
@@ -1249,6 +1441,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 fadingPaths: _viewModel.fadingPaths,
                 clearedPositions: _viewModel.clearedPositions,
                 speedMultiplier: _viewModel.speedMultiplier,
+                soundEffectsEnabled: _viewModel.soundEffects,
                 pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
                 onComplete: col == GameViewModel.columns - 1
                     ? () => _viewModel.onSpinComplete()
@@ -1294,7 +1487,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Text('KAZANÇ', style: _statusKazancStyle),
+          Text('WIN', style: _statusKazancStyle),
           const SizedBox(width: 6),
           Container(
             key: _kazancAnchorKey,
@@ -1302,6 +1495,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               to: _fsAccumulatedWin,
               style: _statusBaseStyle,
               duration: const Duration(milliseconds: 700),
+              vibrationEnabled: _viewModel.vibration,
             ),
           ),
         ],
@@ -1318,12 +1512,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Text('KAZANÇ', style: _statusKazancStyle),
+          Text('WIN', style: _statusKazancStyle),
           const SizedBox(width: 6),
           WinAmountCounter(
             to: liveWin,
             style: _statusBaseStyle,
             duration: const Duration(milliseconds: 900),
+            vibrationEnabled: _viewModel.vibration,
           ),
         ],
       );
@@ -1347,6 +1542,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           gridHeight: screenH * 0.32,
           baseStyle: _statusBaseStyle,
           accentStyle: _statusKazancStyle,
+          soundEnabled: _viewModel.soundEffects,
+          vibrationEnabled: _viewModel.vibration,
           onMultiplierLifted: (col, row) {
             _viewModel.gridCtrl.clearMultiplierPosition(col, row);
           },
@@ -1361,9 +1558,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Text('KAZANÇ', style: _statusKazancStyle),
+          Text('WIN', style: _statusKazancStyle),
           const SizedBox(width: 6),
-          Text('₺${formatMoney(lastWin)}', style: _statusBaseStyle),
+          MoneyText(
+            text: formatMoney(lastWin),
+            style: _statusBaseStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
+          ),
         ],
       );
     }
@@ -1449,6 +1653,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             gridHeight: screenH * 0.32,
             baseStyle: _statusBaseStyle,
             accentStyle: _statusKazancStyle,
+            soundEnabled: _viewModel.soundEffects,
             onMultiplierLifted: (col, row) {
               _viewModel.gridCtrl.clearMultiplierPosition(col, row);
             },
@@ -1472,12 +1677,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Widget _buildTumbleWinValue() {
     // While the spin's win is mid-flight up to the Kazanç readout the
-    // middle band drops to ₺0 — once the sprite lands the flag flips
+    // middle band drops to zero — once the sprite lands the flag flips
     // back and the multiplied total restores in place.
     if (_isFlyingTumble) {
       return Container(
         key: _tumbleWinAnchorKey,
-        child: Text('₺${formatMoney(0)}', style: _statusBaseStyle),
+        child: MoneyText(
+          text: formatMoney(0),
+          style: _statusBaseStyle,
+          symbolOffset: const Offset(0, 1.5),
+          lineYOffset: 0.75,
+          lineLengthScale: 0.94,
+        ),
       );
     }
 
@@ -1491,6 +1702,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           to: _viewModel.liveTumbleWin,
           style: _statusBaseStyle,
           duration: const Duration(milliseconds: 350),
+          vibrationEnabled: _viewModel.vibration,
         ),
       );
     }
@@ -1499,9 +1711,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (result == null) {
       return Container(
         key: _tumbleWinAnchorKey,
-        child: Text(
-          '₺${formatMoney(_viewModel.lastWin)}',
+        child: MoneyText(
+          text: formatMoney(_viewModel.lastWin),
           style: _statusBaseStyle,
+          symbolOffset: const Offset(0, 1.5),
+          lineYOffset: 0.75,
+          lineLengthScale: 0.94,
         ),
       );
     }
@@ -1511,9 +1726,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (!hasSequence) {
       return Container(
         key: _tumbleWinAnchorKey,
-        child: Text(
-          '₺${formatMoney(result.totalWin)}',
+        child: MoneyText(
+          text: formatMoney(result.totalWin),
           style: _statusBaseStyle,
+          symbolOffset: const Offset(0, 1.5),
+          lineYOffset: 0.75,
+          lineLengthScale: 0.94,
         ),
       );
     }
@@ -1526,14 +1744,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // lifts off.
         return Container(
           key: _tumbleWinAnchorKey,
-          child: Text(
-            '₺${formatMoney(result.baseWin)}',
+          child: MoneyText(
+            text: formatMoney(result.baseWin),
             style: _statusBaseStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
           ),
         );
 
       case WinPresentationPhase.multiplierCollecting:
-        // Live formula — `₺base × runningSum`. Multipliers fly into
+        // Live formula — `base × runningSum`. Multipliers fly into
         // the running-sum slot and the integer pops on each landing,
         // matching the previous Kazanç-bar behaviour.
         final sum = _winCtrl.runningSum;
@@ -1543,7 +1765,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text('₺${formatMoney(result.baseWin)}', style: _statusBaseStyle),
+            MoneyText(
+              text: formatMoney(result.baseWin),
+              style: _statusBaseStyle,
+              symbolOffset: const Offset(0, 1.5),
+              lineYOffset: 0.75,
+              lineLengthScale: 0.94,
+            ),
             if (showMultiplySign) ...[
               const SizedBox(width: 8),
               Text('×', style: _statusBaseStyle),
@@ -1577,6 +1805,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             to: result.totalWin,
             style: _statusBaseStyle,
             duration: WinPresentationController.finalCountUpDuration,
+            vibrationEnabled: _viewModel.vibration,
           ),
         );
 
@@ -1586,9 +1815,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // value isn't wiped out.
         return Container(
           key: _tumbleWinAnchorKey,
-          child: Text(
-            '₺${formatMoney(result.totalWin)}',
+          child: MoneyText(
+            text: formatMoney(result.totalWin),
             style: _statusBaseStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
           ),
         );
     }
@@ -1618,7 +1851,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             fit: BoxFit.contain,
           ),
           const SizedBox(width: 6),
-          Text('PAYS ₺${formatMoney(clusterToShow.amount)}', style: infoStyle),
+          Text('PAYS', style: infoStyle),
+          const SizedBox(width: 3),
+          MoneyText(
+            text: formatMoney(clusterToShow.amount),
+            style: infoStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
+          ),
         ],
       );
     }
@@ -1647,16 +1889,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             children: [
               Text('CREDIT', style: _bottomLabelStyle),
               const SizedBox(width: 4),
-              Text(
-                '₺${formatMoney(_viewModel.balance)}',
+              MoneyText(
+                text: formatMoney(_viewModel.balance),
                 style: _bottomValueStyle,
+                symbolOffset: const Offset(0, 1.1),
+                lineYOffset: 1.05,
+                symbolTextYOffset: 0.45,
               ),
               const SizedBox(width: 16),
               Text('BET', style: _bottomLabelStyle),
               const SizedBox(width: 4),
-              Text(
-                '₺${formatMoney(_viewModel.betAmount)}',
+              MoneyText(
+                text: formatMoney(_viewModel.betAmount),
                 style: _bottomValueStyle,
+                symbolOffset: const Offset(0, 1.1),
+                lineYOffset: 1.05,
+                symbolTextYOffset: 0.45,
               ),
             ],
           ),
@@ -1664,6 +1912,157 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         const SizedBox(height: 1),
         _ClockText(style: _bottomClockStyle),
       ],
+    );
+  }
+}
+
+class _FirstLaunchDisclaimerDialog extends StatelessWidget {
+  final VoidCallback onOkay;
+
+  const _FirstLaunchDisclaimerDialog({required this.onOkay});
+
+  static const Color _panelColor = Color(0xFFF0CDE6);
+  static const Color _textColor = Color(0xFF2C2530);
+  static const String _bodyText =
+      'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 18),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.92,
+                        maxHeight: MediaQuery.of(context).size.height * 0.45,
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _panelColor,
+                          borderRadius: BorderRadius.circular(26),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 28,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(26),
+                          child: Column(
+                            children: [
+                              _buildHeader(),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    22,
+                                    24,
+                                    22,
+                                    24,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        _bodyText,
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.barlowCondensed(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: _textColor,
+                                          height: 1.18,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      _buildOkayButton(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      height: 74,
+      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF6D7EB),
+        border: Border(bottom: BorderSide(color: Color(0x1A2C2530))),
+      ),
+      child: Center(
+        child: Text(
+          'DISCLAIMER',
+          style: GoogleFonts.barlowCondensed(
+            fontSize: 27,
+            fontWeight: FontWeight.w900,
+            color: _textColor,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOkayButton() {
+    return GestureDetector(
+      onTap: onOkay,
+      child: Container(
+        width: double.infinity,
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF00C76A),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.32),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          'OKAY',
+          style: GoogleFonts.barlowCondensed(
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1734,9 +2133,12 @@ class _FlyingTumbleSpriteState extends State<_FlyingTumbleSprite>
                   scale: scale,
                   child: Material(
                     type: MaterialType.transparency,
-                    child: Text(
-                      '₺${formatMoney(widget.amount)}',
+                    child: MoneyText(
+                      text: formatMoney(widget.amount),
                       style: widget.style,
+                      symbolOffset: const Offset(0, 1.5),
+                      lineYOffset: 0.75,
+                      lineLengthScale: 0.94,
                     ),
                   ),
                 ),
@@ -1845,6 +2247,292 @@ class _ClockText extends StatelessWidget {
   }
 }
 
+class _PendingFreeSpinAward {
+  final int value;
+  final double winAmount;
+
+  const _PendingFreeSpinAward({
+    required this.value,
+    required this.winAmount,
+  });
+}
+
+class _FreeSpinWinPopup extends StatefulWidget {
+  final int value;
+  final bool isRetrigger;
+  final double winAmount;
+  final VoidCallback onDismiss;
+
+  const _FreeSpinWinPopup({
+    required this.value,
+    required this.isRetrigger,
+    required this.winAmount,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_FreeSpinWinPopup> createState() => _FreeSpinWinPopupState();
+}
+
+class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
+    with SingleTickerProviderStateMixin {
+  static const _initialAssetPath =
+      'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
+  static const _retriggerAssetPath =
+      'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
+
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    )..forward();
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width * 0.88;
+    final assetPath = widget.isRetrigger
+        ? _retriggerAssetPath
+        : _initialAssetPath;
+    final valueOffset = widget.isRetrigger
+        ? Offset(width * -0.155, width * 0.174)
+        : Offset(0, width * 0.035);
+    final winOffset = Offset(0, width * 0.035);
+    final valueFontSize = widget.isRetrigger ? width * 0.064 : width * 0.16;
+    final winFontSize = widget.isRetrigger ? width * 0.078 : width * 0.16;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onDismiss,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.36),
+        alignment: Alignment.center,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.18, end: 1.0).animate(_scale),
+          child: SizedBox(
+            width: width,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.asset(
+                  assetPath,
+                  width: width,
+                  filterQuality: FilterQuality.medium,
+                ),
+                if (widget.isRetrigger && widget.winAmount > 0)
+                  Transform.translate(
+                    offset: winOffset,
+                    child: MoneyText(
+                      text: formatMoney(widget.winAmount),
+                      spacing: width * 0.008,
+                      symbolOffset: Offset(0, width * 0.006),
+                      lineYOffset: width * 0.010,
+                      lineLengthScale: 0.96,
+                      lineTopExtend: width * 0.004,
+                      symbolTextYOffset: width * 0.007,
+                      style: GoogleFonts.outfit(
+                        fontSize: winFontSize,
+                        fontWeight: FontWeight.w900,
+                        height: 1.0,
+                        color: const Color(0xFFFFB72E),
+                      ),
+                    ),
+                  ),
+                Transform.translate(
+                  offset: valueOffset,
+                  child: MoneyText(
+                    text: '${widget.value}',
+                    spacing: width * 0.008,
+                    symbolOffset: Offset(
+                      0,
+                      widget.isRetrigger ? 0 : width * 0.006,
+                    ),
+                    lineYOffset: widget.isRetrigger
+                        ? width * 0.004
+                        : width * 0.010,
+                    lineLengthScale: 0.96,
+                    lineTopExtend: width * 0.004,
+                    symbolTextYOffset: widget.isRetrigger ? 0 : width * 0.007,
+                    style: GoogleFonts.outfit(
+                      fontSize: valueFontSize,
+                      fontWeight: FontWeight.w900,
+                      height: 1.0,
+                      color: const Color(0xFFFFB72E),
+                      shadows: widget.isRetrigger
+                          ? null
+                          : [
+                              Shadow(
+                                color: const Color(
+                                  0xFF9C5A00,
+                                ).withValues(alpha: 0.95),
+                                offset: const Offset(0, 4),
+                                blurRadius: 8,
+                              ),
+                              Shadow(
+                                color: const Color(
+                                  0xFFFFF0A8,
+                                ).withValues(alpha: 0.85),
+                                offset: const Offset(0, -2),
+                                blurRadius: 3,
+                              ),
+                            ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FreeSpinSummaryPopup extends StatefulWidget {
+  final double totalWin;
+  final int totalFreeSpins;
+  final VoidCallback onDismiss;
+
+  const _FreeSpinSummaryPopup({
+    required this.totalWin,
+    required this.totalFreeSpins,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_FreeSpinSummaryPopup> createState() => _FreeSpinSummaryPopupState();
+}
+
+class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
+    with SingleTickerProviderStateMixin {
+  static const _assetPath =
+      'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
+
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    )..forward();
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width * 0.88;
+    final amountFontSize = width * 0.115;
+    final spinFontSize = width * 0.060;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onDismiss,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.36),
+        alignment: Alignment.center,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.18, end: 1.0).animate(_scale),
+          child: SizedBox(
+            width: width,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.asset(
+                  _assetPath,
+                  width: width,
+                  filterQuality: FilterQuality.medium,
+                ),
+                Transform.translate(
+                  offset: Offset(0, width * 0.025),
+                  child: SizedBox(
+                    width: width * 0.46,
+                    height: width * 0.12,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: MoneyText(
+                        text: formatMoney(widget.totalWin),
+                        spacing: width * 0.007,
+                        symbolOffset: Offset(0, width * 0.005),
+                        lineYOffset: width * 0.009,
+                        lineLengthScale: 0.96,
+                        lineTopExtend: width * 0.004,
+                        symbolTextYOffset: width * 0.006,
+                        style: GoogleFonts.outfit(
+                          fontSize: amountFontSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: const Color(0xFFFFD13B),
+                          shadows: [
+                            Shadow(
+                              color: const Color(
+                                0xFF9C5A00,
+                              ).withValues(alpha: 0.95),
+                              offset: const Offset(0, 4),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Transform.translate(
+                  offset: Offset(width * -0.14, width * 0.17),
+                  child: SizedBox(
+                    width: width * 0.11,
+                    height: width * 0.07,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${widget.totalFreeSpins}',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: spinFontSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: const Color(0xFFFFD13B),
+                          letterSpacing: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.85),
+                              offset: const Offset(0, 3),
+                              blurRadius: 5,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Brief celebration overlay that plays on the first frame of a
 /// free-spin round — a scatter burst of cupcakes erupts around the
 /// playfield while a "FREE SPINS" headline scales in from below.
@@ -1896,69 +2584,65 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     final size = MediaQuery.of(context).size;
     const assetPath = 'lib/images/slot_main_screen/Items/cupCake.png';
 
-    // Dense grid of cupcakes that blankets the entire screen.
-    // We tile a grid from edge to edge and jitter each cell slightly
-    // so the result feels organic rather than mechanical.
-    const int cols = 9;
-    const int rows = 14;
-    const double cellSize = 0.16; // base cupcake size as fraction of width
+    const int count = 420;
+    const double cellSize = 0.19;
+
+    double noise(int seed) {
+      final raw = math.sin(seed * 12.9898) * 43758.5453;
+      return raw - raw.floorToDouble();
+    }
 
     final List<Widget> cupcakes = [];
-    int index = 0;
 
-    for (int r = 0; r < rows; r++) {
-      for (int c = 0; c < cols; c++) {
-        // Normalised position: -0.5 … 0.5 range centred on screen.
-        final nx = -0.55 + (c / (cols - 1)) * 1.1;
-        final ny = -0.55 + (r / (rows - 1)) * 1.1;
+    for (int index = 0; index < count; index++) {
+      final t = index / count;
+      final angleBase = index * 2.399963229728653;
+      final angle = angleBase + (noise(index * 7 + 3) - 0.5) * 1.15;
+      final radius = math.sqrt(t) * (0.95 + noise(index * 11 + 5) * 0.58);
+      final aspect = size.height / size.width;
+      final x =
+          math.cos(angle) * radius * 0.88 +
+          (noise(index * 13 + 7) - 0.5) * 0.26;
+      final y =
+          math.sin(angle) * radius * 0.88 / aspect +
+          (noise(index * 17 + 9) - 0.5) * 0.26;
+      final sizeVar = cellSize + noise(index * 19 + 11) * 0.13;
+      final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
+      final delay = (radius * 0.30 + noise(index * 29 + 15) * 0.18).clamp(
+        0.0,
+        0.38,
+      );
 
-        // Deterministic "random" jitter seeded by index.
-        final jx = ((index * 7 + 3) % 17 - 8) / 100.0;
-        final jy = ((index * 11 + 5) % 19 - 9) / 100.0;
+      final localProgress = ((_controller.value - delay) / 0.65).clamp(
+        0.0,
+        1.0,
+      );
+      final pop = Curves.easeOutBack.transform(localProgress);
+      final drift = Curves.easeOutCubic.transform(localProgress);
 
-        final x = nx + jx;
-        final y = ny + jy;
-
-        // Size varies per cell for visual richness.
-        final sizeVar =
-            cellSize + ((index * 13 + 7) % 11) / 110.0; // 0.16 – 0.26
-
-        // Rotation jitter.
-        final angle = ((index * 17 + 2) % 23 - 11) / 18.0; // roughly -0.6 … 0.6
-
-        // Cascade delay — ripples outward from centre.
-        final dist = (x * x + y * y);
-        final delay = (dist * 0.55).clamp(0.0, 0.35);
-
-        final localProgress = ((_controller.value - delay) / 0.65).clamp(
-          0.0,
-          1.0,
-        );
-        final pop = Curves.easeOutBack.transform(localProgress);
-        final drift = Curves.easeOutCubic.transform(localProgress);
-
-        cupcakes.add(
-          Positioned(
-            left: size.width * (0.5 + x) - (size.width * sizeVar / 2),
-            top: size.height * (0.46 + y) - (size.width * sizeVar / 2),
-            child: Transform.translate(
-              offset: Offset(0, (1 - drift) * -90),
-              child: Transform.scale(
-                scale: (0.25 + pop * 0.75) * _scale.value.clamp(0.8, 1.12),
-                child: Transform.rotate(
-                  angle: angle + _rotation.value,
-                  child: Image.asset(
-                    assetPath,
-                    width: size.width * sizeVar,
-                    filterQuality: FilterQuality.medium,
-                  ),
+      cupcakes.add(
+        Positioned(
+          left: size.width * (0.5 + x) - (size.width * sizeVar / 2),
+          top: size.height * (0.46 + y) - (size.width * sizeVar / 2),
+          child: Transform.translate(
+            offset: Offset(
+              (noise(index * 31 + 17) - 0.5) * 95 * (1 - drift),
+              (1 - drift) * (-85 - noise(index * 37 + 19) * 95),
+            ),
+            child: Transform.scale(
+              scale: (0.34 + pop * 0.84) * _scale.value.clamp(0.9, 1.22),
+              child: Transform.rotate(
+                angle: rotation + _rotation.value,
+                child: Image.asset(
+                  assetPath,
+                  width: size.width * sizeVar,
+                  filterQuality: FilterQuality.medium,
                 ),
               ),
             ),
           ),
-        );
-        index++;
-      }
+        ),
+      );
     }
     return cupcakes;
   }
@@ -1975,28 +2659,7 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
               color: Colors.black.withValues(alpha: 0.38),
               child: Stack(
                 alignment: Alignment.center,
-                children: [
-                  ..._buildCupcakeBurst(context),
-                  Positioned(
-                    bottom: MediaQuery.of(context).size.height * 0.26,
-                    child: Text(
-                      'FREE SPINS',
-                      style: GoogleFonts.barlowCondensed(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFFFFD13B),
-                        letterSpacing: 2.0,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.9),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                children: [..._buildCupcakeBurst(context)],
               ),
             ),
           );

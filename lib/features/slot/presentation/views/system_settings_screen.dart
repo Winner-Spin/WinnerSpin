@@ -1,7 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
+import '../../../../core/widgets/money_text.dart';
+import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/custom_switch.dart';
 
@@ -15,10 +19,15 @@ class SystemSettingsScreen extends StatefulWidget {
 }
 
 class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
+  static const Color _panelColor = Color(0xFFF0CDE6);
+  static const Color _panelAccent = Color(0xFFE2BED8);
+  static const Color _textColor = Color(0xFF2C2530);
+
   // Using GameViewModel for states
 
   final ScrollController _scrollController = ScrollController();
   bool _isExiting = false;
+  bool _showGameHistory = false;
 
   @override
   void dispose() {
@@ -33,34 +42,44 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(color: Colors.transparent),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: GestureDetector(
+                onTap: () {
+                  UiClickSound.play();
+                  Navigator.of(context).pop();
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
           ),
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 18),
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.81,
+                        maxWidth: MediaQuery.of(context).size.width * 0.92,
+                        maxHeight: MediaQuery.of(context).size.height * 0.84,
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.93),
+                          color: _panelColor,
+                          borderRadius: BorderRadius.circular(26),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 20,
-                              spreadRadius: 2,
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 28,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: ClipRRect(
+                          borderRadius: BorderRadius.circular(26),
                           child: Column(
                             children: [
                               _buildHeader(context),
@@ -68,8 +87,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                 child: RawScrollbar(
                                   controller: _scrollController,
                                   thumbVisibility: true,
-                                  thumbColor: Colors.white.withValues(
-                                    alpha: 0.5,
+                                  thumbColor: _textColor.withValues(
+                                    alpha: 0.25,
                                   ),
                                   thickness: 6,
                                   radius: const Radius.circular(8),
@@ -81,9 +100,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                   child: SingleChildScrollView(
                                     controller: _scrollController,
                                     padding: const EdgeInsets.fromLTRB(
-                                      20,
-                                      56,
-                                      20,
+                                      22,
+                                      30,
+                                      22,
                                       24,
                                     ),
                                     child: Column(
@@ -93,7 +112,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                         _buildGameHistory(),
                                         const SizedBox(height: 24),
                                         const Divider(
-                                          color: Colors.white24,
+                                          color: Color(0x332C2530),
                                           height: 1,
                                         ),
                                         const SizedBox(height: 24),
@@ -108,22 +127,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                                     fontSize: 20,
                                                     fontWeight: FontWeight.w900,
                                                     color: const Color(
-                                                      0xFFE5A800,
+                                                      0xFF2C2530,
                                                     ),
                                                     letterSpacing: 1.2,
-                                                    shadows: [
-                                                      Shadow(
-                                                        color: Colors.black
-                                                            .withValues(
-                                                              alpha: 0.8,
-                                                            ),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(
-                                                          0,
-                                                          2,
-                                                        ),
-                                                      ),
-                                                    ],
                                                   ),
                                             ),
                                           ],
@@ -176,7 +182,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
                                         const SizedBox(height: 32),
                                         const Divider(
-                                          color: Colors.white24,
+                                          color: Color(0x332C2530),
                                           height: 1,
                                         ),
                                         const SizedBox(height: 24),
@@ -192,30 +198,39 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                                     fontSize: 20,
                                                     fontWeight: FontWeight.w900,
                                                     color: const Color(
-                                                      0xFFE5A800,
+                                                      0xFF2C2530,
                                                     ),
                                                     letterSpacing: 1.2,
-                                                    shadows: [
-                                                      Shadow(
-                                                        color: Colors.black
-                                                            .withValues(
-                                                              alpha: 0.8,
-                                                            ),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(
-                                                          0,
-                                                          2,
-                                                        ),
-                                                      ),
-                                                    ],
                                                   ),
                                             ),
                                           ],
                                         ),
                                         const SizedBox(height: 16),
                                         _buildTotalBet(),
-                                        const SizedBox(height: 32),
-                                        Center(child: _buildExitButton()),
+                                        const SizedBox(height: 36),
+                                        Text(
+                                          'Made with ☕️ & 💻 by Hakan Güneş & Enes Eken',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.barlowCondensed(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.barlowCondensed(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.74,
+                                            ),
+                                            height: 1.08,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -228,10 +243,17 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
               ],
             ),
           ),
+          if (_showGameHistory)
+            Positioned.fill(
+              child: GameHistoryScreen(
+                viewModel: widget.viewModel,
+                onClose: () => setState(() => _showGameHistory = false),
+              ),
+            ),
         ],
       ),
     );
@@ -239,42 +261,45 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+      height: 74,
+      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6D7EB),
+        border: Border(
+          bottom: BorderSide(color: _textColor.withValues(alpha: 0.10)),
+        ),
+      ),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'SYSTEM SETTINGS',
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFFE5A800), // Darker yellow/gold color
-                  letterSpacing: 1.2,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.8),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _buildExitButton(),
+          ),
+          Text(
+            'SETTINGS',
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              color: _textColor,
+              letterSpacing: 1.2,
+            ),
           ),
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.close,
-                  size: 30,
-                  color: Colors.white.withValues(alpha: 0.82),
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _panelAccent.withValues(alpha: 0.88),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.close, size: 30, color: _textColor),
               ),
             ),
           ),
@@ -292,33 +317,26 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   Widget _buildExitButton() {
     return GestureDetector(
-      onTap: _isExiting ? null : _exitGame,
+      onTap: _isExiting
+          ? null
+          : () {
+              UiClickSound.play();
+              _exitGame();
+            },
       child: AnimatedOpacity(
         opacity: _isExiting ? 0.55 : 1,
         duration: const Duration(milliseconds: 120),
         child: Container(
-          width: 132,
-          height: 42,
-          alignment: Alignment.center,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xFFE5A800),
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            color: _panelAccent.withValues(alpha: 0.88),
+            shape: BoxShape.circle,
           ),
-          child: Text(
-            _isExiting ? 'EXITING...' : 'EXIT',
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Colors.black,
-              letterSpacing: 1.0,
-            ),
+          child: const Icon(
+            Icons.logout_rounded,
+            size: 30,
+            color: _textColor,
           ),
         ),
       ),
@@ -328,11 +346,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   Widget _buildGameHistory() {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => GameHistoryScreen(viewModel: widget.viewModel),
-          ),
-        );
+        UiClickSound.play();
+        setState(() => _showGameHistory = true);
       },
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -342,12 +357,12 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             style: GoogleFonts.barlowCondensed(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.6),
+              color: _textColor.withValues(alpha: 0.70),
             ),
           ),
           Icon(
             Icons.open_in_new,
-            color: Colors.white.withValues(alpha: 0.6),
+            color: _textColor.withValues(alpha: 0.70),
             size: 24,
           ),
         ],
@@ -363,7 +378,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
           style: GoogleFonts.barlowCondensed(
             fontSize: 24,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: _textColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -386,16 +401,22 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF262626),
+                    color: const Color(0xFFF6D7EB),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white24, width: 1.5),
+                    border: Border.all(
+                      color: _textColor.withValues(alpha: 0.18),
+                      width: 1.5,
+                    ),
                   ),
-                  child: Text(
-                    '${formatMoney(bet)} \$', // Using $ to match the screenshot
+                  child: MoneyText(
+                    text: formatMoney(bet),
+                    symbolOffset: const Offset(0, 2.0),
+                    lineYOffset: 2.35,
+                    symbolTextYOffset: 2.3,
                     style: GoogleFonts.barlowCondensed(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: _textColor,
                     ),
                   ),
                 ),
@@ -459,7 +480,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 style: GoogleFonts.barlowCondensed(
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: _textColor,
                 ),
               ),
               const SizedBox(height: 2),
@@ -468,7 +489,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 style: GoogleFonts.barlowCondensed(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: _textColor.withValues(alpha: 0.58),
                 ),
               ),
             ],
@@ -482,50 +503,106 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 }
 
 class GameHistoryScreen extends StatefulWidget {
-  const GameHistoryScreen({super.key, required this.viewModel});
+  const GameHistoryScreen({
+    super.key,
+    required this.viewModel,
+    required this.onClose,
+  });
 
   final GameViewModel viewModel;
+  final VoidCallback onClose;
 
   @override
   State<GameHistoryScreen> createState() => _GameHistoryScreenState();
 }
 
 class _GameHistoryScreenState extends State<GameHistoryScreen> {
+  static const Color _panelColor = Color(0xFFF0CDE6);
+  static const Color _panelAccent = Color(0xFFE2BED8);
+  static const Color _headerColor = Color(0xFFF6D7EB);
+  static const Color _textColor = Color(0xFF2C2530);
+  static const Color _goldColor = Color(0xFFE5A800);
+
   final Set<String> _selectedHistoryIds = {};
 
   bool get _isSelecting => _selectedHistoryIds.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
+    return Material(
+      type: MaterialType.transparency,
+      child: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            const SizedBox(height: 18),
             Expanded(
-              child: ListenableBuilder(
-                listenable: widget.viewModel,
-                builder: (context, _) {
-                  final history = widget.viewModel.gameHistory;
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.92,
+                    maxHeight: MediaQuery.of(context).size.height * 0.84,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _panelColor,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 28,
+                          offset: const Offset(0, 14),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(26),
+                      child: Column(
+                        children: [
+                          _buildHeader(context),
+                          Expanded(
+                            child: ListenableBuilder(
+                              listenable: widget.viewModel,
+                              builder: (context, _) {
+                                final history = widget.viewModel.gameHistory;
 
-                  if (history.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
-                      child: _buildHistoryEmptyState(),
-                    );
-                  }
+                                if (history.isEmpty) {
+                                  return Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      32,
+                                      20,
+                                      24,
+                                    ),
+                                    child: _buildHistoryEmptyState(),
+                                  );
+                                }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                    itemBuilder: (context, index) =>
-                        _buildHistoryEntry(history[index]),
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemCount: history.length,
-                  );
-                },
+                                return ListView.separated(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    24,
+                                    20,
+                                    28,
+                                  ),
+                                  itemBuilder: (context, index) =>
+                                      _buildHistoryEntry(history[index]),
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(height: 10),
+                                  itemCount: history.length,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
+            const SizedBox(height: 18),
           ],
         ),
       ),
@@ -533,8 +610,15 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+    return Container(
+      height: 74,
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      decoration: BoxDecoration(
+        color: _headerColor,
+        border: Border(
+          bottom: BorderSide(color: _textColor.withValues(alpha: 0.10)),
+        ),
+      ),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -543,31 +627,35 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                 ? '${_selectedHistoryIds.length} SELECTED'
                 : 'GAME HISTORY',
             style: GoogleFonts.barlowCondensed(
-              fontSize: 20,
+              fontSize: 27,
               fontWeight: FontWeight.w900,
-              color: const Color(0xFFE5A800),
+              color: _textColor,
               letterSpacing: 1.2,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
           ),
           Align(
             alignment: Alignment.centerLeft,
             child: GestureDetector(
               onTap: _isSelecting
-                  ? () => setState(_selectedHistoryIds.clear)
-                  : () => Navigator.of(context).pop(),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
+                  ? () {
+                      UiClickSound.play();
+                      setState(_selectedHistoryIds.clear);
+                    }
+                  : () {
+                      UiClickSound.play();
+                      widget.onClose();
+                    },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _panelAccent.withValues(alpha: 0.88),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(
                   _isSelecting ? Icons.close : Icons.arrow_back_ios_new,
                   size: 24,
-                  color: Colors.white.withValues(alpha: 0.82),
+                  color: _textColor,
                 ),
               ),
             ),
@@ -576,9 +664,17 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: _deleteSelectedEntries,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
+                onTap: () {
+                  UiClickSound.play();
+                  _deleteSelectedEntries();
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _panelAccent.withValues(alpha: 0.88),
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(
                     Icons.delete_outline,
                     size: 28,
@@ -597,9 +693,9 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: _headerColor.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: _textColor.withValues(alpha: 0.10)),
       ),
       child: Text(
         'NO GAME HISTORY YET',
@@ -607,7 +703,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
         style: GoogleFonts.barlowCondensed(
           fontSize: 14,
           fontWeight: FontWeight.w800,
-          color: Colors.white.withValues(alpha: 0.55),
+          color: _textColor.withValues(alpha: 0.55),
           letterSpacing: 0.8,
         ),
       ),
@@ -618,22 +714,28 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     final selected = _selectedHistoryIds.contains(entry.id);
     final winColor = entry.winAmount > 0
         ? const Color(0xFF00C853)
-        : Colors.white.withValues(alpha: 0.55);
+        : _textColor.withValues(alpha: 0.55);
 
     return GestureDetector(
-      onTap: _isSelecting ? () => _toggleEntrySelection(entry.id) : null,
-      onLongPress: () => _toggleEntrySelection(entry.id),
+      onTap: _isSelecting
+          ? () {
+              UiClickSound.play();
+              _toggleEntrySelection(entry.id);
+            }
+          : null,
+      onLongPress: () {
+        UiClickSound.play();
+        _toggleEntrySelection(entry.id);
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFFE5A800).withValues(alpha: 0.16)
-              : Colors.white.withValues(alpha: 0.06),
+              ? _goldColor.withValues(alpha: 0.18)
+              : _headerColor.withValues(alpha: 0.58),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected
-                ? const Color(0xFFE5A800)
-                : Colors.white.withValues(alpha: 0.1),
+            color: selected ? _goldColor : _textColor.withValues(alpha: 0.10),
           ),
         ),
         child: Column(
@@ -647,7 +749,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                     style: GoogleFonts.barlowCondensed(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFFE5A800),
+                      color: _textColor.withValues(alpha: 0.82),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -657,8 +759,8 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                     selected ? Icons.check_circle : Icons.circle_outlined,
                     size: 22,
                     color: selected
-                        ? const Color(0xFFE5A800)
-                        : Colors.white.withValues(alpha: 0.45),
+                        ? _goldColor
+                        : _textColor.withValues(alpha: 0.45),
                   ),
               ],
             ),
@@ -668,22 +770,51 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'NEW BALANCE',
-                    value: '${formatMoney(entry.newBalance)} \$',
+                    valueWidget: MoneyText(
+                      text: formatMoney(entry.newBalance),
+                      symbolOffset: const Offset(0, 1.0),
+                      lineYOffset: 1.25,
+                      symbolTextYOffset: 0.45,
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: _textColor,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'BET',
-                    value: '${formatMoney(entry.bet)} \$',
+                    valueWidget: MoneyText(
+                      text: formatMoney(entry.bet),
+                      symbolOffset: const Offset(0, 1.0),
+                      lineYOffset: 1.25,
+                      symbolTextYOffset: 0.45,
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: _textColor,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildHistoryMetric(
                     label: 'WIN',
-                    value: '${formatMoney(entry.winAmount)} \$',
-                    valueColor: winColor,
+                    valueWidget: MoneyText(
+                      text: formatMoney(entry.winAmount),
+                      symbolOffset: const Offset(0, 1.0),
+                      lineYOffset: 1.25,
+                      symbolTextYOffset: 0.45,
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: winColor,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -696,9 +827,11 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
 
   Widget _buildHistoryMetric({
     required String label,
-    required String value,
+    String? value,
+    Widget? valueWidget,
     Color? valueColor,
   }) {
+    assert(value != null || valueWidget != null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -709,19 +842,28 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
           style: GoogleFonts.barlowCondensed(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.45),
+            color: _textColor.withValues(alpha: 0.48),
             letterSpacing: 0.7,
           ),
         ),
         const SizedBox(height: 3),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            color: valueColor ?? Colors.white,
+        SizedBox(
+          width: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child:
+                valueWidget ??
+                Text(
+                  value!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: valueColor ?? _textColor,
+                  ),
+                ),
           ),
         ),
       ],

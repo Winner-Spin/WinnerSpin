@@ -34,6 +34,7 @@ class RespinButton extends StatelessWidget {
     final button = TranslucentCircleButton(
       size: size,
       onTap: (disabled || (spinning && !autoActive)) ? null : onTap,
+      playSoundOnTapDown: true,
       opacity: opacity,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 160),

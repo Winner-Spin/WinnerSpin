@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import '../../../../../core/audio/app_audio_context.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import 'multiplier_bomb_animation.dart';
@@ -10,7 +13,7 @@ import 'multiplier_label.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
 /// of the column-wide spin in [SlotReel]:
-///   • Symbol scale pulse (impact bounce → settle → fade with size).
+///   • Symbol pre-burst wobble (spring scale + rotation), then fade.
 ///   • Particle burst — gold sparks radiate outward as the symbol fades.
 ///   • Drop-in from above when [path] changes (new symbol falls into place).
 ///
@@ -22,6 +25,7 @@ class TumbleCell extends StatefulWidget {
   final bool isFading;
   final double itemH;
   final int speedMultiplier;
+  final bool soundEnabled;
 
   const TumbleCell({
     super.key,
@@ -29,6 +33,7 @@ class TumbleCell extends StatefulWidget {
     required this.isFading,
     required this.itemH,
     this.speedMultiplier = 1,
+    this.soundEnabled = true,
   });
 
   @override
@@ -42,7 +47,6 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _imageOpacity;
   late final Animation<double> _dropAnimation;
-  late final Animation<double> _scalePulse;
 
   // Regenerated on each fade event so consecutive wins on the same cell
   // get distinct burst patterns; palette refreshes when [path] changes.
@@ -65,20 +69,15 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1950),
     );
 
-    // Once the dust burst starts, the original symbol vanishes quickly so the
-    // eye reads the particles as the item breaking apart, not as a separate
-    // effect drawn over a slowly fading image.
+    // Give the player a readable "this one is about to pop" wobble before the
+    // dust burst starts, then make the symbol vanish quickly as it breaks apart.
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
-      curve: const Interval(0.16, 0.30, curve: Curves.easeOut),
+      curve: const Interval(0.36, 0.52, curve: Curves.easeOut),
     );
     // Drive the fade via Image.opacity so it goes through the image
     // shader's alpha channel — no per-cell saveLayer during a cascade.
     _imageOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(_fadeAnimation);
-    _scalePulse = CurvedAnimation(
-      parent: _fadeController,
-      curve: const _ScalePulseCurve(),
-    );
     _dropAnimation = CurvedAnimation(
       parent: _dropController,
       curve: Curves.easeOutCubic,
@@ -93,6 +92,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     // animate the fade instead of snapping to fully transparent — the player
     // needs to see the symbol + glow before it disappears.
     if (widget.isFading) {
+      _playPopSound();
       _fadeController.forward(from: 0.0);
       _burstController.forward(from: 0.0);
     } else {
@@ -114,6 +114,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     if (widget.isFading != oldWidget.isFading) {
       if (widget.isFading) {
         _particles = _generateParticles();
+        _playPopSound();
         _fadeController.forward(from: 0.0);
         _burstController.forward(from: 0.0);
       } else {
@@ -136,6 +137,32 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     return List.generate(90, (_) => _Particle.random(rng));
   }
 
+  void _playPopSound() {
+    if (!widget.soundEnabled) return;
+    unawaited(_ItemExplosionPopSound.play());
+  }
+
+  double _preBurstScale(double t) {
+    if (t < 0.10) return _lerp(1.0, 1.18, t / 0.10);
+    if (t < 0.20) return _lerp(1.18, 0.94, (t - 0.10) / 0.10);
+    if (t < 0.32) return _lerp(0.94, 1.10, (t - 0.20) / 0.12);
+    if (t < 0.42) return _lerp(1.10, 1.0, (t - 0.32) / 0.10);
+    return 1.0;
+  }
+
+  double _preBurstRotation(double t) {
+    if (t < 0.10) return _lerp(0.0, -0.08, t / 0.10);
+    if (t < 0.20) return _lerp(-0.08, 0.09, (t - 0.10) / 0.10);
+    if (t < 0.32) return _lerp(0.09, -0.045, (t - 0.20) / 0.12);
+    if (t < 0.42) return _lerp(-0.045, 0.0, (t - 0.32) / 0.10);
+    return 0.0;
+  }
+
+  double _lerp(double begin, double end, double t) {
+    final eased = Curves.easeInOut.transform(t.clamp(0.0, 1.0));
+    return begin + (end - begin) * eased;
+  }
+
   @override
   Widget build(BuildContext context) {
     final symbol = SymbolRegistry.byPath(widget.path);
@@ -147,15 +174,15 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         animation: Listenable.merge([
           _fadeController,
           _dropAnimation,
-          _scalePulse,
           _burstController,
         ]),
         builder: (context, child) {
           final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
-          final scale = (1.0 + _scalePulse.value * 0.15) * perSymbolScale;
+          final scale = _preBurstScale(_fadeController.value) * perSymbolScale;
+          final rotation = _preBurstRotation(_fadeController.value);
           // Particles begin as the original item disappears so the symbol
           // reads as dissolving into dust rather than fading under an effect.
-          final particleProgress = ((_fadeController.value - 0.14) / 0.86)
+          final particleProgress = ((_fadeController.value - 0.34) / 0.66)
               .clamp(0.0, 1.0);
 
           return Transform.translate(
@@ -177,7 +204,10 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                Transform.scale(scale: scale, child: child),
+                Transform.rotate(
+                  angle: rotation,
+                  child: Transform.scale(scale: scale, child: child),
+                ),
               ],
             ),
           );
@@ -203,6 +233,56 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+}
+
+class _ItemExplosionPopSound {
+  static const _assetPath = 'audio/Items/Item_Explosion_Pop.wav';
+  static const _popSpacing = Duration(milliseconds: 42);
+  static const _maxQueuedPops = 6;
+  static const _volume = 0.38;
+
+  static Future<AudioPool>? _poolFuture;
+  static int _queuedPops = 0;
+  static bool _isDraining = false;
+
+  static Future<void> play() {
+    _queuedPops = math.min(_queuedPops + 1, _maxQueuedPops);
+    if (!_isDraining) {
+      _isDraining = true;
+      unawaited(_drainQueue());
+    }
+    return Future.value();
+  }
+
+  static Future<void> _drainQueue() async {
+    while (_queuedPops > 0) {
+      _queuedPops--;
+      await _playOne();
+      if (_queuedPops > 0) {
+        await Future.delayed(_popSpacing);
+      }
+    }
+    _isDraining = false;
+    if (_queuedPops > 0) {
+      _isDraining = true;
+      unawaited(_drainQueue());
+    }
+  }
+
+  static Future<void> _playOne() async {
+    try {
+      final pool = await (_poolFuture ??= AudioPool.create(
+        source: AssetSource(_assetPath),
+        minPlayers: 3,
+        maxPlayers: 8,
+        playerMode: PlayerMode.lowLatency,
+        audioContext: AppAudioContext.game,
+      ));
+      await pool.start(volume: _volume);
+    } catch (_) {
+      // Item pop audio should never interrupt the tumble animation.
+    }
   }
 }
 
@@ -278,19 +358,6 @@ class _FrozenBomb extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Scale pulse: bounces from 0 → 1 (overshoot) over the first 30%, settles
-/// back to 0 by 50%, then stays at 0 for the fade-out half.
-class _ScalePulseCurve extends Curve {
-  const _ScalePulseCurve();
-
-  @override
-  double transformInternal(double t) {
-    if (t < 0.3) return t / 0.3;
-    if (t < 0.5) return 1.0 - ((t - 0.3) / 0.2);
-    return 0.0;
   }
 }
 

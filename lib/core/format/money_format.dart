@@ -1,4 +1,4 @@
-/// Formats [amount] as a thousand-grouped TL value with two decimals.
+/// Formats [amount] as a thousand-grouped money value with two decimals.
 /// Example: 9875.5 → "9,875.50"; 1234567.89 → "1,234,567.89".
 String formatMoney(double amount) {
   final fixed = amount.toStringAsFixed(2);

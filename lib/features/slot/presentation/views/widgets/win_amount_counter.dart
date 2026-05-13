@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../../core/format/money_format.dart';
+import '../../../../../core/widgets/money_text.dart';
 
 /// Counts up to [to], smoothly re-animating from the currently
 /// displayed value whenever [to] changes. Drives both the cascade's
@@ -15,6 +17,7 @@ class WinAmountCounter extends StatefulWidget {
   final TextStyle style;
   final Duration duration;
   final Curve curve;
+  final bool vibrationEnabled;
 
   /// When flipped true after construction, snaps the displayed value
   /// to [to] immediately and stops the running animation — used by
@@ -29,6 +32,7 @@ class WinAmountCounter extends StatefulWidget {
     required this.style,
     this.duration = const Duration(milliseconds: 1100),
     this.curve = Curves.easeOut,
+    this.vibrationEnabled = false,
     this.forceComplete = false,
   });
 
@@ -41,14 +45,17 @@ class _WinAmountCounterState extends State<WinAmountCounter>
   late final AnimationController _ctrl;
   late Animation<double> _anim;
   double _displayed = 0;
+  double _lastHapticValue = 0;
+  DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: widget.duration);
-    _anim = Tween<double>(begin: widget.from, end: widget.to).animate(
-      CurvedAnimation(parent: _ctrl, curve: widget.curve),
-    );
+    _anim = Tween<double>(
+      begin: widget.from,
+      end: widget.to,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
     _ctrl.addListener(_onTick);
     if (widget.forceComplete) {
       _displayed = widget.to;
@@ -59,18 +66,34 @@ class _WinAmountCounterState extends State<WinAmountCounter>
   }
 
   void _onTick() {
+    final next = _anim.value;
+    _maybeHapticTick(next);
     setState(() {
-      _displayed = _anim.value;
+      _displayed = next;
     });
+  }
+
+  void _maybeHapticTick(double next) {
+    if (!widget.vibrationEnabled || next <= _lastHapticValue) return;
+    final now = DateTime.now();
+    if (now.difference(_lastHapticAt) < const Duration(milliseconds: 120)) {
+      return;
+    }
+    _lastHapticAt = now;
+    _lastHapticValue = next;
+    HapticFeedback.selectionClick();
   }
 
   @override
   void didUpdateWidget(covariant WinAmountCounter old) {
     super.didUpdateWidget(old);
     if (old.to != widget.to) {
-      _anim = Tween<double>(begin: _displayed, end: widget.to).animate(
-        CurvedAnimation(parent: _ctrl, curve: widget.curve),
-      );
+      _lastHapticValue = _displayed;
+      _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
+      _anim = Tween<double>(
+        begin: _displayed,
+        end: widget.to,
+      ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
       _ctrl
         ..duration = widget.duration
         ..forward(from: 0);
@@ -90,6 +113,13 @@ class _WinAmountCounterState extends State<WinAmountCounter>
 
   @override
   Widget build(BuildContext context) {
-    return Text('₺${formatMoney(_displayed)}', style: widget.style);
+    return MoneyText(
+      text: formatMoney(_displayed),
+      style: widget.style,
+      symbolOffset: const Offset(0, 1.5),
+      lineYOffset: 0.75,
+      lineLengthScale: 0.94,
+      lineTopExtend: 0.9,
+    );
   }
 }

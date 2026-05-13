@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import '../../../../../core/audio/app_audio_context.dart';
 import 'multiplier_label.dart';
 
 /// Lottie bomb animation that plays in the page-local stage overlay
@@ -34,6 +36,7 @@ class MultiplierBombAnimation {
     required Offset cellCenter,
     required double cellSize,
     required int multiplierValue,
+    bool soundEnabled = true,
     VoidCallback? onBlast,
   }) async {
     final overlay = Overlay.of(context);
@@ -59,6 +62,7 @@ class MultiplierBombAnimation {
               height: bombSize,
               child: _BombPlayer(
                 multiplierValue: multiplierValue,
+                soundEnabled: soundEnabled,
                 onBlast: onBlast,
                 onComplete: () {
                   if (entry.mounted) entry.remove();
@@ -94,10 +98,12 @@ class _BombPlayer extends StatefulWidget {
   final VoidCallback? onBlast;
   final VoidCallback onComplete;
   final int multiplierValue;
+  final bool soundEnabled;
 
   const _BombPlayer({
     required this.onComplete,
     required this.multiplierValue,
+    required this.soundEnabled,
     this.onBlast,
   });
 
@@ -122,6 +128,9 @@ class _BombPlayerState extends State<_BombPlayer>
     final v = _ctrl.value;
     if (!_blastFired && v >= MultiplierBombAnimation._blastProgress) {
       _blastFired = true;
+      if (widget.soundEnabled) {
+        unawaited(_BombExplosionSound.play());
+      }
       widget.onBlast?.call();
     }
     if (!_bombEnded && v >= MultiplierBombAnimation._blastEndProgress) {
@@ -208,6 +217,9 @@ class _BombPlayerState extends State<_BombPlayer>
                     _bombEnded = true;
                     if (!_blastFired) {
                       _blastFired = true;
+                      if (widget.soundEnabled) {
+                        unawaited(_BombExplosionSound.play());
+                      }
                       widget.onBlast?.call();
                     }
                     widget.onComplete();
@@ -257,6 +269,28 @@ class _BombPlayerState extends State<_BombPlayer>
         ),
       ],
     );
+  }
+}
+
+class _BombExplosionSound {
+  static const _assetPath = 'audio/Items/Bomb_Explosion.wav';
+  static const _volume = 0.72;
+
+  static Future<AudioPool>? _poolFuture;
+
+  static Future<void> play() async {
+    try {
+      final pool = await (_poolFuture ??= AudioPool.create(
+        source: AssetSource(_assetPath),
+        minPlayers: 3,
+        maxPlayers: 8,
+        playerMode: PlayerMode.mediaPlayer,
+        audioContext: AppAudioContext.game,
+      ));
+      await pool.start(volume: _volume);
+    } catch (_) {
+      // Bomb audio should never interrupt the multiplier animation.
+    }
   }
 }
 
