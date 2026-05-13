@@ -118,6 +118,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   int _fsAwardedThisRound = 0;
   _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
   bool _fsSummaryPopupVisible = false;
+  bool _deferInitialFreeSpinVisualMode = false;
+  int _scatterPulseTrigger = 0;
+  Timer? _scatterPulseTimer;
 
   // True while the tumble-win sprite is in flight toward the Kazanç
   // readout. The middle band drops to zero for the duration so the
@@ -138,6 +141,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
+
+  bool get _isFreeSpinVisualMode =>
+      _viewModel.isInFreeSpins && !_deferInitialFreeSpinVisualMode;
 
   // Optimistic lock raised the instant the cascade ends, before the
   // multiplier collect sequence has actually entered its first phase.
@@ -368,26 +374,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ? _fsAwardedThisRound + popupValue
         : popupValue;
 
-    if (isRetrigger) {
-      setState(() => _showFreeSpinTransition = false);
-      _pendingFreeSpinAwardPopup = _PendingFreeSpinAward(
-        value: popupValue,
-        winAmount: winAmount,
-      );
-      return;
-    }
-
-    setState(() => _showFreeSpinTransition = true);
-    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() => _showFreeSpinTransition = false);
-        _showFreeSpinWinPopup(
-          value: popupValue,
-          isRetrigger: false,
-          winAmount: winAmount,
-        );
+    setState(() {
+      if (isRetrigger) {
+        _showFreeSpinTransition = false;
+      } else {
+        _deferInitialFreeSpinVisualMode = true;
       }
     });
+    _pendingFreeSpinAwardPopup = _PendingFreeSpinAward(
+      value: popupValue,
+      isRetrigger: isRetrigger,
+      winAmount: winAmount,
+    );
   }
 
   void _quickStopReels() {
@@ -430,11 +428,83 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final pending = _pendingFreeSpinAwardPopup;
     if (pending == null || _freeSpinWinPopupEntry != null) return;
     _pendingFreeSpinAwardPopup = null;
-    _showFreeSpinWinPopup(
-      value: pending.value,
-      isRetrigger: true,
-      winAmount: pending.winAmount,
+    _showFreeSpinAwardSequence(pending);
+  }
+
+  void _showFreeSpinAwardSequence(_PendingFreeSpinAward pending) {
+    if (pending.isRetrigger) {
+      _showScatterPulse(
+        minScatterCount: 3,
+        onComplete: () => _showFreeSpinWinPopup(
+          value: pending.value,
+          isRetrigger: pending.isRetrigger,
+          winAmount: pending.winAmount,
+        ),
+      );
+      return;
+    }
+
+    _showScatterPulse(
+      minScatterCount: 4,
+      onComplete: () => _startInitialFreeSpinVisualTransition(pending),
     );
+  }
+
+  void _startInitialFreeSpinVisualTransition(_PendingFreeSpinAward pending) {
+    if (!mounted) return;
+    setState(() {
+      _deferInitialFreeSpinVisualMode = false;
+      _showFreeSpinTransition = true;
+    });
+    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() => _showFreeSpinTransition = false);
+      _showFreeSpinWinPopup(
+        value: pending.value,
+        isRetrigger: pending.isRetrigger,
+        winAmount: pending.winAmount,
+      );
+    });
+  }
+
+  void _showScatterPulse({
+    required int minScatterCount,
+    required VoidCallback onComplete,
+  }) {
+    final scatterCells = _currentScatterCells();
+    if (scatterCells.length < minScatterCount) {
+      onComplete();
+      return;
+    }
+
+    _scatterPulseTimer?.cancel();
+    setState(() => _scatterPulseTrigger++);
+    _scatterPulseTimer = Timer(const Duration(milliseconds: 1050), () {
+      if (!mounted) return;
+      // Reset the trigger so the next spin doesn't re-wrap scatter cells
+      // in _ScatterPulse (which would auto-start even with 1–2 cupcakes).
+      setState(() => _scatterPulseTrigger = 0);
+      onComplete();
+    });
+  }
+
+  List<_ScatterCell> _currentScatterCells() {
+    final scatterPath = SymbolRegistry.all
+        .firstWhere((s) => s.isScatter)
+        .assetPath;
+    final cells = <_ScatterCell>[];
+    final grid = _viewModel.grid;
+
+    for (var col = 0; col < grid.length; col++) {
+      final column = grid[col];
+      for (var row = 0; row < column.length; row++) {
+        if (column[row] == scatterPath) {
+          cells.add(_ScatterCell(column: col, row: row));
+        }
+      }
+    }
+
+    return cells;
   }
 
   void _showFreeSpinSummaryPopup() {
@@ -804,6 +874,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _freeSpinWinPopupEntry = null;
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
+    _scatterPulseTimer?.cancel();
     _lingeringClusterTimer?.cancel();
     _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1042,7 +1113,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 child: ListenableBuilder(
                   listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
                   builder: (context, _) {
-                    final bgPath = _viewModel.isInFreeSpins
+                    final bgPath = _isFreeSpinVisualMode
                         ? 'lib/images/slot_main_screen/freespin arka plan.png'
                         : 'lib/images/slot_main_screen/nihai arka plan.png';
                     return RepaintBoundary(
@@ -1103,7 +1174,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   // / cluster info line sits flush beneath it, and
                   // the round Kazanç readout sits at the bottom past
                   // a transparent gap.
-                  final isFs = _viewModel.isInFreeSpins;
+                  final isFs = _isFreeSpinVisualMode;
                   const bandHeight = 31.0;
                   const wideGap = 31.0;
                   // Tumble + info share one continuous black panel,
@@ -1195,7 +1266,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
+                    if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
                     }
                     return RepaintBoundary(
@@ -1225,7 +1296,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
+                    if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
                     }
                     return RepaintBoundary(
@@ -1456,6 +1527,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 speedMultiplier: _viewModel.speedMultiplier,
                 soundEffectsEnabled: _viewModel.soundEffects,
                 pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
+                scatterPulseTrigger: _scatterPulseTrigger,
                 onComplete: col == GameViewModel.columns - 1
                     ? () => _viewModel.onSpinComplete()
                     : null,
@@ -1483,7 +1555,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final liveWin = _viewModel.liveTumbleWin;
     final isBusy = _viewModel.isBusy;
     final isTumbling = _viewModel.isTumbling;
-    final isFs = _viewModel.isInFreeSpins;
+    final isFs = _isFreeSpinVisualMode;
 
     if (_viewModel.showInsufficientFundsHint) {
       return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
@@ -2262,12 +2334,21 @@ class _ClockText extends StatelessWidget {
 
 class _PendingFreeSpinAward {
   final int value;
+  final bool isRetrigger;
   final double winAmount;
 
   const _PendingFreeSpinAward({
     required this.value,
+    required this.isRetrigger,
     required this.winAmount,
   });
+}
+
+class _ScatterCell {
+  final int column;
+  final int row;
+
+  const _ScatterCell({required this.column, required this.row});
 }
 
 class _FreeSpinWinPopup extends StatefulWidget {
@@ -2291,8 +2372,6 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     with SingleTickerProviderStateMixin {
   static const _initialAssetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
-  static const _retriggerAssetPath =
-      'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
 
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -2316,15 +2395,11 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width * 0.88;
-    final assetPath = widget.isRetrigger
-        ? _retriggerAssetPath
-        : _initialAssetPath;
-    final valueOffset = widget.isRetrigger
-        ? Offset(width * -0.155, width * 0.174)
-        : Offset(0, width * 0.035);
-    final winOffset = Offset(0, width * 0.035);
-    final valueFontSize = widget.isRetrigger ? width * 0.064 : width * 0.16;
-    final winFontSize = widget.isRetrigger ? width * 0.078 : width * 0.16;
+    // Always use FreeSpinWin.png — both initial trigger and retrigger.
+    const assetPath = _initialAssetPath;
+    // Centre offset for the spin-count circle (purple area).
+    final valueOffset = Offset(0, width * 0.035);
+    final valueFontSize = width * 0.16;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onDismiss,
@@ -2343,63 +2418,33 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
                   width: width,
                   filterQuality: FilterQuality.medium,
                 ),
-                if (widget.isRetrigger && widget.winAmount > 0)
-                  Transform.translate(
-                    offset: winOffset,
-                    child: MoneyText(
-                      text: formatMoney(widget.winAmount),
-                      spacing: width * 0.008,
-                      symbolOffset: Offset(0, width * 0.006),
-                      lineYOffset: width * 0.010,
-                      lineLengthScale: 0.96,
-                      lineTopExtend: width * 0.004,
-                      symbolTextYOffset: width * 0.007,
-                      style: GoogleFonts.outfit(
-                        fontSize: winFontSize,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        color: const Color(0xFFFFB72E),
-                      ),
-                    ),
-                  ),
+                // Always show '10' in the purple centre area (no currency symbol).
                 Transform.translate(
                   offset: valueOffset,
-                  child: MoneyText(
-                    text: '${widget.value}',
-                    spacing: width * 0.008,
-                    symbolOffset: Offset(
-                      0,
-                      widget.isRetrigger ? 0 : width * 0.006,
-                    ),
-                    lineYOffset: widget.isRetrigger
-                        ? width * 0.004
-                        : width * 0.010,
-                    lineLengthScale: 0.96,
-                    lineTopExtend: width * 0.004,
-                    symbolTextYOffset: widget.isRetrigger ? 0 : width * 0.007,
+                  child: Text(
+                    '10',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       fontSize: valueFontSize,
                       fontWeight: FontWeight.w900,
                       height: 1.0,
                       color: const Color(0xFFFFB72E),
-                      shadows: widget.isRetrigger
-                          ? null
-                          : [
-                              Shadow(
-                                color: const Color(
-                                  0xFF9C5A00,
-                                ).withValues(alpha: 0.95),
-                                offset: const Offset(0, 4),
-                                blurRadius: 8,
-                              ),
-                              Shadow(
-                                color: const Color(
-                                  0xFFFFF0A8,
-                                ).withValues(alpha: 0.85),
-                                offset: const Offset(0, -2),
-                                blurRadius: 3,
-                              ),
-                            ],
+                      shadows: [
+                        Shadow(
+                          color: const Color(
+                            0xFF9C5A00,
+                          ).withValues(alpha: 0.95),
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                        Shadow(
+                          color: const Color(
+                            0xFFFFF0A8,
+                          ).withValues(alpha: 0.85),
+                          offset: const Offset(0, -2),
+                          blurRadius: 3,
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -66,6 +66,7 @@ class SlotReel extends StatefulWidget {
   final VoidCallback? onDropInStart;
 
   final bool pulseScattersOnLanding;
+  final int scatterPulseTrigger;
   final bool soundEffectsEnabled;
 
   final SlotReelController? controller;
@@ -87,6 +88,7 @@ class SlotReel extends StatefulWidget {
     this.onComplete,
     this.onDropInStart,
     this.pulseScattersOnLanding = false,
+    this.scatterPulseTrigger = 0,
     this.soundEffectsEnabled = true,
   });
 
@@ -259,7 +261,13 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final Widget symbolChild;
     if (!isDropOut && isScatter && widget.pulseScattersOnLanding) {
       symbolChild = _ScatterPulse(
-        assetPath: assetPath,
+        child: Image.asset(
+          assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.low,
+          gaplessPlayback: true,
+          cacheWidth: 256,
+        ),
         animation: animation,
         landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
       );
@@ -464,16 +472,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                   left: 0,
                   right: 0,
                   height: itemH,
-                  child: TumbleCell(
-                    // Stable key per (column, row) so the cell state
-                    // (current path + animation controllers) survives across
-                    // tumble grid swaps and animates the path change.
-                    key: ValueKey('cell-${widget.columnIndex}-$i'),
+                  child: _buildStaticCell(
+                    row: i,
                     path: items[i],
-                    isFading: widget.fadingPaths.contains(items[i]),
                     itemH: itemH,
-                    speedMultiplier: widget.speedMultiplier,
-                    soundEnabled: widget.soundEffectsEnabled,
                   ),
                 );
               }),
@@ -507,6 +509,37 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildStaticCell({
+    required int row,
+    required String path,
+    required double itemH,
+  }) {
+    final cell = TumbleCell(
+      // Stable key per (column, row) so the cell state
+      // (current path + animation controllers) survives across
+      // tumble grid swaps and animates the path change.
+      key: ValueKey('cell-${widget.columnIndex}-$row'),
+      path: path,
+      isFading: widget.fadingPaths.contains(path),
+      itemH: itemH,
+      speedMultiplier: widget.speedMultiplier,
+      soundEnabled: widget.soundEffectsEnabled,
+    );
+
+    final symbol = SymbolRegistry.byPath(path);
+    if (symbol?.tier != SymbolTier.scatter || widget.scatterPulseTrigger <= 0) {
+      return cell;
+    }
+
+    return _ScatterPulse(
+      key: ValueKey(
+        'manual-scatter-pulse-${widget.columnIndex}-$row-${widget.scatterPulseTrigger}',
+      ),
+      child: cell,
+      autoStart: true,
+    );
+  }
+
   @override
   void dispose() {
     widget.controller?._detach(this);
@@ -530,14 +563,17 @@ class _HeftyBounceCurve extends Curve {
 /// golden glow, radial light burst, and sparkle effects once the
 /// drop-in animation crosses [landThreshold].
 class _ScatterPulse extends StatefulWidget {
-  final String assetPath;
-  final Animation<double> animation;
+  final Widget child;
+  final Animation<double>? animation;
   final double landThreshold;
+  final bool autoStart;
 
   const _ScatterPulse({
-    required this.assetPath,
-    required this.animation,
-    required this.landThreshold,
+    super.key,
+    required this.child,
+    this.animation,
+    this.landThreshold = 1.0,
+    this.autoStart = false,
   });
 
   @override
@@ -598,13 +634,24 @@ class _ScatterPulseState extends State<_ScatterPulse>
       CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
     );
 
-    widget.animation.addListener(_checkLanding);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLanding());
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _hasTriggered) return;
+        _hasTriggered = true;
+        _pulseController.forward();
+        _effectController.forward();
+      });
+    } else {
+      widget.animation?.addListener(_checkLanding);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkLanding());
+    }
   }
 
   void _checkLanding() {
     if (!mounted) return;
-    if (!_hasTriggered && widget.animation.value >= widget.landThreshold) {
+    final animation = widget.animation;
+    if (animation == null) return;
+    if (!_hasTriggered && animation.value >= widget.landThreshold) {
       _hasTriggered = true;
       _pulseController.forward();
       _effectController.forward();
@@ -613,7 +660,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
 
   @override
   void dispose() {
-    widget.animation.removeListener(_checkLanding);
+    widget.animation?.removeListener(_checkLanding);
     _pulseController.dispose();
     _effectController.dispose();
     super.dispose();
@@ -697,13 +744,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
             ],
           );
         },
-        child: Image.asset(
-          widget.assetPath,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.low,
-          gaplessPlayback: true,
-          cacheWidth: 256,
-        ),
+        child: widget.child,
       ),
     );
   }

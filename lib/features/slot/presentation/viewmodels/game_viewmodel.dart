@@ -256,9 +256,16 @@ class GameViewModel extends ChangeNotifier {
   SpinResult? _lastSpinResult;
   SpinResult? get lastSpinResult => _lastSpinResult;
   bool get shouldPulseLandingScatters {
-    final grid = _pendingResult?.initialGrid;
-    if (grid == null) return false;
+    // During an active FS round the scatter-pulse sequence is driven
+    // entirely by _showScatterPulse() in game_screen.dart (triggered
+    // after the spin settles). Firing the drop-animation pulse here
+    // too would cause single-cupcake pulses on every FS spin.
+    if (isInFreeSpins) return false;
 
+    final pending = _pendingResult;
+    if (pending == null || pending.freeSpinsTriggered) return false;
+
+    final grid = pending.initialGrid;
     final scatterPath = SymbolRegistry.all
         .firstWhere((s) => s.isScatter)
         .assetPath;
