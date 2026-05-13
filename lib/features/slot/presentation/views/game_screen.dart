@@ -441,7 +441,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_fsSummaryPopupVisible) return;
     final overlay = _stageOverlayKey.currentState;
     if (overlay == null) {
-      _viewModel.releaseFsRoundHold();
+      _playFreeSpinExitTransitionThenRelease();
       return;
     }
 
@@ -462,12 +462,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           entry.remove();
           if (!mounted) return;
           setState(() => _fsSummaryPopupVisible = false);
-          _viewModel.releaseFsRoundHold();
+          _playFreeSpinExitTransitionThenRelease();
         },
       ),
     );
     _freeSpinWinPopupEntry = entry;
     overlay.insert(entry);
+  }
+
+  void _playFreeSpinExitTransitionThenRelease() {
+    _freeSpinTransitionTimer?.cancel();
+    setState(() => _showFreeSpinTransition = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !_showFreeSpinTransition) return;
+      _viewModel.releaseFsRoundHold();
+    });
+    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() => _showFreeSpinTransition = false);
+    });
   }
 
   void _showAutoPlaySettings(BuildContext context) {
@@ -1027,7 +1040,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // round is active, so the round's distinct atmosphere is
                 // visible the moment FS starts.
                 child: ListenableBuilder(
-                  listenable: _viewModel.fsCtrl,
+                  listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
                   builder: (context, _) {
                     final bgPath = _viewModel.isInFreeSpins
                         ? 'lib/images/slot_main_screen/freespin arka plan.png'
@@ -2608,12 +2621,12 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
           (noise(index * 17 + 9) - 0.5) * 0.26;
       final sizeVar = cellSize + noise(index * 19 + 11) * 0.13;
       final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
-      final delay = (radius * 0.30 + noise(index * 29 + 15) * 0.18).clamp(
+      final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
         0.0,
-        0.38,
+        0.28,
       );
 
-      final localProgress = ((_controller.value - delay) / 0.65).clamp(
+      final localProgress = ((_controller.value - delay) / 0.52).clamp(
         0.0,
         1.0,
       );
