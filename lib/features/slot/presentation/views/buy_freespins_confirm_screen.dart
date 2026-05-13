@@ -1,8 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
+import '../audio/ui_click_sound.dart';
 import 'widgets/confirm_button.dart';
+
+const Color _panelColor = Color(0xFFF0CDE6);
+const Color _textColor = Color(0xFF2C2530);
 
 /// Full-screen confirmation overlay shown before a Buy FS purchase is
 /// committed. Same black-card structure as the info / settings screens
@@ -12,13 +18,11 @@ import 'widgets/confirm_button.dart';
 class BuyFreeSpinsConfirmScreen extends StatelessWidget {
   final int spinCount;
   final double price;
-  final VoidCallback onConfirm;
 
   const BuyFreeSpinsConfirmScreen({
     super.key,
     required this.spinCount,
     required this.price,
-    required this.onConfirm,
   });
 
   @override
@@ -35,9 +39,15 @@ class BuyFreeSpinsConfirmScreen extends StatelessWidget {
           // Tap-outside-to-dismiss backdrop. Transparent so the game
           // screen behind it stays visible through the dialog gap.
           Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(color: Colors.transparent),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: GestureDetector(
+                onTap: () {
+                  UiClickSound.play();
+                  Navigator.of(context).pop(false);
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
           ),
           Center(
@@ -46,7 +56,7 @@ class BuyFreeSpinsConfirmScreen extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.93),
+                  color: _panelColor,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.4),
@@ -73,17 +83,14 @@ class BuyFreeSpinsConfirmScreen extends StatelessWidget {
                           variant: ConfirmButtonVariant.yes,
                           width: buttonWidth,
                           height: buttonHeight,
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            onConfirm();
-                          },
+                          onTap: () => Navigator.of(context).pop(true),
                         ),
                         ConfirmButton(
                           label: 'NO',
                           variant: ConfirmButtonVariant.no,
                           width: buttonWidth,
                           height: buttonHeight,
-                          onTap: () => Navigator.of(context).pop(),
+                          onTap: () => Navigator.of(context).pop(false),
                         ),
                       ],
                     ),
@@ -118,10 +125,10 @@ class _ConfirmPrompt extends StatelessWidget {
       fontWeight: FontWeight.w600,
       letterSpacing: 0.5,
       height: 1.15,
-      color: const Color(0xFFB8D8FF),
+      color: _textColor,
       shadows: const [
         Shadow(
-          color: Color(0xCC000000),
+          color: Color(0x66FFFFFF),
           offset: Offset(0, 2),
           blurRadius: 3,
         ),
@@ -130,7 +137,7 @@ class _ConfirmPrompt extends StatelessWidget {
     final accent = base.copyWith(
       fontSize: accentSize,
       fontWeight: FontWeight.w900,
-      color: const Color(0xFFFFC93C),
+      color: _textColor,
     );
 
     return Text.rich(

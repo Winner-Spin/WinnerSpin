@@ -312,6 +312,7 @@ class _BigWinOverlayState extends State<BigWinOverlay>
   void _handleTap() {
     if (_amountSkipped || _completed) return;
     setState(() => _amountSkipped = true);
+    unawaited(_stopCelebrationSound());
     _startAmountPop();
     Future.delayed(_postCountHold, () {
       if (mounted) _completeOnce();

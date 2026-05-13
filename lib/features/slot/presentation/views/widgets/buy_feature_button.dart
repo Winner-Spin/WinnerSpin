@@ -69,12 +69,11 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     super.dispose();
   }
 
-  void _toggleGlass() {
-    if (_glassCtrl.status == AnimationStatus.completed ||
-        _glassCtrl.status == AnimationStatus.forward) {
+  @override
+  void didUpdateWidget(covariant BuyFeatureButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.disabled && _glassCtrl.value != 0) {
       _glassCtrl.reverse();
-    } else {
-      _glassCtrl.forward();
     }
   }
 
@@ -84,36 +83,36 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     final w = widget.width;
     final h = widget.height;
     final isDisabled = widget.disabled;
+    const g = 0.0;
+
+    // Opaque value only. The previous candy/glass toggle could leave
+    // the button looking passive after a cancelled buy dialog.
+    double mix(double opaque, double glass) => opaque + (glass - opaque) * g;
 
     return IgnorePointer(
       ignoring: isDisabled,
       child: Opacity(
         opacity: isDisabled ? 0.55 : 1.0,
-        // Cache the gradient stack so the disabled-state saveLayer
-        // reads the raster instead of re-rasterising it.
         child: RepaintBoundary(
           child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _pressCtrl.forward(),
-            onTapUp: (_) {
-              _pressCtrl.reverse();
-              _toggleGlass();
-              UiClickSound.play();
-              if (widget.vibrationEnabled) HapticFeedback.lightImpact();
-              widget.onTap?.call();
-            },
-            onTapCancel: () => _pressCtrl.reverse(),
-            child: ScaleTransition(
-              scale: _scale,
-              child: AnimatedBuilder(
-                animation: _glassCtrl,
-                builder: (context, _) {
-                  final g = Curves.easeInOut.transform(_glassCtrl.value);
-                  // Lerp helper: opaque value at g=0, glass value at g=1.
-                  double mix(double opaque, double glass) =>
-                      opaque + (glass - opaque) * g;
-
-                  return Container(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _pressCtrl.forward(),
+          onTapUp: (_) {
+            _pressCtrl.reverse();
+          },
+          onTapCancel: () => _pressCtrl.reverse(),
+          onTap: () {
+            _glassCtrl.reverse();
+            UiClickSound.play();
+            if (widget.vibrationEnabled) HapticFeedback.lightImpact();
+            widget.onTap?.call();
+          },
+          child: ScaleTransition(
+            scale: _scale,
+            child: AnimatedBuilder(
+              animation: _glassCtrl,
+              builder: (context, _) {
+                return Container(
                     width: w,
                     height: h,
                     decoration: BoxDecoration(

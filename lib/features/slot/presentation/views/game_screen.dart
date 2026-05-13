@@ -452,9 +452,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _startInitialFreeSpinVisualTransition(_PendingFreeSpinAward pending) {
     if (!mounted) return;
-    setState(() {
-      _deferInitialFreeSpinVisualMode = false;
-      _showFreeSpinTransition = true;
+    setState(() => _showFreeSpinTransition = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !_showFreeSpinTransition) return;
+      setState(() => _deferInitialFreeSpinVisualMode = false);
     });
     _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
@@ -609,9 +610,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   /// charging the Buy FS fee on first tap — keeps the player from
   /// dropping ₺10k on a stray press. Confirming runs the actual
   /// buy; cancelling just closes the dialog.
-  void _promptBuyFreeSpinsConfirm() {
-    if (!_viewModel.canBuyFreeSpinsForUi) return;
-    Navigator.of(context).push(
+  Future<void> _promptBuyFreeSpinsConfirm() async {
+    if (_viewModel.anteBetActive ||
+        _isBigWinShowing ||
+        _viewModel.isBusy ||
+        _isCelebrationActive ||
+        !_viewModel.canBuyFreeSpinsForUi) {
+      return;
+    }
+    final confirmed = await Navigator.of(context).push<bool>(
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,
@@ -619,13 +626,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         pageBuilder: (_, _, _) => BuyFreeSpinsConfirmScreen(
           spinCount: 10,
           price: _viewModel.buyFeaturePrice,
-          onConfirm: _viewModel.buyFreeSpins,
         ),
         transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 200),
       ),
     );
+    if (!mounted || confirmed != true) return;
+    await _viewModel.buyFreeSpins();
   }
 
   void _maybeShowBigWin(double amount) {
@@ -1037,6 +1045,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_celebrationLocked) {
       setState(() => _celebrationLocked = false);
     }
+    if (_bigWinEntry != null) {
+      return;
+    }
     _viewModel.commitPendingFsConsume();
     if (_viewModel.isInFreeSpins && _viewModel.freeSpinsRemaining == 0) {
       _showFreeSpinSummaryPopup();
@@ -1269,15 +1280,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
                     }
+                    final betButtonPassive =
+                        _isBigWinShowing ||
+                        _viewModel.isBusy ||
+                        _isCelebrationActive;
                     return RepaintBoundary(
                       child: BuyFeatureButton(
                         price: _viewModel.buyFeaturePrice,
                         disabled:
-                            _isBigWinShowing ||
-                            !_viewModel.canBuyFreeSpinsForUi ||
-                            _viewModel.anteBetActive,
+                            _viewModel.anteBetActive ||
+                            betButtonPassive ||
+                            !_viewModel.canBuyFreeSpinsForUi,
                         vibrationEnabled: _viewModel.vibration,
-                        onTap: _promptBuyFreeSpinsConfirm,
+                        onTap: () {
+                          _promptBuyFreeSpinsConfirm();
+                        },
                         width: screenW * 0.39,
                         height: screenW * 0.22,
                       ),
@@ -1614,7 +1631,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       final hasMultiplierSequence =
           result != null &&
           result.baseWin > 0 &&
-          result.finalMultipliers.isNotEmpty;
+          result.finalMultipliers.isNotEmpty &&
+          !(_viewModel.lastSpinWasFreeSpin && !_isFreeSpinVisualMode);
 
       if (hasMultiplierSequence) {
         return WinPresentation(
@@ -2418,11 +2436,11 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
                   width: width,
                   filterQuality: FilterQuality.medium,
                 ),
-                // Always show '10' in the purple centre area (no currency symbol).
+                // Show the awarded free-spin count in the purple centre area.
                 Transform.translate(
                   offset: valueOffset,
                   child: Text(
-                    '10',
+                    '${widget.value}',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       fontSize: valueFontSize,

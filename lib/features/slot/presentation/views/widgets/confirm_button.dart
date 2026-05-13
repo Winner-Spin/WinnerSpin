@@ -66,9 +66,9 @@ class _ConfirmButtonState extends State<ConfirmButton>
       onTapDown: (_) => _pressCtrl.forward(),
       onTapUp: (_) {
         _pressCtrl.reverse();
-        widget.onTap();
       },
       onTapCancel: () => _pressCtrl.reverse(),
+      onTap: widget.onTap,
       child: ScaleTransition(
         scale: _scale,
         child: RepaintBoundary(

@@ -145,6 +145,9 @@ class GameViewModel extends ChangeNotifier {
   bool _isAutoSpinning = false;
   bool get isAutoSpinning => _isAutoSpinning;
 
+  bool _lastSpinWasFreeSpin = false;
+  bool get lastSpinWasFreeSpin => _lastSpinWasFreeSpin;
+
   int _autoSpinsRemaining = 0;
   int get autoSpinsRemaining => _autoSpinsRemaining;
 
@@ -206,7 +209,7 @@ class GameViewModel extends ChangeNotifier {
       !isBusy &&
       !_isAutoSpinning &&
       !isInFreeSpins &&
-      _balanceCtrl.canAfford(buyFeaturePrice);
+      _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
 
   /// User-facing buy availability. Mirrors the displayed credit (not
   /// the canonical balance) so the button doesn't go grey while the
@@ -274,7 +277,7 @@ class GameViewModel extends ChangeNotifier {
         .where((path) => path == scatterPath)
         .length;
 
-    return scatterCount >= 3;
+    return scatterCount >= 4;
   }
 
   // ── Tumble animation timing ──
@@ -451,6 +454,7 @@ class GameViewModel extends ChangeNotifier {
     _currentSpinFromBuy = false;
 
     final bool isFreeSpin = isInFreeSpins;
+    _lastSpinWasFreeSpin = isFreeSpin;
 
     if (!isFreeSpin) {
       final cost = _balanceCtrl.effectiveBetCost;
@@ -523,9 +527,18 @@ class GameViewModel extends ChangeNotifier {
   /// the awarded round so the engine still applies the buy boost
   /// across the FS spins that follow.
   Future<void> buyFreeSpins() async {
-    if (!canBuyFreeSpins) return;
-    if (isBusy) return;
+    if (_isAutoSpinning) {
+      _isAutoSpinning = false;
+      _autoSpinsRemaining = 0;
+    }
+    if (_anteCtrl.active) return;
+    if (isBusy || isInFreeSpins) return;
+    if (!_balanceCtrl.canAffordDisplayed(buyFeaturePrice)) {
+      _flashInsufficientFundsHint();
+      return;
+    }
 
+    _lastSpinWasFreeSpin = false;
     final price = buyFeaturePrice;
     _balanceCtrl.charge(price);
     _pool.recordBet(price);
