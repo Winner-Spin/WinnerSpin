@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
 /// Row of [+ / current bet / -] controls.
@@ -186,7 +187,7 @@ class _BetDisplay extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'BAHİS',
+            'BET',
             style: GoogleFonts.outfit(
               color: const Color(0xFFF3E5F5),
               fontSize: 10,
@@ -201,8 +202,8 @@ class _BetDisplay extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '₺${amount.toStringAsFixed(0)}',
+          MoneyText(
+            text: amount.toStringAsFixed(0),
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontSize: 22,

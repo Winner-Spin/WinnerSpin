@@ -6,8 +6,25 @@ import '../../../domain/engine/slot_engine.dart';
 /// write; setters short-circuit when the value is unchanged.
 class BalanceController extends ChangeNotifier {
   static const List<double> _betTiers = [
-    10, 20, 30, 40, 50, 75, 100, 200, 500, 750,
-    1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000,
+    10,
+    20,
+    30,
+    40,
+    50,
+    75,
+    100,
+    200,
+    500,
+    750,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
   ];
   static const double _defaultBalance = 10000.0;
 
@@ -37,7 +54,7 @@ class BalanceController extends ChangeNotifier {
   /// AnteToggle to preview the cost regardless of the current toggle state.
   double get anteCost => _betAmount * 1.25;
 
-  /// Buy Free Spins price in TL at the current bet level.
+  /// Buy Free Spins price at the current bet level.
   double get buyFeaturePrice =>
       _betAmount * SlotEngine.buyFeaturePriceMultiplier;
 

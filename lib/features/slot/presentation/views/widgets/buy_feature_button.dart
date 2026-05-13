@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
 /// Glossy candy-style "BUY FEATURE" button. Tapping toggles between an
@@ -12,6 +14,7 @@ class BuyFeatureButton extends StatefulWidget {
   final double width;
   final double height;
   final bool disabled;
+  final bool vibrationEnabled;
   final VoidCallback? onTap;
 
   const BuyFeatureButton({
@@ -21,11 +24,13 @@ class BuyFeatureButton extends StatefulWidget {
     this.width = 235,
     this.height = 112,
     this.disabled = false,
+    this.vibrationEnabled = true,
     this.onTap,
   });
 
-  String get _formattedPrice =>
-      '₺${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')}';
+  String get _formattedPrice => price
+      .toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
 
   @override
   State<BuyFeatureButton> createState() => _BuyFeatureButtonState();
@@ -94,6 +99,7 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
               _pressCtrl.reverse();
               _toggleGlass();
               UiClickSound.play();
+              if (widget.vibrationEnabled) HapticFeedback.lightImpact();
               widget.onTap?.call();
             },
             onTapCancel: () => _pressCtrl.reverse(),
@@ -342,7 +348,7 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                                     SizedBox(height: h * 0.03),
                                     FittedBox(
                                       fit: BoxFit.scaleDown,
-                                      child: _EmbossedText(
+                                      child: _EmbossedMoneyText(
                                         text: widget._formattedPrice,
                                         fontSize: h * 0.30,
                                         strokeWidth: 4.2,
@@ -410,6 +416,67 @@ class _EmbossedText extends StatelessWidget {
         Text(
           text,
           textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            height: 1.0,
+            color: fillColor,
+            shadows: const [
+              Shadow(
+                color: Color(0xFF6E1A4B),
+                offset: Offset(0, 2),
+                blurRadius: 2,
+              ),
+              Shadow(
+                color: Color(0x55FFC089),
+                offset: Offset(0, -1),
+                blurRadius: 1,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmbossedMoneyText extends StatelessWidget {
+  final String text;
+  final double fontSize;
+  final double strokeWidth;
+  final double letterSpacing;
+  final Color fillColor;
+
+  const _EmbossedMoneyText({
+    required this.text,
+    required this.fontSize,
+    required this.strokeWidth,
+    required this.letterSpacing,
+    required this.fillColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        MoneyText(
+          text: text,
+          style: GoogleFonts.outfit(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            height: 1.0,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeJoin = StrokeJoin.round
+              ..color = const Color(0xFF8B2258),
+          ),
+        ),
+        MoneyText(
+          text: text,
           style: GoogleFonts.outfit(
             fontSize: fontSize,
             fontWeight: FontWeight.w900,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
 /// CTA that purchases a Free Spins round at 100× the base bet. Disabled
@@ -127,8 +128,8 @@ class BuyFsButton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              '₺${price.toStringAsFixed(0)}',
+            MoneyText(
+              text: price.toStringAsFixed(0),
               style: GoogleFonts.outfit(
                 color: textColor,
                 fontSize: 17,

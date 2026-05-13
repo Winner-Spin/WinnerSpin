@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/widgets/money_text.dart';
 import '../../../domain/models/cluster_win.dart';
 
 /// Overlay that renders explosion particles and floating win amounts
@@ -238,12 +239,14 @@ class _EffectPainter extends CustomPainter {
         scale = 1.0;
       }
 
-      final text =
-          '₺${e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}';
+      final text = e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+      final fontSize = (style.fontSize ?? 28) * scale;
+      final symbolSize = Size(fontSize * 0.74, fontSize * 1.04);
+      final symbolSpacing = 1.5 * scale;
 
       // Draw text outline (dark stroke for readability)
       final strokeStyle = style.copyWith(
-        fontSize: (style.fontSize ?? 28) * scale,
+        fontSize: fontSize,
         foreground: Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 4.0
@@ -252,7 +255,7 @@ class _EffectPainter extends CustomPainter {
       );
 
       final fillStyle = style.copyWith(
-        fontSize: (style.fontSize ?? 28) * scale,
+        fontSize: fontSize,
         color: style.color?.withValues(alpha: textOpacity),
         shadows: [
           Shadow(
@@ -273,7 +276,28 @@ class _EffectPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final textX = e.cx - strokeTp.width / 2;
+      final contentWidth = symbolSize.width + symbolSpacing + strokeTp.width;
+      final startX = e.cx - contentWidth / 2;
+      final symbolY = textY + (strokeTp.height - symbolSize.height) / 2 + 1.1;
+      final textX = startX + symbolSize.width + symbolSpacing;
+
+      canvas.save();
+      canvas.translate(startX, symbolY);
+      MoneySymbolPainter(
+        style: strokeStyle,
+        lineYOffset: 1.45,
+        lineTopExtend: 0.9,
+      ).paint(canvas, symbolSize);
+      canvas.restore();
+
+      canvas.save();
+      canvas.translate(startX, symbolY);
+      MoneySymbolPainter(
+        style: fillStyle.copyWith(shadows: const []),
+        lineYOffset: 1.45,
+        lineTopExtend: 0.9,
+      ).paint(canvas, symbolSize);
+      canvas.restore();
 
       strokeTp.paint(canvas, Offset(textX, textY));
       fillTp.paint(canvas, Offset(textX, textY));

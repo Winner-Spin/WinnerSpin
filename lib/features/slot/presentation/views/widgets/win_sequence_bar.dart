@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/format/money_format.dart';
+import '../../../../../core/widgets/money_text.dart';
 import 'win_amount_counter.dart';
 import 'win_presentation_controller.dart';
 
@@ -23,6 +24,7 @@ class WinSequenceBar extends StatelessWidget {
   /// the running multiplier formula. Used by the free-spin layout where
   /// the strip's top half already shows the live total.
   final bool formulaOnly;
+  final bool vibrationEnabled;
 
   const WinSequenceBar({
     super.key,
@@ -31,6 +33,7 @@ class WinSequenceBar extends StatelessWidget {
     required this.accentStyle,
     required this.sumAnchorKey,
     this.formulaOnly = false,
+    this.vibrationEnabled = false,
   });
 
   @override
@@ -55,9 +58,13 @@ class WinSequenceBar extends StatelessWidget {
             // showing the value while the player reads it.
             return _kazancRow(
               accentStyle: accentStyle,
-              valueWidget: Text(
-                '₺${formatMoney(controller.baseWin)}',
+              valueWidget: MoneyText(
+                text: formatMoney(controller.baseWin),
                 style: baseStyle,
+                symbolOffset: const Offset(0, 1.5),
+                lineYOffset: 0.75,
+                lineLengthScale: 0.94,
+                lineTopExtend: 0.9,
               ),
             );
 
@@ -82,6 +89,7 @@ class WinSequenceBar extends StatelessWidget {
                 to: controller.totalWin,
                 style: baseStyle,
                 duration: WinPresentationController.finalCountUpDuration,
+                vibrationEnabled: vibrationEnabled,
               ),
             );
         }
@@ -98,7 +106,7 @@ class WinSequenceBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text('KAZANÇ', style: accentStyle),
+        Text('WIN', style: accentStyle),
         const SizedBox(width: 6),
         valueWidget,
       ],
@@ -115,7 +123,7 @@ class WinSequenceBar extends StatelessWidget {
     // Layout — left half always shows the base. Right half evolves:
     //   • flight not started yet → empty
     //   • flight started, sum still 0 → bare "×" placeholder
-    //   • after first landing → "× N = ₺total"; the running sum pops
+    //   • after first landing → "× N = total"; the running sum pops
     //     1.0 → 1.5 → 1.0 in place and the trailing money amount
     //     reels up to base*sum on every new landing.
     return FittedBox(
@@ -125,7 +133,14 @@ class WinSequenceBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Text('₺${formatMoney(base)}', style: baseStyle),
+          MoneyText(
+            text: formatMoney(base),
+            style: baseStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
+          ),
           if (showMultiplySign) ...[
             const SizedBox(width: 8),
             Text('×', style: baseStyle),
@@ -154,6 +169,7 @@ class WinSequenceBar extends StatelessWidget {
                 to: base * sum,
                 style: accentStyle,
                 duration: const Duration(milliseconds: 350),
+                vibrationEnabled: vibrationEnabled,
               ),
             ],
           ],

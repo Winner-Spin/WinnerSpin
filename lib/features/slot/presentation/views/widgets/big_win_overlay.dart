@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/audio/app_audio_context.dart';
+import '../../../../../core/widgets/money_text.dart';
 import 'win_amount_counter.dart';
 
 const double _coinRainCycleProgress = 0.78;
@@ -69,6 +70,7 @@ class BigWinOverlay extends StatefulWidget {
   final WinTier tier;
   final Duration duration;
   final bool soundEnabled;
+  final bool vibrationEnabled;
   final VoidCallback onComplete;
 
   /// When true, the overlay opens with the count-up already settled at
@@ -83,6 +85,7 @@ class BigWinOverlay extends StatefulWidget {
     required this.tier,
     required this.soundEnabled,
     required this.onComplete,
+    this.vibrationEnabled = false,
     this.duration = const Duration(seconds: 12),
     this.instantAmount = false,
   });
@@ -406,6 +409,7 @@ class _BigWinOverlayState extends State<BigWinOverlay>
                             amount: widget.amount,
                             duration: _countDuration,
                             skipCountUp: _amountSkipped,
+                            vibrationEnabled: widget.vibrationEnabled,
                           ),
                         ),
                       ],
@@ -488,11 +492,13 @@ class _AmountBanner extends StatelessWidget {
   final double amount;
   final Duration duration;
   final bool skipCountUp;
+  final bool vibrationEnabled;
 
   const _AmountBanner({
     required this.amount,
     required this.duration,
     this.skipCountUp = false,
+    this.vibrationEnabled = false,
   });
 
   @override
@@ -514,6 +520,7 @@ class _AmountBanner extends StatelessWidget {
             to: amount,
             duration: duration,
             forceComplete: skipCountUp,
+            vibrationEnabled: vibrationEnabled,
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontSize: 38,
@@ -576,8 +583,6 @@ class _CoinsPainter extends CustomPainter {
   static const _faceBottom = Color(0xFFFFB627);
   static const _innerRing = Color(0xFFC8902B);
   static const _shineColor = Color(0xFFFFFDF0);
-  // Stamp sits in the same warm-gold family as the face, so the ₺
-  // reads as embossed metal rather than a dark cut-out.
   static const _stampColor = Color(0xFFC8902B);
 
   @override
@@ -633,22 +638,24 @@ class _CoinsPainter extends CustomPainter {
           ..strokeWidth = r * 0.06,
       );
 
-      // ₺ stamp at the centre. The TextPainter is rebuilt per coin
-      // because each varies in radius — overhead is fine for the
-      // BIG WIN scene's short lifetime.
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '₺',
-          style: TextStyle(
-            color: _stampColor.withValues(alpha: alpha * 0.9),
-            fontSize: r * 1.25,
-            fontWeight: FontWeight.w900,
-            height: 1.0,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+      final stampStyle = TextStyle(
+        color: _stampColor.withValues(alpha: alpha * 0.9),
+        fontSize: r * 1.25,
+        fontWeight: FontWeight.w900,
+        height: 1.0,
+      );
+      final stampSize = Size(r * 0.92, r * 1.30);
+      canvas.save();
+      canvas.translate(
+        cx - stampSize.width / 2,
+        cy - stampSize.height / 2 + 1.1,
+      );
+      MoneySymbolPainter(
+        style: stampStyle,
+        lineYOffset: 1.45,
+        lineTopExtend: 0.9,
+      ).paint(canvas, stampSize);
+      canvas.restore();
 
       // Top-left specular highlight to read as a 3D coin.
       canvas.drawCircle(

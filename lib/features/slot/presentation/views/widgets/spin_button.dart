@@ -142,7 +142,7 @@ class _SpinButtonState extends State<SpinButton>
           ),
           const SizedBox(width: 10),
           Text(
-            'Dönüyor...',
+            'Spinning...',
             style: GoogleFonts.outfit(
               color: textColor,
               fontSize: 20,

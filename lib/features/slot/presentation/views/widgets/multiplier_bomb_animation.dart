@@ -217,6 +217,9 @@ class _BombPlayerState extends State<_BombPlayer>
                     _bombEnded = true;
                     if (!_blastFired) {
                       _blastFired = true;
+                      if (widget.soundEnabled) {
+                        unawaited(_BombExplosionSound.play());
+                      }
                       widget.onBlast?.call();
                     }
                     widget.onComplete();
@@ -279,8 +282,8 @@ class _BombExplosionSound {
     try {
       final pool = await (_poolFuture ??= AudioPool.create(
         source: AssetSource(_assetPath),
-        minPlayers: 1,
-        maxPlayers: 4,
+        minPlayers: 3,
+        maxPlayers: 8,
         playerMode: PlayerMode.mediaPlayer,
         audioContext: AppAudioContext.game,
       ));

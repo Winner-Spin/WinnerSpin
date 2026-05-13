@@ -111,10 +111,10 @@ class GameViewModel extends ChangeNotifier {
 
   // ── User profile ──
 
-  String _username = 'Yükleniyor...';
+  String _username = 'Loading...';
   String get username => _username;
 
-  String _email = 'Yükleniyor...';
+  String _email = 'Loading...';
   String get email => _email;
 
   bool _isLoading = true;
@@ -331,6 +331,14 @@ class GameViewModel extends ChangeNotifier {
     spin();
   }
 
+  void startFreeSpinAutoSpin(int spinCount) {
+    if (!isInFreeSpins || isBusy || spinCount <= 0) return;
+    _autoSpinsRemaining = spinCount;
+    _isAutoSpinning = true;
+    notifyListeners();
+    spin();
+  }
+
   void stopAutoSpin() {
     if (!_isAutoSpinning && _autoSpinsRemaining == 0) return;
     _isAutoSpinning = false;
@@ -347,7 +355,7 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void toggleSpeed() {
-    if (isBusy || _isAutoSpinning) return;
+    if (isBusy && !_isAutoSpinning) return;
     _speedMultiplier = (_speedMultiplier % 3) + 1;
     notifyListeners();
   }
@@ -388,8 +396,8 @@ class GameViewModel extends ChangeNotifier {
         _listenToUserBalance(uid);
 
         if (userData != null) {
-          _username = userData['username'] ?? 'Kullanıcı';
-          _email = userData['email'] ?? 'Email Yok';
+          _username = userData['username'] ?? 'Player';
+          _email = userData['email'] ?? 'No Email';
           _balanceCtrl.hydrate(userData);
           _fsCtrl.hydrate(userData);
 
@@ -397,14 +405,14 @@ class GameViewModel extends ChangeNotifier {
             _savePlayerState();
           }
         } else {
-          _username = 'Bilinmiyor';
-          _email = 'Bilinmiyor';
+          _username = 'Unknown';
+          _email = 'Unknown';
         }
       }
     } catch (e) {
       debugPrint('Data fetch error: $e');
-      _username = 'Hata oluştu';
-      _email = 'Hata oluştu';
+      _username = 'Error';
+      _email = 'Error';
     } finally {
       _isLoading = false;
       notifyListeners();

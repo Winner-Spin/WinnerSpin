@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/format/money_format.dart';
+import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
 /// Glossy candy-style "DOUBLE CHANCE" button. Same multi-layer construction
@@ -11,6 +13,7 @@ class DoubleChanceButton extends StatefulWidget {
   final double betAmount;
   final bool isOn;
   final bool disabled;
+  final bool vibrationEnabled;
   final VoidCallback onTap;
   final double width;
   final double height;
@@ -20,6 +23,7 @@ class DoubleChanceButton extends StatefulWidget {
     required this.betAmount,
     required this.isOn,
     required this.disabled,
+    this.vibrationEnabled = true,
     required this.onTap,
     this.width = 235,
     this.height = 112,
@@ -69,6 +73,7 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
           : (_) {
               _pressCtrl.reverse();
               UiClickSound.play();
+              if (widget.vibrationEnabled) HapticFeedback.lightImpact();
               widget.onTap();
             },
       onTapCancel: disabled ? null : () => _pressCtrl.reverse(),
@@ -272,8 +277,8 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                                       ),
                                     ),
                                     SizedBox(width: h * 0.04),
-                                    _EmbossedText(
-                                      text: '₺${formatMoney(widget.betAmount)}',
+                                    _EmbossedMoneyText(
+                                      text: formatMoney(widget.betAmount),
                                       fontSize: h * 0.20,
                                       strokeWidth: 2.6,
                                       letterSpacing: 0.5,
@@ -490,6 +495,67 @@ class _EmbossedText extends StatelessWidget {
         Text(
           text,
           textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            height: 1.0,
+            color: fillColor,
+            shadows: const [
+              Shadow(
+                color: Color(0xFF053C14),
+                offset: Offset(0, 2),
+                blurRadius: 2,
+              ),
+              Shadow(
+                color: Color(0x55FFC089),
+                offset: Offset(0, -1),
+                blurRadius: 1,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmbossedMoneyText extends StatelessWidget {
+  final String text;
+  final double fontSize;
+  final double strokeWidth;
+  final double letterSpacing;
+  final Color fillColor;
+
+  const _EmbossedMoneyText({
+    required this.text,
+    required this.fontSize,
+    required this.strokeWidth,
+    required this.letterSpacing,
+    required this.fillColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        MoneyText(
+          text: text,
+          style: GoogleFonts.outfit(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            height: 1.0,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeJoin = StrokeJoin.round
+              ..color = const Color(0xFF053C14),
+          ),
+        ),
+        MoneyText(
+          text: text,
           style: GoogleFonts.outfit(
             fontSize: fontSize,
             fontWeight: FontWeight.w900,
