@@ -47,6 +47,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _imageOpacity;
   late final Animation<double> _dropAnimation;
+  late final Listenable _cellAnimationListenable;
 
   // Regenerated on each fade event so consecutive wins on the same cell
   // get distinct burst patterns; palette refreshes when [path] changes.
@@ -82,6 +83,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       parent: _dropController,
       curve: Curves.easeOutCubic,
     );
+    _cellAnimationListenable = Listenable.merge([
+      _fadeController,
+      _dropAnimation,
+      _burstController,
+    ]);
 
     _particles = _generateParticles();
     _palette = _GlowPalette.forPath(widget.path);
@@ -171,11 +177,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([
-          _fadeController,
-          _dropAnimation,
-          _burstController,
-        ]),
+        animation: _cellAnimationListenable,
         builder: (context, child) {
           final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
           final scale = _preBurstScale(_fadeController.value) * perSymbolScale;
