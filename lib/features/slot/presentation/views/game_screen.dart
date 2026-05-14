@@ -26,6 +26,7 @@ import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
+import 'widgets/multiplier_label.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
@@ -34,6 +35,8 @@ import 'auto_play_settings_screen.dart';
 import 'buy_freespins_confirm_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
+
+const int _freeSpinPopupCacheWidth = 1024;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -263,15 +266,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _precacheOpeningGridSymbols();
+      _precacheMultiplierLabels();
+      _precacheWinOverlayAssets();
       _scheduleDeferredSymbolPrecache();
       precacheImage(
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
-        context,
-      );
-      precacheImage(
-        const AssetImage(
-          'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png',
-        ),
         context,
       );
       unawaited(_maybeShowFirstLaunchDisclaimer());
@@ -369,6 +368,45 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _precacheSymbol(String path) {
     precacheImage(ResizeImage(AssetImage(path), width: 256), context);
+  }
+
+  void _precacheMultiplierLabels() {
+    for (final path in MultiplierLabel.assetPaths) {
+      precacheImage(ResizeImage(AssetImage(path), width: 384), context);
+    }
+  }
+
+  void _precacheWinOverlayAssets() {
+    for (final path in WinTier.assetPaths) {
+      precacheImage(
+        ResizeImage(
+          AssetImage(path),
+          width: BigWinOverlay.headlineCacheWidth,
+        ),
+        context,
+      );
+    }
+    precacheImage(
+      const ResizeImage(
+        AssetImage(BigWinOverlay.amountBannerAssetPath),
+        width: BigWinOverlay.amountBannerCacheWidth,
+      ),
+      context,
+    );
+    precacheImage(
+      const ResizeImage(
+        AssetImage(_FreeSpinWinPopupState.assetPath),
+        width: _freeSpinPopupCacheWidth,
+      ),
+      context,
+    );
+    precacheImage(
+      const ResizeImage(
+        AssetImage(_FreeSpinSummaryPopupState.assetPath),
+        width: _freeSpinPopupCacheWidth,
+      ),
+      context,
+    );
   }
 
   Future<File> _firstLaunchDisclaimerFile() async {
@@ -2435,7 +2473,7 @@ class _FreeSpinWinPopup extends StatefulWidget {
 
 class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     with SingleTickerProviderStateMixin {
-  static const _initialAssetPath =
+  static const assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
 
   late final AnimationController _controller;
@@ -2461,7 +2499,6 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width * 0.88;
     // Always use FreeSpinWin.png — both initial trigger and retrigger.
-    const assetPath = _initialAssetPath;
     // Centre offset for the spin-count circle (purple area).
     final valueOffset = Offset(0, width * 0.035);
     final valueFontSize = width * 0.16;
@@ -2482,6 +2519,7 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
                   assetPath,
                   width: width,
                   filterQuality: FilterQuality.medium,
+                  cacheWidth: _freeSpinPopupCacheWidth,
                 ),
                 // Show the awarded free-spin count in the purple centre area.
                 Transform.translate(
@@ -2539,7 +2577,7 @@ class _FreeSpinSummaryPopup extends StatefulWidget {
 
 class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
     with SingleTickerProviderStateMixin {
-  static const _assetPath =
+  static const assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
 
   late final AnimationController _controller;
@@ -2581,9 +2619,10 @@ class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
               alignment: Alignment.center,
               children: [
                 Image.asset(
-                  _assetPath,
+                  assetPath,
                   width: width,
                   filterQuality: FilterQuality.medium,
+                  cacheWidth: _freeSpinPopupCacheWidth,
                 ),
                 Transform.translate(
                   offset: Offset(0, width * 0.025),

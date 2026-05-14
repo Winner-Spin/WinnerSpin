@@ -30,6 +30,8 @@ class MultiplierLabel extends StatelessWidget {
 
   static String assetPathFor(int value) => _assets[value] ?? _assets[5]!;
 
+  static Iterable<String> get assetPaths => _assets.values;
+
   static const Map<int, Size> _intrinsicSizes = {
     2: Size(1448, 929),
     3: Size(1161, 859),
