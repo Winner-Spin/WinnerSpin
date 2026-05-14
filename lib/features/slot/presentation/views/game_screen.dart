@@ -1595,12 +1595,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  // Bottom panel only reads balance + bet — no need to
-                  // rebuild on unrelated _viewModel notifications.
-                  child: ListenableBuilder(
-                    listenable: _viewModel.balanceCtrl,
-                    builder: (context, _) => _buildBottomPanel(screenW),
-                  ),
+                  // Clock stays on its own stream and avoids bet rebuilds.
+                  child: _buildBottomPanel(),
                 ),
               ),
               if (_showFreeSpinTransition)
@@ -2064,42 +2060,49 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBottomPanel(double screenW) {
+  Widget _buildBottomPanel() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text('CREDIT', style: _bottomLabelStyle),
-              const SizedBox(width: 4),
-              MoneyText(
-                text: formatMoney(_viewModel.balance),
-                style: _bottomValueStyle,
-                symbolOffset: const Offset(0, 1.1),
-                lineYOffset: 1.05,
-                symbolTextYOffset: 0.45,
-              ),
-              const SizedBox(width: 16),
-              Text('BET', style: _bottomLabelStyle),
-              const SizedBox(width: 4),
-              MoneyText(
-                text: formatMoney(_viewModel.betAmount),
-                style: _bottomValueStyle,
-                symbolOffset: const Offset(0, 1.1),
-                lineYOffset: 1.05,
-                symbolTextYOffset: 0.45,
-              ),
-            ],
-          ),
+        ListenableBuilder(
+          listenable: _viewModel.balanceCtrl,
+          builder: (context, _) => _buildBottomMoneyRow(),
         ),
         const SizedBox(height: 1),
         _ClockText(style: _bottomClockStyle),
       ],
+    );
+  }
+
+  Widget _buildBottomMoneyRow() {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('CREDIT', style: _bottomLabelStyle),
+          const SizedBox(width: 4),
+          MoneyText(
+            text: formatMoney(_viewModel.balance),
+            style: _bottomValueStyle,
+            symbolOffset: const Offset(0, 1.1),
+            lineYOffset: 1.05,
+            symbolTextYOffset: 0.45,
+          ),
+          const SizedBox(width: 16),
+          Text('BET', style: _bottomLabelStyle),
+          const SizedBox(width: 4),
+          MoneyText(
+            text: formatMoney(_viewModel.betAmount),
+            style: _bottomValueStyle,
+            symbolOffset: const Offset(0, 1.1),
+            lineYOffset: 1.05,
+            symbolTextYOffset: 0.45,
+          ),
+        ],
+      ),
     );
   }
 }
