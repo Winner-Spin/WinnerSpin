@@ -1,12 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'multiplier_bomb_animation.dart';
-import 'multiplier_label.dart';
+import 'multiplier_bomb_symbol.dart';
 import 'tumble_cell.dart';
 
 class SlotReelController {
@@ -275,42 +274,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       // Multiplier cells render the bomb (frozen on frame 0) already during
       // the column-wide drop-in / drop-out so the player never sees a flash
       // of the legacy multiplier sprite morph into a bomb in the static phase.
-      symbolChild = Center(
-        child: SizedBox(
-          width: itemH * 1.3,
-          height: itemH * 1.3,
-          child: RepaintBoundary(
-            child: Stack(
-              fit: StackFit.expand,
-              clipBehavior: Clip.none,
-              children: [
-                Transform.scale(
-                  scale: MultiplierLabel.bombScaleFor(multiplierValue),
-                  child: Lottie.asset(
-                    MultiplierBombAnimation.assetPath,
-                    fit: BoxFit.contain,
-                    animate: false,
-                    renderCache: RenderCache.drawingCommands,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment(
-                    MultiplierLabel.labelXOffsetFor(multiplierValue),
-                    0.15,
-                  ),
-                  child: FractionallySizedBox(
-                    widthFactor: 1.0,
-                    heightFactor: 0.43,
-                    child: MultiplierLabel(
-                      value: multiplierValue,
-                      fit: BoxFit.fitHeight,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      symbolChild = MultiplierBombSymbol(
+        itemH: itemH,
+        multiplierValue: multiplierValue,
+        labelAlignmentY: 0.15,
       );
     } else {
       symbolChild = Image.asset(

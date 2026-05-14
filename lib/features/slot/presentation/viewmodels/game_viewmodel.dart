@@ -471,12 +471,12 @@ class GameViewModel extends ChangeNotifier {
       _pool.recordBet(cost);
     } else {
       // FS round — no charge, so the history entry records a zero
-      // stake. The counter consume is deferred (the screen fires it
-      // when the lingering-cluster line clears, so the displayed FS
-      // counter updates as soon as the cluster pay line steps off),
-      // and the round-hold flag keeps [isInFreeSpins] reporting true
-      // on the last FS spin even after the counter hits zero so the
-      // FS chrome holds through the full post-spin celebration.
+      // stake. The counter consume is queued until the reel result is
+      // ready, then committed before the landing grid animates in so
+      // the player sees the FS count step down before any PAYS/tumble
+      // presentation. The round-hold flag keeps [isInFreeSpins]
+      // reporting true on the last FS spin even after the counter hits
+      // zero so the FS chrome holds through the full post-spin celebration.
       _pendingHistoryBet = 0;
       _pendingFsConsume = true;
       _fsRoundHoldActive = true;
@@ -516,6 +516,11 @@ class GameViewModel extends ChangeNotifier {
     _pool = taskOutput.pool;
     _pendingResult = taskOutput.result;
 
+    if (isFreeSpin) {
+      // Step the visible counter down as soon as the landing grid is ready,
+      // before the reel drop-in and any PAYS/tumble presentation begin.
+      commitPendingFsConsume();
+    }
     _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
@@ -687,12 +692,10 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Commits the deferred FS counter consume queued by an FS spin's
-  /// start. The screen calls this when the lingering cluster line
-  /// clears (~1s after the cascade settles) so the displayed counter
-  /// updates immediately, decoupled from the chrome transition which
-  /// stays raised through [_fsRoundHoldActive] until the celebration
-  /// fully unwinds.
+  /// Commits the deferred FS counter consume queued by an FS spin's start.
+  /// FS spins call this as soon as the reel result is handled. The chrome
+  /// stays raised through [_fsRoundHoldActive] until the celebration fully
+  /// unwinds.
   void commitPendingFsConsume() {
     if (!_pendingFsConsume) return;
     _pendingFsConsume = false;

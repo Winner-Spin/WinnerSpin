@@ -775,10 +775,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _winCtrl.reset();
       _bigWinShownThisSpin = false;
       // Drop the previous spin's lock state without touching the FS
-      // consume — the consume for THIS spin was just queued by spin()
-      // and must wait for this spin's own celebration to settle. The
-      // viewmodel's own _pendingFsConsume flag stays set on the new
-      // spin; the unlock just clears local screen state.
+      // consume. The consume for THIS spin was just queued by spin()
+      // and will commit from the viewmodel as soon as the reel result
+      // is ready.
       if (_celebrationLocked) {
         setState(() => _celebrationLocked = false);
       }
@@ -925,16 +924,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
     } else if (_wasTumbling && !isTumbling && _lingeringCluster != null) {
       // Cascade just finished — let the final cluster's payout linger
-      // for a beat, then flip the FS info row back to FREE SPINS LEFT
-      // and commit the FS counter consume so the displayed remaining
-      // count updates the instant the cluster pay line steps off
-      // (the FS chrome itself stays through the rest of the
-      // celebration via the round-hold flag).
+      // for a beat, then flip the FS info row back to FREE SPINS LEFT.
+      // The FS counter has already stepped down before the PAYS/tumble
+      // presentation begins.
       _lingeringClusterTimer?.cancel();
       _lingeringClusterTimer = Timer(const Duration(seconds: 1), () {
         if (!mounted) return;
         setState(() => _lingeringCluster = null);
-        _viewModel.commitPendingFsConsume();
       });
     }
     _wasTumbling = isTumbling;
