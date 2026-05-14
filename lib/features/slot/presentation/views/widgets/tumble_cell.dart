@@ -3,13 +3,11 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 
 import '../../../../../core/audio/app_audio_context.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
-import 'multiplier_bomb_animation.dart';
-import 'multiplier_label.dart';
+import 'multiplier_bomb_symbol.dart';
 
 /// A single grid cell that handles four cascade-tumble effects independently
 /// of the column-wide spin in [SlotReel]:
@@ -47,6 +45,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _imageOpacity;
   late final Animation<double> _dropAnimation;
+  late final Listenable _cellAnimationListenable;
 
   // Regenerated on each fade event so consecutive wins on the same cell
   // get distinct burst patterns; palette refreshes when [path] changes.
@@ -82,6 +81,11 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       parent: _dropController,
       curve: Curves.easeOutCubic,
     );
+    _cellAnimationListenable = Listenable.merge([
+      _fadeController,
+      _dropAnimation,
+      _burstController,
+    ]);
 
     _particles = _generateParticles();
     _palette = _GlowPalette.forPath(widget.path);
@@ -171,11 +175,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([
-          _fadeController,
-          _dropAnimation,
-          _burstController,
-        ]),
+        animation: _cellAnimationListenable,
         builder: (context, child) {
           final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
           final scale = _preBurstScale(_fadeController.value) * perSymbolScale;
@@ -287,10 +287,7 @@ class _ItemExplosionPopSound {
 }
 
 /// Bomb sprite shown frozen on frame 0 in place of the multiplier face.
-/// The animated detonation runs in [MultiplierBombAnimation] as a root
-/// overlay when the win presentation reaches this cell, so this widget
-/// only needs to render the static bomb body. Wrapped in [Opacity] so
-/// the cell's existing fade-out path keeps working.
+/// Wrapped in [Opacity] so the cell's existing fade-out path keeps working.
 class _FrozenBomb extends StatelessWidget {
   final Animation<double> opacity;
   final double itemH;
@@ -303,59 +300,14 @@ class _FrozenBomb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Static PNG snapshot of the bomb body — drops the per-frame Skia
-    // path-replay cost of the full Lottie composition. The animated
-    // detonation runs in [MultiplierBombAnimation] overlay; this cell's
-    // PNG is hidden via [GameViewModel.clearedPositions] the moment that
-    // overlay starts, so there is no overlap during the fuse phase.
     return AnimatedBuilder(
       animation: opacity,
       builder: (context, child) =>
           Opacity(opacity: opacity.value, child: child),
-      // Render the Lottie in a 1.3x cell-sized box so the rope can
-      // overflow into the row above (Clip.none lets it spill). The
-      // bomb's own scale was counter-shrunk in the composition so the
-      // visible bomb body stays the same size as before.
-      child: Center(
-        child: SizedBox(
-          width: itemH * 1.3,
-          height: itemH * 1.3,
-          child: RepaintBoundary(
-            child: Stack(
-              fit: StackFit.expand,
-              clipBehavior: Clip.none,
-              children: [
-                Transform.scale(
-                  scale: MultiplierLabel.bombScaleFor(multiplierValue),
-                  child: Lottie.asset(
-                    MultiplierBombAnimation.assetPath,
-                    fit: BoxFit.contain,
-                    animate: false,
-                  ),
-                ),
-                // The bomb body sits ~22% below the Lottie box's
-                // geometric centre. We wrap the 5x label in Align
-                // (with the same y-bias) because Stack's `alignment`
-                // is ignored when StackFit.expand gives non-positioned
-                // children tight constraints.
-                Align(
-                  alignment: Alignment(
-                    MultiplierLabel.labelXOffsetFor(multiplierValue),
-                    0.22,
-                  ),
-                  child: FractionallySizedBox(
-                    widthFactor: 1.0,
-                    heightFactor: 0.43,
-                    child: MultiplierLabel(
-                      value: multiplierValue,
-                      fit: BoxFit.fitHeight,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: MultiplierBombSymbol(
+        itemH: itemH,
+        multiplierValue: multiplierValue,
+        labelAlignmentY: 0.22,
       ),
     );
   }

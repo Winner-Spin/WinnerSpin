@@ -82,6 +82,7 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
   late final Animation<double> _flightT;
   late final Offset _control;
   late final List<_Spark> _sparks;
+  late final Listenable _animationListenable;
 
   @override
   void initState() {
@@ -92,6 +93,7 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
     _burst = AnimationController(vsync: this, duration: widget.burstDuration);
     _settleT = CurvedAnimation(parent: _settle, curve: Curves.easeOutBack);
     _flightT = CurvedAnimation(parent: _flight, curve: Curves.easeInOutCubic);
+    _animationListenable = Listenable.merge([_settleT, _flightT, _burst]);
 
     final mid = Offset(
       (widget.start.dx + widget.end.dx) / 2,
@@ -177,7 +179,7 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_settleT, _flightT, _burst]),
+      animation: _animationListenable,
       builder: (context, _) {
         final flightT = _flightT.value;
         final burstRaw = _burst.value;

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Renders the multiplier badge (e.g. "2x", "10x", "50x") as a sprite,
@@ -27,6 +29,21 @@ class MultiplierLabel extends StatelessWidget {
   };
 
   static String assetPathFor(int value) => _assets[value] ?? _assets[5]!;
+
+  static Iterable<String> get assetPaths => _assets.values;
+
+  static const Map<int, Size> _intrinsicSizes = {
+    2: Size(1448, 929),
+    3: Size(1161, 859),
+    5: Size(724, 520),
+    10: Size(724, 396),
+    25: Size(724, 382),
+    50: Size(1448, 847),
+    100: Size(1448, 1086),
+  };
+
+  static const double _decodeOversample = 1.25;
+  static const int _minCacheWidth = 96;
 
   /// Per-value bomb body scale. Higher multipliers get a slightly bigger
   /// bomb to telegraph their weight without changing the badge in front.
@@ -63,6 +80,24 @@ class MultiplierLabel extends StatelessWidget {
   static double labelXOffsetFor(int value) =>
       _labelXOffset[value] ?? _defaultLabelXOffset;
 
+  static int? _cacheWidthFor({
+    required int value,
+    required double height,
+    required double extraScale,
+    required double devicePixelRatio,
+  }) {
+    final intrinsic = _intrinsicSizes[value];
+    if (intrinsic == null || !height.isFinite || height <= 0) return null;
+
+    final displayWidth = height * (intrinsic.width / intrinsic.height);
+    final targetWidth =
+        (displayWidth * extraScale * devicePixelRatio * _decodeOversample)
+            .ceil();
+    final minWidth = math.min(_minCacheWidth, intrinsic.width.toInt());
+
+    return targetWidth.clamp(minWidth, intrinsic.width.toInt()).toInt();
+  }
+
   @override
   Widget build(BuildContext context) {
     final extra = labelScaleFor(value);
@@ -73,11 +108,19 @@ class MultiplierLabel extends StatelessWidget {
             : constraints.biggest.shortestSide;
         final dx = height * labelXOffsetFor(value);
         final dy = height * _defaultLabelYOffset;
+        final cacheWidth = _cacheWidthFor(
+          value: value,
+          height: height,
+          extraScale: extra,
+          devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+        );
         final image = Image.asset(
           assetPathFor(value),
           fit: fit,
           alignment: Alignment.center,
           filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+          cacheWidth: cacheWidth,
         );
         final scaled = extra == 1.0
             ? image

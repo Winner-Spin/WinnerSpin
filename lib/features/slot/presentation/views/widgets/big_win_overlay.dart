@@ -59,6 +59,8 @@ enum WinTier {
     if (multiplier >= bigWin.threshold) return bigWin;
     return null;
   }
+
+  static Iterable<String> get assetPaths => values.map((tier) => tier.assetPath);
 }
 
 /// Celebratory overlay that pops in once a spin clears the big-win
@@ -66,6 +68,11 @@ enum WinTier {
 /// WINBOX amount panel, and a field of drifting yellow sparkles.
 /// Plays elastic-pop → hold → fade and self-removes via [onComplete].
 class BigWinOverlay extends StatefulWidget {
+  static const amountBannerAssetPath =
+      'lib/images/slot_main_screen/WIN_ARTICLES/WINBOX.png';
+  static const headlineCacheWidth = 1280;
+  static const amountBannerCacheWidth = 1024;
+
   final double amount;
   final WinTier tier;
   final Duration duration;
@@ -472,6 +479,7 @@ class _TierHeadline extends StatelessWidget {
       tier.assetPath,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
+      cacheWidth: BigWinOverlay.headlineCacheWidth,
     );
     // Box stays at the same footprint for every tier so the
     // surrounding stars and amount banner keep their original gaps —
@@ -495,6 +503,21 @@ class _AmountBanner extends StatelessWidget {
   final bool skipCountUp;
   final bool vibrationEnabled;
 
+  static final TextStyle _amountStyle = GoogleFonts.outfit(
+    color: Colors.white,
+    fontSize: 38,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 1.2,
+    decoration: TextDecoration.none,
+    shadows: [
+      Shadow(
+        color: Colors.black.withValues(alpha: 0.45),
+        offset: const Offset(0, 3),
+        blurRadius: 6,
+      ),
+    ],
+  );
+
   const _AmountBanner({
     required this.amount,
     required this.duration,
@@ -508,9 +531,10 @@ class _AmountBanner extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Image.asset(
-          'lib/images/slot_main_screen/WIN_ARTICLES/WINBOX.png',
+          BigWinOverlay.amountBannerAssetPath,
           width: 340,
           filterQuality: FilterQuality.medium,
+          cacheWidth: BigWinOverlay.amountBannerCacheWidth,
         ),
         Padding(
           // Inset clears the candy-stripe rounded ends of the panel
@@ -522,20 +546,7 @@ class _AmountBanner extends StatelessWidget {
             duration: duration,
             forceComplete: skipCountUp,
             vibrationEnabled: vibrationEnabled,
-            style: GoogleFonts.outfit(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-              decoration: TextDecoration.none,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  offset: const Offset(0, 3),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
+            style: _amountStyle,
           ),
         ),
       ],

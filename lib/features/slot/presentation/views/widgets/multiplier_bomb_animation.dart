@@ -208,6 +208,7 @@ class _BombPlayerState extends State<_BombPlayer>
             MultiplierBombAnimation.assetPath,
             controller: _ctrl,
             fit: BoxFit.contain,
+            renderCache: RenderCache.drawingCommands,
             onLoaded: (composition) {
               _ctrl
                 ..duration = composition.duration

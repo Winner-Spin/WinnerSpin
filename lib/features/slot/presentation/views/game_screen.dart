@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -26,6 +27,7 @@ import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
+import 'widgets/multiplier_label.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
@@ -34,6 +36,8 @@ import 'auto_play_settings_screen.dart';
 import 'buy_freespins_confirm_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
+
+const int _freeSpinPopupCacheWidth = 1024;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -117,6 +121,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   OverlayEntry? _freeSpinWinPopupEntry;
   int _fsAwardedThisRound = 0;
   _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
+  bool _freeSpinAwardSequenceActive = false;
   bool _fsSummaryPopupVisible = false;
   bool _deferInitialFreeSpinVisualMode = false;
   int _scatterPulseTrigger = 0;
@@ -141,6 +146,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
+  Timer? _deferredPrecacheTimer;
 
   bool get _isFreeSpinVisualMode =>
       _viewModel.isInFreeSpins && !_deferInitialFreeSpinVisualMode;
@@ -176,6 +182,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final TextStyle _bottomValueStyle;
   late final TextStyle _bottomClockStyle;
 
+  late final Listenable _freeSpinVisualListenable;
+  late final Listenable _gridVisualListenable;
+  late final Listenable _balanceStatusListenable;
+  late final Listenable _fsInfoListenable;
+  late final Listenable _buyFeatureListenable;
+  late final Listenable _anteToggleListenable;
+  late final Listenable _spinControlsListenable;
+  late final Listenable _tumbleWinListenable;
+
   @override
   void initState() {
     super.initState();
@@ -183,6 +198,44 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       GameViewModel.columns,
       (_) => SlotReelController(),
     );
+    _freeSpinVisualListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.fsCtrl,
+    ]);
+    _gridVisualListenable = Listenable.merge([_viewModel, _viewModel.gridCtrl]);
+    _balanceStatusListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+    ]);
+    _fsInfoListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.fsCtrl,
+      _viewModel.gridCtrl,
+    ]);
+    _buyFeatureListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.anteCtrl,
+      _viewModel.fsCtrl,
+    ]);
+    _anteToggleListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.anteCtrl,
+      _viewModel.balanceCtrl,
+      _viewModel.fsCtrl,
+    ]);
+    _spinControlsListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.fsCtrl,
+      _winCtrl,
+    ]);
+    _tumbleWinListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.gridCtrl,
+      _winCtrl,
+    ]);
     WidgetsBinding.instance.addObserver(this);
     UiClickSound.enabled = _viewModel.soundEffects;
     unawaited(UiClickSound.preload());
@@ -209,26 +262,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
 
-    // Pre-decode symbol assets at the cell-sized cache width so the
-    // first appearance of each symbol doesn't block the main thread.
-    // The free-spin backdrop is also pre-decoded so the first FS trigger
-    // doesn't stall the swap.
+    // Pre-decode the opening grid first so startup doesn't compete with
+    // every symbol asset at once. Remaining symbols are warmed shortly
+    // after first paint in small batches.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      for (final sym in SymbolRegistry.all) {
-        precacheImage(
-          ResizeImage(AssetImage(sym.assetPath), width: 256),
-          context,
-        );
-      }
+      _precacheOpeningGridSymbols();
+      _precacheMultiplierLabels();
+      _precacheWinOverlayAssets();
+      unawaited(_FreeSpinScatterTransitionState.precacheCupcakeImage());
+      _scheduleDeferredSymbolPrecache();
       precacheImage(
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
-        context,
-      );
-      precacheImage(
-        const AssetImage(
-          'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png',
-        ),
         context,
       );
       unawaited(_maybeShowFirstLaunchDisclaimer());
@@ -285,6 +330,85 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       fontWeight: FontWeight.w500,
       letterSpacing: 0.3,
       height: 1.0,
+    );
+  }
+
+  void _precacheOpeningGridSymbols() {
+    final openingPaths = <String>{
+      for (final column in _viewModel.grid) ...column,
+    };
+    for (final path in openingPaths) {
+      _precacheSymbol(path);
+    }
+  }
+
+  void _scheduleDeferredSymbolPrecache() {
+    final openingPaths = <String>{
+      for (final column in _viewModel.grid) ...column,
+    };
+    final remainingPaths = SymbolRegistry.all
+        .map((symbol) => symbol.assetPath)
+        .where((path) => !openingPaths.contains(path))
+        .toList(growable: false);
+
+    _deferredPrecacheTimer?.cancel();
+    _deferredPrecacheTimer = Timer(const Duration(milliseconds: 300), () {
+      unawaited(_precacheSymbolsInBatches(remainingPaths));
+    });
+  }
+
+  Future<void> _precacheSymbolsInBatches(List<String> paths) async {
+    const batchSize = 3;
+    for (var index = 0; index < paths.length; index += batchSize) {
+      if (!mounted) return;
+      final end = math.min(index + batchSize, paths.length);
+      for (final path in paths.sublist(index, end)) {
+        _precacheSymbol(path);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 24));
+    }
+  }
+
+  void _precacheSymbol(String path) {
+    precacheImage(ResizeImage(AssetImage(path), width: 256), context);
+  }
+
+  void _precacheMultiplierLabels() {
+    for (final path in MultiplierLabel.assetPaths) {
+      precacheImage(ResizeImage(AssetImage(path), width: 384), context);
+    }
+  }
+
+  void _precacheWinOverlayAssets() {
+    for (final path in WinTier.assetPaths) {
+      precacheImage(
+        ResizeImage(
+          AssetImage(path),
+          width: BigWinOverlay.headlineCacheWidth,
+        ),
+        context,
+      );
+    }
+    precacheImage(
+      const ResizeImage(
+        AssetImage(BigWinOverlay.amountBannerAssetPath),
+        width: BigWinOverlay.amountBannerCacheWidth,
+      ),
+      context,
+    );
+    precacheImage(
+      const ResizeImage(
+        AssetImage(_FreeSpinWinPopupState.assetPath),
+        width: _freeSpinPopupCacheWidth,
+      ),
+      context,
+    );
+    precacheImage(
+      const ResizeImage(
+        AssetImage(_FreeSpinSummaryPopupState.assetPath),
+        width: _freeSpinPopupCacheWidth,
+      ),
+      context,
     );
   }
 
@@ -417,6 +541,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             _freeSpinWinPopupEntry = null;
           }
           entry.remove();
+          _freeSpinAwardSequenceActive = false;
+          _continueAutoSpinIfPresentationIdle();
         },
       ),
     );
@@ -432,6 +558,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _showFreeSpinAwardSequence(_PendingFreeSpinAward pending) {
+    _freeSpinAwardSequenceActive = true;
     if (pending.isRetrigger) {
       _showScatterPulse(
         minScatterCount: 3,
@@ -534,6 +661,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           if (!mounted) return;
           setState(() => _fsSummaryPopupVisible = false);
           _playFreeSpinExitTransitionThenRelease();
+          _continueAutoSpinIfPresentationIdle();
         },
       ),
     );
@@ -551,6 +679,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       setState(() => _showFreeSpinTransition = false);
+      _continueAutoSpinIfPresentationIdle();
     });
   }
 
@@ -692,10 +821,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _winCtrl.reset();
       _bigWinShownThisSpin = false;
       // Drop the previous spin's lock state without touching the FS
-      // consume — the consume for THIS spin was just queued by spin()
-      // and must wait for this spin's own celebration to settle. The
-      // viewmodel's own _pendingFsConsume flag stays set on the new
-      // spin; the unlock just clears local screen state.
+      // consume. The consume for THIS spin was just queued by spin()
+      // and will commit from the viewmodel as soon as the reel result
+      // is ready.
       if (_celebrationLocked) {
         setState(() => _celebrationLocked = false);
       }
@@ -842,16 +970,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
     } else if (_wasTumbling && !isTumbling && _lingeringCluster != null) {
       // Cascade just finished — let the final cluster's payout linger
-      // for a beat, then flip the FS info row back to FREE SPINS LEFT
-      // and commit the FS counter consume so the displayed remaining
-      // count updates the instant the cluster pay line steps off
-      // (the FS chrome itself stays through the rest of the
-      // celebration via the round-hold flag).
+      // for a beat, then flip the FS info row back to FREE SPINS LEFT.
+      // The FS counter has already stepped down before the PAYS/tumble
+      // presentation begins.
       _lingeringClusterTimer?.cancel();
       _lingeringClusterTimer = Timer(const Duration(seconds: 1), () {
         if (!mounted) return;
         setState(() => _lingeringCluster = null);
-        _viewModel.commitPendingFsConsume();
       });
     }
     _wasTumbling = isTumbling;
@@ -883,6 +1008,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _scatterPulseTimer?.cancel();
+    _deferredPrecacheTimer?.cancel();
     _lingeringClusterTimer?.cancel();
     _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1055,6 +1181,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
     _viewModel.releaseFsRoundHold();
     _showPendingFreeSpinAwardPopup();
+    _continueAutoSpinIfPresentationIdle();
+  }
+
+  void _continueAutoSpinIfPresentationIdle() {
+    if (!mounted) return;
+    if (_isCelebrationActive ||
+        _freeSpinAwardSequenceActive ||
+        _pendingFreeSpinAwardPopup != null ||
+        _scatterPulseTimer?.isActive == true ||
+        _freeSpinWinPopupEntry != null ||
+        _showFreeSpinTransition ||
+        _fsSummaryPopupVisible) {
+      return;
+    }
+    _viewModel.continueAutoSpinIfReady();
   }
 
   void _handleLogout(BuildContext context) {
@@ -1122,7 +1263,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // round is active, so the round's distinct atmosphere is
                 // visible the moment FS starts.
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
+                  listenable: _freeSpinVisualListenable,
                   builder: (context, _) {
                     final bgPath = _isFreeSpinVisualMode
                         ? 'lib/images/slot_main_screen/freespin arka plan.png'
@@ -1148,19 +1289,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   children: [
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
+                        listenable: _gridVisualListenable,
                         builder: (context, _) => _buildSlotGrid(),
                       ),
                     ),
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
+                        listenable: _viewModel.gridCtrl,
                         builder: (context, _) {
                           return RepaintBoundary(
                             child: FloatingWinOverlay(
@@ -1177,7 +1312,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               ListenableBuilder(
-                listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
+                listenable: _freeSpinVisualListenable,
                 builder: (context, _) {
                   // In free-spin rounds the strip splits into three
                   // black bands of the original height: top hosts the
@@ -1196,10 +1331,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   final totalHeight = isFs ? fsTotalHeight : bandHeight;
                   final kazancBand = _buildStatusBand(
                     child: ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel,
-                        _viewModel.balanceCtrl,
-                      ]),
+                      listenable: _balanceStatusListenable,
                       builder: (context, _) => _buildStatusText(
                         screenH: screenH,
                         gridLeft: gridLeftPx,
@@ -1237,11 +1369,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             height: bandHeight,
                             child: _buildStatusBand(
                               child: ListenableBuilder(
-                                listenable: Listenable.merge([
-                                  _viewModel,
-                                  _viewModel.fsCtrl,
-                                  _viewModel.gridCtrl,
-                                ]),
+                                listenable: _fsInfoListenable,
                                 builder: (context, _) => _buildFsInfoLine(),
                               ),
                             ),
@@ -1270,12 +1398,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.55,
                 left: screenW * 0.08,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                    _viewModel.anteCtrl,
-                    _viewModel.fsCtrl,
-                  ]),
+                  listenable: _buyFeatureListenable,
                   builder: (context, _) {
                     if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
@@ -1306,12 +1429,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.55,
                 right: screenW * 0.08,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.anteCtrl,
-                    _viewModel.balanceCtrl,
-                    _viewModel.fsCtrl,
-                  ]),
+                  listenable: _anteToggleListenable,
                   builder: (context, _) {
                     if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
@@ -1323,6 +1441,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         disabled:
                             _isBigWinShowing ||
                             _viewModel.isBusy ||
+                            _viewModel.isAutoSpinning ||
                             _viewModel.isInFreeSpins,
                         vibrationEnabled: _viewModel.vibration,
                         onTap: _viewModel.toggleAnteBet,
@@ -1338,12 +1457,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                    _viewModel.fsCtrl,
-                    _winCtrl,
-                  ]),
+                  listenable: _spinControlsListenable,
                   builder: (context, _) {
                     final autoActive = _viewModel.isAutoSpinning;
                     return Row(
@@ -1505,12 +1619,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  // Bottom panel only reads balance + bet — no need to
-                  // rebuild on unrelated _viewModel notifications.
-                  child: ListenableBuilder(
-                    listenable: _viewModel.balanceCtrl,
-                    builder: (context, _) => _buildBottomPanel(screenW),
-                  ),
+                  // Clock stays on its own stream and avoids bet rebuilds.
+                  child: _buildBottomPanel(),
                 ),
               ),
               if (_showFreeSpinTransition)
@@ -1675,7 +1785,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       );
     }
 
-    if (isBusy) {
+    if (isBusy || _viewModel.isAutoSpinning) {
       return Text('GOOD LUCK!', style: _statusBaseStyle);
     }
 
@@ -1734,12 +1844,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       children: [
         Center(
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              _viewModel,
-              _viewModel.balanceCtrl,
-              _viewModel.gridCtrl,
-              _winCtrl,
-            ]),
+            listenable: _tumbleWinListenable,
             builder: (context, _) => _buildTumbleWinLine(),
           ),
         ),
@@ -1979,42 +2084,49 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBottomPanel(double screenW) {
+  Widget _buildBottomPanel() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text('CREDIT', style: _bottomLabelStyle),
-              const SizedBox(width: 4),
-              MoneyText(
-                text: formatMoney(_viewModel.balance),
-                style: _bottomValueStyle,
-                symbolOffset: const Offset(0, 1.1),
-                lineYOffset: 1.05,
-                symbolTextYOffset: 0.45,
-              ),
-              const SizedBox(width: 16),
-              Text('BET', style: _bottomLabelStyle),
-              const SizedBox(width: 4),
-              MoneyText(
-                text: formatMoney(_viewModel.betAmount),
-                style: _bottomValueStyle,
-                symbolOffset: const Offset(0, 1.1),
-                lineYOffset: 1.05,
-                symbolTextYOffset: 0.45,
-              ),
-            ],
-          ),
+        ListenableBuilder(
+          listenable: _viewModel.balanceCtrl,
+          builder: (context, _) => _buildBottomMoneyRow(),
         ),
         const SizedBox(height: 1),
         _ClockText(style: _bottomClockStyle),
       ],
+    );
+  }
+
+  Widget _buildBottomMoneyRow() {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('CREDIT', style: _bottomLabelStyle),
+          const SizedBox(width: 4),
+          MoneyText(
+            text: formatMoney(_viewModel.balance),
+            style: _bottomValueStyle,
+            symbolOffset: const Offset(0, 1.1),
+            lineYOffset: 1.05,
+            symbolTextYOffset: 0.45,
+          ),
+          const SizedBox(width: 16),
+          Text('BET', style: _bottomLabelStyle),
+          const SizedBox(width: 4),
+          MoneyText(
+            text: formatMoney(_viewModel.betAmount),
+            style: _bottomValueStyle,
+            symbolOffset: const Offset(0, 1.1),
+            lineYOffset: 1.05,
+            symbolTextYOffset: 0.45,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2037,7 +2149,7 @@ class _FirstLaunchDisclaimerDialog extends StatelessWidget {
         children: [
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
               child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
@@ -2388,7 +2500,7 @@ class _FreeSpinWinPopup extends StatefulWidget {
 
 class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     with SingleTickerProviderStateMixin {
-  static const _initialAssetPath =
+  static const assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
 
   late final AnimationController _controller;
@@ -2414,7 +2526,6 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width * 0.88;
     // Always use FreeSpinWin.png — both initial trigger and retrigger.
-    const assetPath = _initialAssetPath;
     // Centre offset for the spin-count circle (purple area).
     final valueOffset = Offset(0, width * 0.035);
     final valueFontSize = width * 0.16;
@@ -2435,6 +2546,7 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
                   assetPath,
                   width: width,
                   filterQuality: FilterQuality.medium,
+                  cacheWidth: _freeSpinPopupCacheWidth,
                 ),
                 // Show the awarded free-spin count in the purple centre area.
                 Transform.translate(
@@ -2492,7 +2604,7 @@ class _FreeSpinSummaryPopup extends StatefulWidget {
 
 class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
     with SingleTickerProviderStateMixin {
-  static const _assetPath =
+  static const assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
 
   late final AnimationController _controller;
@@ -2534,9 +2646,10 @@ class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
               alignment: Alignment.center,
               children: [
                 Image.asset(
-                  _assetPath,
+                  assetPath,
                   width: width,
                   filterQuality: FilterQuality.medium,
+                  cacheWidth: _freeSpinPopupCacheWidth,
                 ),
                 Transform.translate(
                   offset: Offset(0, width * 0.025),
@@ -2623,10 +2736,20 @@ class _FreeSpinScatterTransition extends StatefulWidget {
 
 class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     with SingleTickerProviderStateMixin {
+  static const _cupcakeAssetPath =
+      'lib/images/slot_main_screen/Items/cupCake.png';
+  static const int _cupcakeCount = 420;
+  static const double _cupcakeCellSize = 0.19;
+  static ui.Image? _cachedCupcakeImage;
+  static Future<ui.Image>? _cupcakeImageFuture;
+
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
   late final Animation<double> _rotation;
+  Size? _burstLayoutSize;
+  late List<_CupcakeBurstParticle> _cupcakeParticles = const [];
+  ui.Image? _cupcakeImage;
 
   @override
   void initState() {
@@ -2648,6 +2771,7 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       begin: -0.16,
       end: 0.08,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    unawaited(_resolveCupcakeImage());
   }
 
   @override
@@ -2656,22 +2780,40 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     super.dispose();
   }
 
-  List<Widget> _buildCupcakeBurst(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    const assetPath = 'lib/images/slot_main_screen/Items/cupCake.png';
+  static Future<ui.Image> precacheCupcakeImage() {
+    final cached = _cachedCupcakeImage;
+    if (cached != null) return Future.value(cached);
+    return _cupcakeImageFuture ??= _loadCupcakeImage().then((image) {
+      _cachedCupcakeImage = image;
+      return image;
+    });
+  }
 
-    const int count = 420;
-    const double cellSize = 0.19;
+  static Future<ui.Image> _loadCupcakeImage() async {
+    final data = await rootBundle.load(_cupcakeAssetPath);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
 
+  Future<void> _resolveCupcakeImage() async {
+    final image = await precacheCupcakeImage();
+    if (!mounted) return;
+    setState(() => _cupcakeImage = image);
+  }
+
+  void _ensureCupcakeBurstLayout(Size size) {
+    if (_burstLayoutSize == size) return;
     double noise(int seed) {
       final raw = math.sin(seed * 12.9898) * 43758.5453;
       return raw - raw.floorToDouble();
     }
 
-    final List<Widget> cupcakes = [];
+    final particles = <_CupcakeBurstParticle>[];
 
-    for (int index = 0; index < count; index++) {
-      final t = index / count;
+    for (int index = 0; index < _cupcakeCount; index++) {
+      final t = index / _cupcakeCount;
       final angleBase = index * 2.399963229728653;
       final angle = angleBase + (noise(index * 7 + 3) - 0.5) * 1.15;
       final radius = math.sqrt(t) * (0.95 + noise(index * 11 + 5) * 0.58);
@@ -2682,65 +2824,151 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       final y =
           math.sin(angle) * radius * 0.88 / aspect +
           (noise(index * 17 + 9) - 0.5) * 0.26;
-      final sizeVar = cellSize + noise(index * 19 + 11) * 0.13;
+      final sizeVar = _cupcakeCellSize + noise(index * 19 + 11) * 0.13;
       final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
       final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
         0.0,
         0.28,
       );
+      final width = size.width * sizeVar;
 
-      final localProgress = ((_controller.value - delay) / 0.52).clamp(
-        0.0,
-        1.0,
-      );
-      final pop = Curves.easeOutBack.transform(localProgress);
-      final drift = Curves.easeOutCubic.transform(localProgress);
-
-      cupcakes.add(
-        Positioned(
-          left: size.width * (0.5 + x) - (size.width * sizeVar / 2),
-          top: size.height * (0.46 + y) - (size.width * sizeVar / 2),
-          child: Transform.translate(
-            offset: Offset(
-              (noise(index * 31 + 17) - 0.5) * 95 * (1 - drift),
-              (1 - drift) * (-85 - noise(index * 37 + 19) * 95),
-            ),
-            child: Transform.scale(
-              scale: (0.34 + pop * 0.84) * _scale.value.clamp(0.9, 1.22),
-              child: Transform.rotate(
-                angle: rotation + _rotation.value,
-                child: Image.asset(
-                  assetPath,
-                  width: size.width * sizeVar,
-                  filterQuality: FilterQuality.medium,
-                ),
-              ),
-            ),
-          ),
+      particles.add(
+        _CupcakeBurstParticle(
+          left: size.width * (0.5 + x) - (width / 2),
+          top: size.height * (0.46 + y) - (width / 2),
+          driftX: (noise(index * 31 + 17) - 0.5) * 95,
+          driftY: -85 - noise(index * 37 + 19) * 95,
+          rotation: rotation,
+          delay: delay,
+          width: width,
         ),
       );
     }
-    return cupcakes;
+
+    _burstLayoutSize = size;
+    _cupcakeParticles = particles;
   }
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return Opacity(
-            opacity: _fade.value,
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.38),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [..._buildCupcakeBurst(context)],
-              ),
-            ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final size =
+              constraints.hasBoundedWidth && constraints.hasBoundedHeight
+              ? constraints.biggest
+              : MediaQuery.sizeOf(context);
+          _ensureCupcakeBurstLayout(size);
+          return AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Opacity(
+                opacity: _fade.value,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.38),
+                  child: CustomPaint(
+                    size: size,
+                    painter: _CupcakeBurstPainter(
+                      particles: _cupcakeParticles,
+                      image: _cupcakeImage,
+                      progress: _controller.value,
+                      scale: _scale.value.clamp(0.9, 1.22),
+                      rotation: _rotation.value,
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
     );
+  }
+}
+
+class _CupcakeBurstParticle {
+  final double left;
+  final double top;
+  final double driftX;
+  final double driftY;
+  final double rotation;
+  final double delay;
+  final double width;
+
+  const _CupcakeBurstParticle({
+    required this.left,
+    required this.top,
+    required this.driftX,
+    required this.driftY,
+    required this.rotation,
+    required this.delay,
+    required this.width,
+  });
+}
+
+class _CupcakeBurstPainter extends CustomPainter {
+  final List<_CupcakeBurstParticle> particles;
+  final ui.Image? image;
+  final double progress;
+  final double scale;
+  final double rotation;
+
+  const _CupcakeBurstPainter({
+    required this.particles,
+    required this.image,
+    required this.progress,
+    required this.scale,
+    required this.rotation,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cupcake = image;
+    if (cupcake == null) return;
+
+    final source = Rect.fromLTWH(
+      0,
+      0,
+      cupcake.width.toDouble(),
+      cupcake.height.toDouble(),
+    );
+    final paint = Paint()
+      ..filterQuality = FilterQuality.medium
+      ..isAntiAlias = true;
+
+    for (final particle in particles) {
+      final localProgress = ((progress - particle.delay) / 0.52).clamp(
+        0.0,
+        1.0,
+      );
+      final pop = Curves.easeOutBack.transform(localProgress);
+      final drift = Curves.easeOutCubic.transform(localProgress);
+      final drawScale = (0.34 + pop * 0.84) * scale;
+      final center = Offset(
+        particle.left + particle.width / 2 + particle.driftX * (1 - drift),
+        particle.top + particle.width / 2 + particle.driftY * (1 - drift),
+      );
+      final target = Rect.fromCenter(
+        center: Offset.zero,
+        width: particle.width,
+        height: particle.width,
+      );
+
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(particle.rotation + rotation);
+      canvas.scale(drawScale);
+      canvas.drawImageRect(cupcake, source, target, paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CupcakeBurstPainter oldDelegate) {
+    return oldDelegate.particles != particles ||
+        oldDelegate.image != image ||
+        oldDelegate.progress != progress ||
+        oldDelegate.scale != scale ||
+        oldDelegate.rotation != rotation;
   }
 }

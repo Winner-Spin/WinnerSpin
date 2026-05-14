@@ -348,7 +348,6 @@ class GameViewModel extends ChangeNotifier {
     _autoSpinsRemaining = spinCount;
     _speedMultiplier = speedMultiplier.clamp(1, 3).toInt();
     _isAutoSpinning = true;
-    notifyListeners();
     spin();
   }
 
@@ -365,6 +364,22 @@ class GameViewModel extends ChangeNotifier {
     } else {
       startAutoSpin(100, speedMultiplier: _speedMultiplier);
     }
+  }
+
+  void continueAutoSpinIfReady({
+    Duration delay = const Duration(milliseconds: 600),
+  }) {
+    if (!_isAutoSpinning || isBusy) return;
+    Future.delayed(delay, () {
+      if (_isAutoSpinning && !isBusy) {
+        spin();
+      }
+    });
+  }
+
+  void _consumeAutoSpinAtStart() {
+    if (!_isAutoSpinning) return;
+    _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
   }
 
   void toggleSpeed() {
@@ -471,17 +486,18 @@ class GameViewModel extends ChangeNotifier {
       _pool.recordBet(cost);
     } else {
       // FS round — no charge, so the history entry records a zero
-      // stake. The counter consume is deferred (the screen fires it
-      // when the lingering-cluster line clears, so the displayed FS
-      // counter updates as soon as the cluster pay line steps off),
-      // and the round-hold flag keeps [isInFreeSpins] reporting true
-      // on the last FS spin even after the counter hits zero so the
-      // FS chrome holds through the full post-spin celebration.
+      // stake. The counter consume is queued until the reel result is
+      // ready, then committed before the landing grid animates in so
+      // the player sees the FS count step down before any PAYS/tumble
+      // presentation. The round-hold flag keeps [isInFreeSpins]
+      // reporting true on the last FS spin even after the counter hits
+      // zero so the FS chrome holds through the full post-spin celebration.
       _pendingHistoryBet = 0;
       _pendingFsConsume = true;
       _fsRoundHoldActive = true;
     }
 
+    _consumeAutoSpinAtStart();
     _isSpinning = true;
     _balanceCtrl.resetLastWin();
     _liveTumbleWin = 0;
@@ -516,6 +532,11 @@ class GameViewModel extends ChangeNotifier {
     _pool = taskOutput.pool;
     _pendingResult = taskOutput.result;
 
+    if (isFreeSpin) {
+      // Step the visible counter down as soon as the landing grid is ready,
+      // before the reel drop-in and any PAYS/tumble presentation begin.
+      commitPendingFsConsume();
+    }
     _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
@@ -671,28 +692,17 @@ class GameViewModel extends ChangeNotifier {
     _pendingHistoryBet = 0;
 
     if (_isAutoSpinning) {
-      _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
       if (_autoSpinsRemaining == 0) {
         _isAutoSpinning = false;
-        notifyListeners();
-        return;
       }
-
       notifyListeners();
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (_isAutoSpinning && !isBusy) {
-          spin();
-        }
-      });
     }
   }
 
-  /// Commits the deferred FS counter consume queued by an FS spin's
-  /// start. The screen calls this when the lingering cluster line
-  /// clears (~1s after the cascade settles) so the displayed counter
-  /// updates immediately, decoupled from the chrome transition which
-  /// stays raised through [_fsRoundHoldActive] until the celebration
-  /// fully unwinds.
+  /// Commits the deferred FS counter consume queued by an FS spin's start.
+  /// FS spins call this as soon as the reel result is handled. The chrome
+  /// stays raised through [_fsRoundHoldActive] until the celebration fully
+  /// unwinds.
   void commitPendingFsConsume() {
     if (!_pendingFsConsume) return;
     _pendingFsConsume = false;

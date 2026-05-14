@@ -47,8 +47,9 @@ class TumbleSimulator {
           final sym = SymbolRegistry.byPath(entry.key);
           if (sym != null && sym.isRegular) {
             winners.add(entry.key);
-            final winForCluster = sym.getPayoutForCount(entry.value) * betAmount;
-            
+            final winForCluster =
+                sym.getPayoutForCount(entry.value) * betAmount;
+
             final positions = <int>[];
             for (int c = 0; c < kEngineColumns; c++) {
               for (int r = 0; r < kEngineRows; r++) {
@@ -58,12 +59,14 @@ class TumbleSimulator {
               }
             }
 
-            clusterWins.add(ClusterWin(
-              assetPath: entry.key,
-              amount: winForCluster,
-              positions: positions,
-            ));
-            
+            clusterWins.add(
+              ClusterWin(
+                assetPath: entry.key,
+                amount: winForCluster,
+                positions: positions,
+              ),
+            );
+
             tumbleWin += winForCluster;
           }
         }
@@ -88,7 +91,12 @@ class TumbleSimulator {
       _applyGravity(grid);
 
       if (safeRefill) {
-        ChainForcer.fillEmptySafe(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+        ChainForcer.fillEmptySafe(
+          grid,
+          weights,
+          maxMults,
+          isFreeSpins: isFreeSpins,
+        );
       } else {
         // Forced chain seeds 8+ of one symbol so the next tumble has a
         // guaranteed winner — natural refill rarely reaches that threshold.
@@ -96,27 +104,34 @@ class TumbleSimulator {
             ? ChainForcer.fsForcedChainProb(tumbleCount)
             : RtpConfig.chainProbBase;
         if (engineRng.nextDouble() < chainProb) {
-          ChainForcer.fillEmptyForcedChain(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+          ChainForcer.fillEmptyForcedChain(
+            grid,
+            weights,
+            maxMults,
+            isFreeSpins: isFreeSpins,
+          );
         } else {
-          ChainForcer.fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins);
+          ChainForcer.fillEmptyRandom(
+            grid,
+            weights,
+            maxMults,
+            isFreeSpins: isFreeSpins,
+          );
         }
       }
 
-      tumbles.add(TumbleStep(
-        winningPaths: winningPaths,
-        gridAfter: _deepCopy(grid),
-        winAmount: tumbleWin,
-        clusterWins: clusterWins,
-      ));
+      tumbles.add(
+        TumbleStep(
+          winningPaths: winningPaths,
+          gridAfter: _deepCopy(grid),
+          winAmount: tumbleWin,
+          clusterWins: clusterWins,
+        ),
+      );
     }
 
     final rawMultiplier = MultiplierCollector.rawSum(grid);
-    final finalMultiplier = MultiplierCollector.finalize(
-      rawMultiplier,
-      isFreeSpins: isFreeSpins,
-      anteBet: anteBet,
-      buyFs: buyFs,
-    );
+    final finalMultiplier = MultiplierCollector.finalize(rawMultiplier);
 
     // Snapshot every multiplier symbol still on the final grid so the
     // win-presentation layer can fly each face value out of its own cell.
@@ -125,11 +140,9 @@ class TumbleSimulator {
       for (int r = 0; r < kEngineRows; r++) {
         final sym = SymbolRegistry.byPath(grid[c][r]);
         if (sym != null && sym.isMultiplier) {
-          finalMultipliers.add(MultiplierLanding(
-            column: c,
-            row: r,
-            value: sym.multiplierValue,
-          ));
+          finalMultipliers.add(
+            MultiplierLanding(column: c, row: r, value: sym.multiplierValue),
+          );
         }
       }
     }
@@ -137,8 +150,11 @@ class TumbleSimulator {
     // Scatters are evaluated after all tumbles so cascades can build them up.
     // Asymmetric: 4+ scatters trigger from base, 3+ retrigger from inside FS.
     final scatterCount = _countAsset(grid, scatterPath);
-    final scatterPayout = scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
-    final freeSpinsTriggered = isFreeSpins ? (scatterCount >= 3) : (scatterCount >= 4);
+    final scatterPayout =
+        scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
+    final freeSpinsTriggered = isFreeSpins
+        ? (scatterCount >= 3)
+        : (scatterCount >= 4);
 
     final totalWin = (totalBaseWin * max(1.0, finalMultiplier)) + scatterPayout;
 
@@ -166,7 +182,9 @@ class TumbleSimulator {
         final path = grid[c][r];
         if (path.isEmpty) continue;
         final sym = SymbolRegistry.byPath(path);
-        if (sym != null && sym.isRegular) counts[path] = (counts[path] ?? 0) + 1;
+        if (sym != null && sym.isRegular) {
+          counts[path] = (counts[path] ?? 0) + 1;
+        }
       }
     }
     return counts;
@@ -182,7 +200,10 @@ class TumbleSimulator {
     return count;
   }
 
-  static void _removeSymbols(List<List<String>> grid, List<String> winnerPaths) {
+  static void _removeSymbols(
+    List<List<String>> grid,
+    List<String> winnerPaths,
+  ) {
     final winSet = winnerPaths.toSet();
     for (int c = 0; c < kEngineColumns; c++) {
       for (int r = 0; r < kEngineRows; r++) {

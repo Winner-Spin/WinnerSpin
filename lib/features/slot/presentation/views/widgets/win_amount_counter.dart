@@ -46,7 +46,7 @@ class _WinAmountCounterState extends State<WinAmountCounter>
   late Animation<double> _anim;
   double _displayed = 0;
   double _lastHapticValue = 0;
-  DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _lastHapticAtMs = 0;
 
   @override
   void initState() {
@@ -75,11 +75,9 @@ class _WinAmountCounterState extends State<WinAmountCounter>
 
   void _maybeHapticTick(double next) {
     if (!widget.vibrationEnabled || next <= _lastHapticValue) return;
-    final now = DateTime.now();
-    if (now.difference(_lastHapticAt) < const Duration(milliseconds: 120)) {
-      return;
-    }
-    _lastHapticAt = now;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastHapticAtMs < 120) return;
+    _lastHapticAtMs = nowMs;
     _lastHapticValue = next;
     HapticFeedback.selectionClick();
   }
@@ -89,7 +87,7 @@ class _WinAmountCounterState extends State<WinAmountCounter>
     super.didUpdateWidget(old);
     if (old.to != widget.to) {
       _lastHapticValue = _displayed;
-      _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
+      _lastHapticAtMs = 0;
       _anim = Tween<double>(
         begin: _displayed,
         end: widget.to,

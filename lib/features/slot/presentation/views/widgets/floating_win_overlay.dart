@@ -39,6 +39,7 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
     fontWeight: FontWeight.w900,
     letterSpacing: 1.5,
   );
+  static final RegExp _trailingZeroPattern = RegExp(r'\.0$');
 
   @override
   void initState() {
@@ -112,10 +113,10 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
         _WinEffect(
           cx: cx,
           cy: cy,
-          amount: win.amount,
+          amountText: _formatAmount(win.amount),
           particles: particles,
           totalMs: durationMs,
-          startTime: DateTime.now(),
+          startMs: DateTime.now().millisecondsSinceEpoch,
         ),
       );
     }
@@ -130,15 +131,19 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       return;
     }
 
-    final now = DateTime.now();
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
     _effects.removeWhere((e) {
-      final elapsed = now.difference(e.startTime).inMilliseconds;
+      final elapsed = nowMs - e.startMs;
       return elapsed > e.totalMs;
     });
 
     // No setState needed — we just mark the CustomPaint for repaint.
     // The AnimationController listener already triggers a rebuild of
     // AnimatedBuilder below.
+  }
+
+  String _formatAmount(double amount) {
+    return amount.toStringAsFixed(1).replaceAll(_trailingZeroPattern, '');
   }
 
   @override
@@ -174,18 +179,19 @@ class _Particle {
 }
 
 class _WinEffect {
-  final double cx, cy, amount;
+  final double cx, cy;
+  final String amountText;
   final List<_Particle> particles;
   final int totalMs;
-  final DateTime startTime;
+  final int startMs;
 
   const _WinEffect({
     required this.cx,
     required this.cy,
-    required this.amount,
+    required this.amountText,
     required this.particles,
     required this.totalMs,
-    required this.startTime,
+    required this.startMs,
   });
 }
 
@@ -197,10 +203,10 @@ class _EffectPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final now = DateTime.now();
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     for (final e in effects) {
-      final elapsed = now.difference(e.startTime).inMilliseconds;
+      final elapsed = nowMs - e.startMs;
       final t = (elapsed / e.totalMs).clamp(0.0, 1.0);
       final life = 1.0 - t;
 
@@ -239,7 +245,6 @@ class _EffectPainter extends CustomPainter {
         scale = 1.0;
       }
 
-      final text = e.amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
       final fontSize = (style.fontSize ?? 28) * scale;
       final symbolSize = Size(fontSize * 0.74, fontSize * 1.04);
       final symbolSpacing = 1.5 * scale;
@@ -267,12 +272,12 @@ class _EffectPainter extends CustomPainter {
       );
 
       final strokeTp = TextPainter(
-        text: TextSpan(text: text, style: strokeStyle),
+        text: TextSpan(text: e.amountText, style: strokeStyle),
         textDirection: TextDirection.ltr,
       )..layout();
 
       final fillTp = TextPainter(
-        text: TextSpan(text: text, style: fillStyle),
+        text: TextSpan(text: e.amountText, style: fillStyle),
         textDirection: TextDirection.ltr,
       )..layout();
 
