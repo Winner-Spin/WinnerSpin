@@ -39,6 +39,7 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
     fontWeight: FontWeight.w900,
     letterSpacing: 1.5,
   );
+  static final RegExp _trailingZeroPattern = RegExp(r'\.0$');
 
   @override
   void initState() {
@@ -142,7 +143,7 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   }
 
   String _formatAmount(double amount) {
-    return amount.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+    return amount.toStringAsFixed(1).replaceAll(_trailingZeroPattern, '');
   }
 
   @override
