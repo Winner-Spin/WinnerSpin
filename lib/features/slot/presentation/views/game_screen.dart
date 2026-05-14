@@ -121,6 +121,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   OverlayEntry? _freeSpinWinPopupEntry;
   int _fsAwardedThisRound = 0;
   _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
+  bool _freeSpinAwardSequenceActive = false;
   bool _fsSummaryPopupVisible = false;
   bool _deferInitialFreeSpinVisualMode = false;
   int _scatterPulseTrigger = 0;
@@ -540,6 +541,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             _freeSpinWinPopupEntry = null;
           }
           entry.remove();
+          _freeSpinAwardSequenceActive = false;
+          _continueAutoSpinIfPresentationIdle();
         },
       ),
     );
@@ -555,6 +558,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _showFreeSpinAwardSequence(_PendingFreeSpinAward pending) {
+    _freeSpinAwardSequenceActive = true;
     if (pending.isRetrigger) {
       _showScatterPulse(
         minScatterCount: 3,
@@ -657,6 +661,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           if (!mounted) return;
           setState(() => _fsSummaryPopupVisible = false);
           _playFreeSpinExitTransitionThenRelease();
+          _continueAutoSpinIfPresentationIdle();
         },
       ),
     );
@@ -674,6 +679,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       setState(() => _showFreeSpinTransition = false);
+      _continueAutoSpinIfPresentationIdle();
     });
   }
 
@@ -1175,6 +1181,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
     _viewModel.releaseFsRoundHold();
     _showPendingFreeSpinAwardPopup();
+    _continueAutoSpinIfPresentationIdle();
+  }
+
+  void _continueAutoSpinIfPresentationIdle() {
+    if (!mounted) return;
+    if (_isCelebrationActive ||
+        _freeSpinAwardSequenceActive ||
+        _pendingFreeSpinAwardPopup != null ||
+        _scatterPulseTimer?.isActive == true ||
+        _freeSpinWinPopupEntry != null ||
+        _showFreeSpinTransition ||
+        _fsSummaryPopupVisible) {
+      return;
+    }
+    _viewModel.continueAutoSpinIfReady();
   }
 
   void _handleLogout(BuildContext context) {
@@ -1420,6 +1441,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         disabled:
                             _isBigWinShowing ||
                             _viewModel.isBusy ||
+                            _viewModel.isAutoSpinning ||
                             _viewModel.isInFreeSpins,
                         vibrationEnabled: _viewModel.vibration,
                         onTap: _viewModel.toggleAnteBet,
@@ -1763,7 +1785,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       );
     }
 
-    if (isBusy) {
+    if (isBusy || _viewModel.isAutoSpinning) {
       return Text('GOOD LUCK!', style: _statusBaseStyle);
     }
 

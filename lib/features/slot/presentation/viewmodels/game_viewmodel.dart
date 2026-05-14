@@ -348,7 +348,6 @@ class GameViewModel extends ChangeNotifier {
     _autoSpinsRemaining = spinCount;
     _speedMultiplier = speedMultiplier.clamp(1, 3).toInt();
     _isAutoSpinning = true;
-    notifyListeners();
     spin();
   }
 
@@ -365,6 +364,22 @@ class GameViewModel extends ChangeNotifier {
     } else {
       startAutoSpin(100, speedMultiplier: _speedMultiplier);
     }
+  }
+
+  void continueAutoSpinIfReady({
+    Duration delay = const Duration(milliseconds: 600),
+  }) {
+    if (!_isAutoSpinning || isBusy) return;
+    Future.delayed(delay, () {
+      if (_isAutoSpinning && !isBusy) {
+        spin();
+      }
+    });
+  }
+
+  void _consumeAutoSpinAtStart() {
+    if (!_isAutoSpinning) return;
+    _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
   }
 
   void toggleSpeed() {
@@ -482,6 +497,7 @@ class GameViewModel extends ChangeNotifier {
       _fsRoundHoldActive = true;
     }
 
+    _consumeAutoSpinAtStart();
     _isSpinning = true;
     _balanceCtrl.resetLastWin();
     _liveTumbleWin = 0;
@@ -676,19 +692,10 @@ class GameViewModel extends ChangeNotifier {
     _pendingHistoryBet = 0;
 
     if (_isAutoSpinning) {
-      _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
       if (_autoSpinsRemaining == 0) {
         _isAutoSpinning = false;
-        notifyListeners();
-        return;
       }
-
       notifyListeners();
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (_isAutoSpinning && !isBusy) {
-          spin();
-        }
-      });
     }
   }
 
