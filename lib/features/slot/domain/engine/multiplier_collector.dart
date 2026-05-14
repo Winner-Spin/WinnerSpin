@@ -1,11 +1,7 @@
-import 'dart:math';
-
 import '../models/symbol_registry.dart';
-import 'ante_config.dart';
-import 'buy_config.dart';
 import 'engine_runtime.dart';
 
-/// Sums multiplier-symbol values on the grid and applies ante/buy scaling.
+/// Sums multiplier-symbol values on the grid.
 class MultiplierCollector {
   MultiplierCollector._();
 
@@ -21,22 +17,9 @@ class MultiplierCollector {
     return total;
   }
 
-  /// Mutually-exclusive FS multiplier scaling: ante scales down, buy scales
-  /// up, farm uses the raw value. Floor at 1.0 so scaling never turns a
-  /// winning multiplier into a no-boost result. Only applied inside FS.
-  static double finalize(
-    double rawMultiplier, {
-    required bool isFreeSpins,
-    required bool anteBet,
-    required bool buyFs,
-  }) {
-    if (!isFreeSpins || rawMultiplier <= 1.0) return rawMultiplier;
-    if (anteBet) {
-      return max(1.0, rawMultiplier * AnteConfig.fsMultiplierScale);
-    }
-    if (buyFs) {
-      return max(1.0, rawMultiplier * BuyConfig.fsMultiplierScale);
-    }
-    return rawMultiplier;
-  }
+  /// Returns the visible multiplier total unchanged.
+  ///
+  /// Player-facing multiplier math must match the symbols shown on screen:
+  /// if the grid shows 2x, the win uses exactly 2x in every game mode.
+  static double finalize(double rawMultiplier) => rawMultiplier;
 }

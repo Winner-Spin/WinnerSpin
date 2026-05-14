@@ -381,7 +381,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ' symbols left on the screen are added together. If there was a regular symbol win, the tumble win total is multiplied by that sum.',
         ),
         _buildText(
-          'During FREE SPINS, multiplier symbols appear more often. Bought FREE SPINS and Double Chance-triggered rounds may scale the final multiplier value differently.',
+          'During FREE SPINS, multiplier symbols appear more often. Multiplier values always pay exactly as shown on the symbols.',
         ),
 
         const SizedBox(height: 16),
