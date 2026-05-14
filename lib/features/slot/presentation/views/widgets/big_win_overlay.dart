@@ -495,6 +495,21 @@ class _AmountBanner extends StatelessWidget {
   final bool skipCountUp;
   final bool vibrationEnabled;
 
+  static final TextStyle _amountStyle = GoogleFonts.outfit(
+    color: Colors.white,
+    fontSize: 38,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 1.2,
+    decoration: TextDecoration.none,
+    shadows: [
+      Shadow(
+        color: Colors.black.withValues(alpha: 0.45),
+        offset: const Offset(0, 3),
+        blurRadius: 6,
+      ),
+    ],
+  );
+
   const _AmountBanner({
     required this.amount,
     required this.duration,
@@ -522,20 +537,7 @@ class _AmountBanner extends StatelessWidget {
             duration: duration,
             forceComplete: skipCountUp,
             vibrationEnabled: vibrationEnabled,
-            style: GoogleFonts.outfit(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-              decoration: TextDecoration.none,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  offset: const Offset(0, 3),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
+            style: _amountStyle,
           ),
         ),
       ],
