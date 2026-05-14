@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -268,6 +269,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _precacheOpeningGridSymbols();
       _precacheMultiplierLabels();
       _precacheWinOverlayAssets();
+      unawaited(_FreeSpinScatterTransitionState.precacheCupcakeImage());
       _scheduleDeferredSymbolPrecache();
       precacheImage(
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
@@ -2125,7 +2127,7 @@ class _FirstLaunchDisclaimerDialog extends StatelessWidget {
         children: [
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
               child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
@@ -2716,6 +2718,8 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       'lib/images/slot_main_screen/Items/cupCake.png';
   static const int _cupcakeCount = 420;
   static const double _cupcakeCellSize = 0.19;
+  static ui.Image? _cachedCupcakeImage;
+  static Future<ui.Image>? _cupcakeImageFuture;
 
   late final AnimationController _controller;
   late final Animation<double> _fade;
@@ -2723,7 +2727,7 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
   late final Animation<double> _rotation;
   Size? _burstLayoutSize;
   late List<_CupcakeBurstParticle> _cupcakeParticles = const [];
-  late List<Widget> _cupcakeImages = const [];
+  ui.Image? _cupcakeImage;
 
   @override
   void initState() {
@@ -2745,12 +2749,36 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       begin: -0.16,
       end: 0.08,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    unawaited(_resolveCupcakeImage());
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  static Future<ui.Image> precacheCupcakeImage() {
+    final cached = _cachedCupcakeImage;
+    if (cached != null) return Future.value(cached);
+    return _cupcakeImageFuture ??= _loadCupcakeImage().then((image) {
+      _cachedCupcakeImage = image;
+      return image;
+    });
+  }
+
+  static Future<ui.Image> _loadCupcakeImage() async {
+    final data = await rootBundle.load(_cupcakeAssetPath);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
+
+  Future<void> _resolveCupcakeImage() async {
+    final image = await precacheCupcakeImage();
+    if (!mounted) return;
+    setState(() => _cupcakeImage = image);
   }
 
   void _ensureCupcakeBurstLayout(Size size) {
@@ -2761,7 +2789,6 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     }
 
     final particles = <_CupcakeBurstParticle>[];
-    final images = <Widget>[];
 
     for (int index = 0; index < _cupcakeCount; index++) {
       final t = index / _cupcakeCount;
@@ -2791,56 +2818,13 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
           driftY: -85 - noise(index * 37 + 19) * 95,
           rotation: rotation,
           delay: delay,
-        ),
-      );
-      images.add(
-        Image.asset(
-          _cupcakeAssetPath,
           width: width,
-          filterQuality: FilterQuality.medium,
         ),
       );
     }
 
     _burstLayoutSize = size;
     _cupcakeParticles = particles;
-    _cupcakeImages = images;
-  }
-
-  List<Widget> _buildCupcakeBurst(Size size) {
-    _ensureCupcakeBurstLayout(size);
-
-    final cupcakes = <Widget>[];
-    for (int index = 0; index < _cupcakeParticles.length; index++) {
-      final particle = _cupcakeParticles[index];
-      final localProgress = ((_controller.value - particle.delay) / 0.52).clamp(
-        0.0,
-        1.0,
-      );
-      final pop = Curves.easeOutBack.transform(localProgress);
-      final drift = Curves.easeOutCubic.transform(localProgress);
-
-      cupcakes.add(
-        Positioned(
-          left: particle.left,
-          top: particle.top,
-          child: Transform.translate(
-            offset: Offset(
-              particle.driftX * (1 - drift),
-              particle.driftY * (1 - drift),
-            ),
-            child: Transform.scale(
-              scale: (0.34 + pop * 0.84) * _scale.value.clamp(0.9, 1.22),
-              child: Transform.rotate(
-                angle: particle.rotation + _rotation.value,
-                child: _cupcakeImages[index],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return cupcakes;
   }
 
   @override
@@ -2852,6 +2836,7 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
               constraints.hasBoundedWidth && constraints.hasBoundedHeight
               ? constraints.biggest
               : MediaQuery.sizeOf(context);
+          _ensureCupcakeBurstLayout(size);
           return AnimatedBuilder(
             animation: _controller,
             builder: (context, _) {
@@ -2859,9 +2844,15 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
                 opacity: _fade.value,
                 child: Container(
                   color: Colors.black.withValues(alpha: 0.38),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: _buildCupcakeBurst(size),
+                  child: CustomPaint(
+                    size: size,
+                    painter: _CupcakeBurstPainter(
+                      particles: _cupcakeParticles,
+                      image: _cupcakeImage,
+                      progress: _controller.value,
+                      scale: _scale.value.clamp(0.9, 1.22),
+                      rotation: _rotation.value,
+                    ),
                   ),
                 ),
               );
@@ -2880,6 +2871,7 @@ class _CupcakeBurstParticle {
   final double driftY;
   final double rotation;
   final double delay;
+  final double width;
 
   const _CupcakeBurstParticle({
     required this.left,
@@ -2888,5 +2880,73 @@ class _CupcakeBurstParticle {
     required this.driftY,
     required this.rotation,
     required this.delay,
+    required this.width,
   });
+}
+
+class _CupcakeBurstPainter extends CustomPainter {
+  final List<_CupcakeBurstParticle> particles;
+  final ui.Image? image;
+  final double progress;
+  final double scale;
+  final double rotation;
+
+  const _CupcakeBurstPainter({
+    required this.particles,
+    required this.image,
+    required this.progress,
+    required this.scale,
+    required this.rotation,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cupcake = image;
+    if (cupcake == null) return;
+
+    final source = Rect.fromLTWH(
+      0,
+      0,
+      cupcake.width.toDouble(),
+      cupcake.height.toDouble(),
+    );
+    final paint = Paint()
+      ..filterQuality = FilterQuality.medium
+      ..isAntiAlias = true;
+
+    for (final particle in particles) {
+      final localProgress = ((progress - particle.delay) / 0.52).clamp(
+        0.0,
+        1.0,
+      );
+      final pop = Curves.easeOutBack.transform(localProgress);
+      final drift = Curves.easeOutCubic.transform(localProgress);
+      final drawScale = (0.34 + pop * 0.84) * scale;
+      final center = Offset(
+        particle.left + particle.width / 2 + particle.driftX * (1 - drift),
+        particle.top + particle.width / 2 + particle.driftY * (1 - drift),
+      );
+      final target = Rect.fromCenter(
+        center: Offset.zero,
+        width: particle.width,
+        height: particle.width,
+      );
+
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(particle.rotation + rotation);
+      canvas.scale(drawScale);
+      canvas.drawImageRect(cupcake, source, target, paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CupcakeBurstPainter oldDelegate) {
+    return oldDelegate.particles != particles ||
+        oldDelegate.image != image ||
+        oldDelegate.progress != progress ||
+        oldDelegate.scale != scale ||
+        oldDelegate.rotation != rotation;
+  }
 }
