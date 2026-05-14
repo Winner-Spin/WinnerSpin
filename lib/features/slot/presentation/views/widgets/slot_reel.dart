@@ -472,11 +472,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                   left: 0,
                   right: 0,
                   height: itemH,
-                  child: _buildStaticCell(
-                    row: i,
-                    path: items[i],
-                    itemH: itemH,
-                  ),
+                  child: _buildStaticCell(row: i, path: items[i], itemH: itemH),
                 );
               }),
             ),
@@ -589,6 +585,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
   late final Animation<double> _burstExpand;
   late final Animation<double> _burstOpacity;
   late final Animation<double> _sparkleProgress;
+  late final Listenable _pulseListenable;
   bool _hasTriggered = false;
 
   @override
@@ -612,6 +609,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
       vsync: this,
       duration: const Duration(milliseconds: 1050),
     );
+    _pulseListenable = Listenable.merge([_pulseController, _effectController]);
 
     // Golden glow: fade in fast, hold, fade out
     _glowOpacity = TweenSequence<double>([
@@ -673,7 +671,7 @@ class _ScatterPulseState extends State<_ScatterPulse>
     // surrounding reel cells when only this scatter is animating.
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([_pulseController, _effectController]),
+        animation: _pulseListenable,
         builder: (context, child) {
           final scale = _pulseScale.value;
           final glow = _glowOpacity.value;
