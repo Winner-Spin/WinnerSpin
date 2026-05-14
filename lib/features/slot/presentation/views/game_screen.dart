@@ -1272,7 +1272,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: _gridVisualListenable,
+                        listenable: _viewModel.gridCtrl,
                         builder: (context, _) {
                           return RepaintBoundary(
                             child: FloatingWinOverlay(
