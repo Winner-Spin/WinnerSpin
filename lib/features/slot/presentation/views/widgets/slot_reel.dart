@@ -290,6 +290,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                     MultiplierBombAnimation.assetPath,
                     fit: BoxFit.contain,
                     animate: false,
+                    renderCache: RenderCache.drawingCommands,
                   ),
                 ),
                 Align(

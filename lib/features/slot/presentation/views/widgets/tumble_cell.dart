@@ -333,6 +333,7 @@ class _FrozenBomb extends StatelessWidget {
                     MultiplierBombAnimation.assetPath,
                     fit: BoxFit.contain,
                     animate: false,
+                    renderCache: RenderCache.drawingCommands,
                   ),
                 ),
                 // The bomb body sits ~22% below the Lottie box's
