@@ -141,6 +141,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
+  Timer? _deferredPrecacheTimer;
 
   bool get _isFreeSpinVisualMode =>
       _viewModel.isInFreeSpins && !_deferInitialFreeSpinVisualMode;
@@ -256,18 +257,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
 
-    // Pre-decode symbol assets at the cell-sized cache width so the
-    // first appearance of each symbol doesn't block the main thread.
-    // The free-spin backdrop is also pre-decoded so the first FS trigger
-    // doesn't stall the swap.
+    // Pre-decode the opening grid first so startup doesn't compete with
+    // every symbol asset at once. Remaining symbols are warmed shortly
+    // after first paint in small batches.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      for (final sym in SymbolRegistry.all) {
-        precacheImage(
-          ResizeImage(AssetImage(sym.assetPath), width: 256),
-          context,
-        );
-      }
+      _precacheOpeningGridSymbols();
+      _scheduleDeferredSymbolPrecache();
       precacheImage(
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
         context,
@@ -333,6 +329,46 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       letterSpacing: 0.3,
       height: 1.0,
     );
+  }
+
+  void _precacheOpeningGridSymbols() {
+    final openingPaths = <String>{
+      for (final column in _viewModel.grid) ...column,
+    };
+    for (final path in openingPaths) {
+      _precacheSymbol(path);
+    }
+  }
+
+  void _scheduleDeferredSymbolPrecache() {
+    final openingPaths = <String>{
+      for (final column in _viewModel.grid) ...column,
+    };
+    final remainingPaths = SymbolRegistry.all
+        .map((symbol) => symbol.assetPath)
+        .where((path) => !openingPaths.contains(path))
+        .toList(growable: false);
+
+    _deferredPrecacheTimer?.cancel();
+    _deferredPrecacheTimer = Timer(const Duration(milliseconds: 300), () {
+      unawaited(_precacheSymbolsInBatches(remainingPaths));
+    });
+  }
+
+  Future<void> _precacheSymbolsInBatches(List<String> paths) async {
+    const batchSize = 3;
+    for (var index = 0; index < paths.length; index += batchSize) {
+      if (!mounted) return;
+      final end = math.min(index + batchSize, paths.length);
+      for (final path in paths.sublist(index, end)) {
+        _precacheSymbol(path);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 24));
+    }
+  }
+
+  void _precacheSymbol(String path) {
+    precacheImage(ResizeImage(AssetImage(path), width: 256), context);
   }
 
   Future<File> _firstLaunchDisclaimerFile() async {
@@ -930,6 +966,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _scatterPulseTimer?.cancel();
+    _deferredPrecacheTimer?.cancel();
     _lingeringClusterTimer?.cancel();
     _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
