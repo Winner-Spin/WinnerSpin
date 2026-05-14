@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import 'register_screen.dart';
@@ -11,23 +15,46 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final LoginViewModel _viewModel = LoginViewModel();
+
+  late final AnimationController _errorPulseCtrl;
+  late final Animation<double> _errorPulseScale;
 
   @override
   void initState() {
     super.initState();
     _viewModel.addListener(_onViewModelChange);
     _viewModel.initMusic();
+    _errorPulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _errorPulseScale = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _errorPulseCtrl, curve: Curves.easeOutBack),
+    );
   }
 
   void _onViewModelChange() {
     _showErrorIfNeeded(context);
     _handleLoginSuccess(context);
+    // One-shot grow on appearance: the image scales up from a small
+    // start to its full size and stays there. The controller's value
+    // resets to 0 when the message clears so the next error re-plays
+    // the grow from scratch.
+    final hasError = _viewModel.errorMessage != null;
+    if (hasError && _errorPulseCtrl.value == 0) {
+      _errorPulseCtrl.forward(from: 0);
+    } else if (!hasError && _errorPulseCtrl.value != 0) {
+      _errorPulseCtrl.value = 0;
+    }
   }
 
   @override
   void dispose() {
+    _errorClearTimer?.cancel();
+    _errorPulseCtrl.dispose();
     _viewModel.removeListener(_onViewModelChange);
     // We no longer dispose the view model because it is a singleton
     // and audio needs to be kept alive.
@@ -46,8 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
               final double screenH = constraints.maxHeight;
               final double screenW = constraints.maxWidth;
 
-          return Stack(
-            children: [
+              return Stack(
+                children: [
               // Background
               Positioned.fill(
                 child: Image.asset(
@@ -102,24 +129,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Login Button (or loading spinner)
+              // Login Button — stays mounted while the auth request
+              // is in flight so the layout doesn't reflow under the
+              // player. Taps are swallowed by the disabled-state
+              // wrapper while loading, and a small spinner overlays
+              // the button to signal the request is still running.
               Positioned(
                 top: screenH * 0.70,
                 left: screenW * 0.25,
                 right: screenW * 0.25,
                 child: Center(
-                  child: _viewModel.isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
-                      : AnimatedImageButton(
-                          imagePath:
-                              'lib/images/login_screen/login_button_final.png',
-                          width: 180,
-                          onTap: () {
-                            _viewModel.login();
-                          },
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Opacity(
+                        opacity: _viewModel.isLoading ? 0.7 : 1.0,
+                        child: AbsorbPointer(
+                          absorbing: _viewModel.isLoading,
+                          child: AnimatedImageButton(
+                            imagePath:
+                                'lib/images/login_screen/login_button_final.png',
+                            width: 180,
+                            onTap: () {
+                              _viewModel.login();
+                            },
+                          ),
                         ),
+                      ),
+                      if (_viewModel.isLoading)
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -137,13 +184,37 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-            ],
-          );
+
+              // Inline error indicator sitting in the gap between
+              // the password field and the login button — replaces
+              // the old SnackBar with the campaign-art badge and
+              // plays a one-shot grow on appearance to draw the
+              // player's eye.
+              if (_viewModel.errorMessage != null)
+                Positioned(
+                  top: screenH * 0.62,
+                  left: screenW * 0.18,
+                  right: screenW * 0.18,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: ScaleTransition(
+                        scale: _errorPulseScale,
+                        child: Image.asset(
+                          'lib/images/login_screen/invalid_error.png',
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                ],
+              );
+            },
+          ); // LayoutBuilder
         },
-      ); // LayoutBuilder
-     },
-    ), // AnimatedBuilder
-   ); // Scaffold
+      ), // AnimatedBuilder
+    ); // Scaffold
   }
 
   // ─── NAVIGATION (View responsibility) ───────────────────────
@@ -176,18 +247,19 @@ class _LoginScreenState extends State<LoginScreen> {
   // ─── ERROR HANDLING ──────────────────────────────────────────
 
   String? _lastShownError;
+  Timer? _errorClearTimer;
 
   void _showErrorIfNeeded(BuildContext context) {
     if (!mounted) return;
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _errorClearTimer?.cancel();
+      _errorClearTimer = Timer(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        _viewModel.clearError();
+        _lastShownError = null;
+      });
     }
   }
 
@@ -217,22 +289,22 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: GoogleFonts.nunito(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
+                hintStyle: GoogleFonts.nunito(
+                  color: const Color(0xFFFFF0C2).withValues(alpha: 0.74),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  shadows: const [
                     Shadow(
-                      color: Colors.black45,
+                      color: Color(0x99000000),
                       offset: Offset(0, 1),
-                      blurRadius: 2,
+                      blurRadius: 3,
                     ),
                   ],
                 ),

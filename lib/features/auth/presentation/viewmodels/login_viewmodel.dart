@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
+import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 
@@ -38,9 +39,10 @@ class LoginViewModel extends ChangeNotifier {
   void initMusic() async {
     if (_isMusicInitialized) return;
     _isMusicInitialized = true;
-    
+
+    await _audioPlayer.setAudioContext(AppAudioContext.game);
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.play(AssetSource('audio/bg_music.mp3'));
+    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
     _isMusicMuted = false;
     notifyListeners();
   }
@@ -84,6 +86,16 @@ class LoginViewModel extends ChangeNotifier {
   /// Resets the loginSuccess flag after navigation is handled.
   void resetLoginSuccess() {
     _loginSuccess = false;
+  }
+
+  /// Clears the currently surfaced error message. The login screen
+  /// calls this after the in-screen error banner has been on screen
+  /// long enough for the player to read it, so a fresh login attempt
+  /// doesn't have to re-render against a stale error.
+  void clearError() {
+    if (_errorMessage == null) return;
+    _errorMessage = null;
+    notifyListeners();
   }
 
   // ─── MUSIC ─────────────────────────────────────────────────

@@ -1,8 +1,10 @@
 import 'dart:math';
 
+import '../models/multiplier_landing.dart';
 import '../models/spin_result.dart';
 import '../models/symbol_registry.dart';
 import '../models/tumble_step.dart';
+import '../models/cluster_win.dart';
 import 'chain_forcer.dart';
 import 'engine_runtime.dart';
 import 'multiplier_collector.dart';
@@ -37,6 +39,7 @@ class TumbleSimulator {
       final counts = _countRegularSymbols(grid);
 
       final winners = <String>[];
+      final clusterWins = <ClusterWin>[];
       double tumbleWin = 0;
 
       for (final entry in counts.entries) {
@@ -44,7 +47,24 @@ class TumbleSimulator {
           final sym = SymbolRegistry.byPath(entry.key);
           if (sym != null && sym.isRegular) {
             winners.add(entry.key);
-            tumbleWin += sym.getPayoutForCount(entry.value) * betAmount;
+            final winForCluster = sym.getPayoutForCount(entry.value) * betAmount;
+            
+            final positions = <int>[];
+            for (int c = 0; c < kEngineColumns; c++) {
+              for (int r = 0; r < kEngineRows; r++) {
+                if (grid[c][r] == entry.key) {
+                  positions.add(c * 100 + r);
+                }
+              }
+            }
+
+            clusterWins.add(ClusterWin(
+              assetPath: entry.key,
+              amount: winForCluster,
+              positions: positions,
+            ));
+            
+            tumbleWin += winForCluster;
           }
         }
       }
@@ -86,6 +106,7 @@ class TumbleSimulator {
         winningPaths: winningPaths,
         gridAfter: _deepCopy(grid),
         winAmount: tumbleWin,
+        clusterWins: clusterWins,
       ));
     }
 
@@ -96,6 +117,22 @@ class TumbleSimulator {
       anteBet: anteBet,
       buyFs: buyFs,
     );
+
+    // Snapshot every multiplier symbol still on the final grid so the
+    // win-presentation layer can fly each face value out of its own cell.
+    final finalMultipliers = <MultiplierLanding>[];
+    for (int c = 0; c < kEngineColumns; c++) {
+      for (int r = 0; r < kEngineRows; r++) {
+        final sym = SymbolRegistry.byPath(grid[c][r]);
+        if (sym != null && sym.isMultiplier) {
+          finalMultipliers.add(MultiplierLanding(
+            column: c,
+            row: r,
+            value: sym.multiplierValue,
+          ));
+        }
+      }
+    }
 
     // Scatters are evaluated after all tumbles so cascades can build them up.
     // Asymmetric: 4+ scatters trigger from base, 3+ retrigger from inside FS.
@@ -109,6 +146,8 @@ class TumbleSimulator {
       initialGrid: _deepCopy(startGrid),
       tumbles: tumbles,
       totalWin: totalWin,
+      baseWin: totalBaseWin,
+      finalMultipliers: finalMultipliers,
       tumbleCount: tumbleCount,
       freeSpinsTriggered: freeSpinsTriggered,
       isRetrigger: isFreeSpins && freeSpinsTriggered,
