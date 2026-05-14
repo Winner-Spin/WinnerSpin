@@ -145,6 +145,9 @@ class GameViewModel extends ChangeNotifier {
   bool _isAutoSpinning = false;
   bool get isAutoSpinning => _isAutoSpinning;
 
+  bool _lastSpinWasFreeSpin = false;
+  bool get lastSpinWasFreeSpin => _lastSpinWasFreeSpin;
+
   int _autoSpinsRemaining = 0;
   int get autoSpinsRemaining => _autoSpinsRemaining;
 
@@ -206,7 +209,7 @@ class GameViewModel extends ChangeNotifier {
       !isBusy &&
       !_isAutoSpinning &&
       !isInFreeSpins &&
-      _balanceCtrl.canAfford(buyFeaturePrice);
+      _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
 
   /// User-facing buy availability. Mirrors the displayed credit (not
   /// the canonical balance) so the button doesn't go grey while the
@@ -234,6 +237,17 @@ class GameViewModel extends ChangeNotifier {
   SpinResult? _pendingResult;
   double _pendingHistoryBet = 0;
   bool _pendingFsConsume = false;
+
+  /// Latches true for the duration of the buy-trigger spin so the FS
+  /// round started by its scatters carries the buy origin flag through
+  /// to the engine for the buy multiplier boost. Held through the
+  /// post-spin celebration too — the screen reads it to skip the FS
+  /// accumulator flight on the trigger spin (its win goes to balance,
+  /// not the FS round total) and unlock the respin button as soon as
+  /// the cascade settles instead of waiting on a flight that never
+  /// runs. Cleared at the start of the next spin.
+  bool _currentSpinFromBuy = false;
+  bool get isCurrentSpinFromBuy => _currentSpinFromBuy;
   String? _historyUserId;
   final List<GameHistoryEntry> _gameHistory = [];
   List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
@@ -245,9 +259,16 @@ class GameViewModel extends ChangeNotifier {
   SpinResult? _lastSpinResult;
   SpinResult? get lastSpinResult => _lastSpinResult;
   bool get shouldPulseLandingScatters {
-    final grid = _pendingResult?.initialGrid;
-    if (grid == null) return false;
+    // During an active FS round the scatter-pulse sequence is driven
+    // entirely by _showScatterPulse() in game_screen.dart (triggered
+    // after the spin settles). Firing the drop-animation pulse here
+    // too would cause single-cupcake pulses on every FS spin.
+    if (isInFreeSpins) return false;
 
+    final pending = _pendingResult;
+    if (pending == null || pending.freeSpinsTriggered) return false;
+
+    final grid = pending.initialGrid;
     final scatterPath = SymbolRegistry.all
         .firstWhere((s) => s.isScatter)
         .assetPath;
@@ -256,7 +277,7 @@ class GameViewModel extends ChangeNotifier {
         .where((path) => path == scatterPath)
         .length;
 
-    return scatterCount >= 3;
+    return scatterCount >= 4;
   }
 
   // ── Tumble animation timing ──
@@ -326,14 +347,6 @@ class GameViewModel extends ChangeNotifier {
 
     _autoSpinsRemaining = spinCount;
     _speedMultiplier = speedMultiplier.clamp(1, 3).toInt();
-    _isAutoSpinning = true;
-    notifyListeners();
-    spin();
-  }
-
-  void startFreeSpinAutoSpin(int spinCount) {
-    if (!isInFreeSpins || isBusy || spinCount <= 0) return;
-    _autoSpinsRemaining = spinCount;
     _isAutoSpinning = true;
     notifyListeners();
     spin();
@@ -435,7 +448,13 @@ class GameViewModel extends ChangeNotifier {
   Future<void> spin() async {
     if (isBusy) return;
 
+    // Any leftover buy-trigger marker from the previous spin clears
+    // here so the next manual / auto spin runs through the normal
+    // celebration paths.
+    _currentSpinFromBuy = false;
+
     final bool isFreeSpin = isInFreeSpins;
+    _lastSpinWasFreeSpin = isFreeSpin;
 
     if (!isFreeSpin) {
       final cost = _balanceCtrl.effectiveBetCost;
@@ -500,15 +519,55 @@ class GameViewModel extends ChangeNotifier {
     _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
-  /// Buys an FS round at 100× bet. Charges the fee, queues 10 free spins,
-  /// and flags the round as bought so the engine applies the buy boost.
-  void buyFreeSpins() {
-    if (!canBuyFreeSpins) return;
+  /// Buys an FS round at 100× bet. Charges the fee, then immediately
+  /// fires a trigger spin that's guaranteed to land scatters — the
+  /// player watches the cupcakes drop in, any clusters resolve, and
+  /// the FS round starts naturally off the scatter trigger rather
+  /// than being awarded out of view. The buy origin is recorded on
+  /// the awarded round so the engine still applies the buy boost
+  /// across the FS spins that follow.
+  Future<void> buyFreeSpins() async {
+    if (_isAutoSpinning) {
+      _isAutoSpinning = false;
+      _autoSpinsRemaining = 0;
+    }
+    if (_anteCtrl.active) return;
+    if (isBusy || isInFreeSpins) return;
+    if (!_balanceCtrl.canAffordDisplayed(buyFeaturePrice)) {
+      _flashInsufficientFundsHint();
+      return;
+    }
 
+    _lastSpinWasFreeSpin = false;
     final price = buyFeaturePrice;
     _balanceCtrl.charge(price);
     _pool.recordBet(price);
-    _fsCtrl.awardBoughtRound();
+    _currentSpinFromBuy = true;
+    _pendingHistoryBet = 0;
+
+    _isSpinning = true;
+    _balanceCtrl.resetLastWin();
+    _liveTumbleWin = 0;
+    _gridCtrl.capturePreviousGrid();
+    _gridCtrl.resetForNewSpin();
+    if (_vibration) HapticFeedback.lightImpact();
+    notifyListeners();
+
+    final taskOutput = await compute(
+      runSlotSpinTask,
+      SpinTaskInput(
+        pool: _pool,
+        betAmount: betAmount,
+        isFreeSpins: false,
+        anteBet: false,
+        buyFs: false,
+        forceFsTrigger: true,
+      ),
+    );
+
+    _pool = taskOutput.pool;
+    _pendingResult = taskOutput.result;
+    _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
   /// Wipes the dust residue left by last round's exploded multipliers.
@@ -583,8 +642,18 @@ class GameViewModel extends ChangeNotifier {
         // Only an initial trigger captures ante state — retriggers inherit
         // the existing round's flag.
         _anteCtrl.captureForNewRound();
+        // The buy CTA's trigger spin lights up the FS round with the buy
+        // origin so the engine applies the buy multiplier boost across
+        // every spin in this round.
+        if (_currentSpinFromBuy) {
+          _fsCtrl.markCurrentRoundFromBuy();
+        }
       }
     }
+    // [_currentSpinFromBuy] stays raised until the next spin starts —
+    // the celebration code reads it to skip the FS accumulator flight
+    // on the trigger spin so its win lands on balance and the lock
+    // releases the moment the cascade settles.
 
     // Round ended? Clear the FS-source flags.
     if (!isInFreeSpins) {

@@ -204,28 +204,26 @@ class _BombPlayerState extends State<_BombPlayer>
             final scale = 1.0 + Curves.easeOutCubic.transform(blastT) * 0.55;
             return Transform.scale(scale: scale, child: child);
           },
-          child: ClipOval(
-            child: Lottie.asset(
-              MultiplierBombAnimation.assetPath,
-              controller: _ctrl,
-              fit: BoxFit.contain,
-              onLoaded: (composition) {
-                _ctrl
-                  ..duration = composition.duration
-                  ..forward().then((_) {
-                    if (!mounted || _bombEnded) return;
-                    _bombEnded = true;
-                    if (!_blastFired) {
-                      _blastFired = true;
-                      if (widget.soundEnabled) {
-                        unawaited(_BombExplosionSound.play());
-                      }
-                      widget.onBlast?.call();
+          child: Lottie.asset(
+            MultiplierBombAnimation.assetPath,
+            controller: _ctrl,
+            fit: BoxFit.contain,
+            onLoaded: (composition) {
+              _ctrl
+                ..duration = composition.duration
+                ..forward().then((_) {
+                  if (!mounted || _bombEnded) return;
+                  _bombEnded = true;
+                  if (!_blastFired) {
+                    _blastFired = true;
+                    if (widget.soundEnabled) {
+                      unawaited(_BombExplosionSound.play());
                     }
-                    widget.onComplete();
-                  });
-              },
-            ),
+                    widget.onBlast?.call();
+                  }
+                  widget.onComplete();
+                });
+            },
           ),
         ),
         // Multiplier label rides in the same overlay, on top of the

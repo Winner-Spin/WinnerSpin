@@ -31,6 +31,7 @@ import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 import 'auto_play_settings_screen.dart';
+import 'buy_freespins_confirm_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
 
@@ -66,6 +67,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // row flips back to FREE SPINS LEFT.
   bool _wasTumbling = false;
   Timer? _lingeringClusterTimer;
+
+  // Safety net for the celebration lock. The post-spin sequence has
+  // multiple async hand-offs (multiplier collect → flight → count-up
+  // → big-win overlay) that each release the lock when they finish.
+  // If a single hand-off hangs (e.g. an animation callback never
+  // fires), the lock would otherwise stay raised forever and freeze
+  // the respin button. The watchdog force-releases the lock and
+  // commits any deferred FS state if no path released it within a
+  // generous upper bound.
+  Timer? _celebrationLockWatchdog;
+  static const Duration _celebrationLockMaxHold = Duration(seconds: 20);
 
   // FS-round running total. Accumulates each spin's awarded win so
   // the top Kazanç readout climbs through the round instead of
@@ -103,6 +115,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Object? _lastFreeSpinAwardPopupResult;
   Timer? _freeSpinTransitionTimer;
   OverlayEntry? _freeSpinWinPopupEntry;
+  int _fsAwardedThisRound = 0;
+  _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
+  bool _fsSummaryPopupVisible = false;
+  bool _deferInitialFreeSpinVisualMode = false;
+  int _scatterPulseTrigger = 0;
+  Timer? _scatterPulseTimer;
 
   // True while the tumble-win sprite is in flight toward the Kazanç
   // readout. The middle band drops to zero for the duration so the
@@ -123,6 +141,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
   OverlayEntry? _bigWinEntry;
+
+  bool get _isFreeSpinVisualMode =>
+      _viewModel.isInFreeSpins && !_deferInitialFreeSpinVisualMode;
 
   // Optimistic lock raised the instant the cascade ends, before the
   // multiplier collect sequence has actually entered its first phase.
@@ -171,7 +192,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // the lastWin → FS-accumulator hand-off doesn't get missed.
     _viewModel.balanceCtrl.addListener(_onViewModelChange);
     _viewModel.gridCtrl.addListener(_onViewModelChange);
+    // The Buy CTA's trigger spin flips the FS state on the FS counter
+    // (not the viewmodel itself), so the lastWin → FS-accumulator
+    // hand-off would otherwise miss its window — listen on the FS
+    // controller too so the FS flight queues the moment the round
+    // gets awarded mid-cascade.
+    _viewModel.fsCtrl.addListener(_onViewModelChange);
     _viewModel.fsCtrl.addListener(_onFreeSpinStateChange);
+    // `isInFreeSpins` also reflects the viewmodel's round-hold flag,
+    // which only emits notifications on the viewmodel itself. Without
+    // this listener, `_wasInFreeSpins` would stall on the previous
+    // round's hold being cleared (viewmodel-only notify) and a
+    // subsequent buy-trigger awarding FS would see `_wasInFreeSpins`
+    // still true — skipping the cupcake-burst transition.
+    _viewModel.addListener(_onFreeSpinStateChange);
     _winCtrl.addListener(_onWinCtrlChange);
     _viewModel.fetchUserData();
 
@@ -336,28 +370,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     double winAmount = 0,
   }) {
     _freeSpinTransitionTimer?.cancel();
+    _fsAwardedThisRound = isRetrigger
+        ? _fsAwardedThisRound + popupValue
+        : popupValue;
 
-    if (isRetrigger) {
-      setState(() => _showFreeSpinTransition = false);
-      _showFreeSpinWinPopup(
-        value: popupValue,
-        isRetrigger: true,
-        winAmount: winAmount,
-      );
-      return;
-    }
-
-    setState(() => _showFreeSpinTransition = true);
-    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() => _showFreeSpinTransition = false);
-        _showFreeSpinWinPopup(
-          value: popupValue,
-          isRetrigger: false,
-          winAmount: winAmount,
-        );
+    setState(() {
+      if (isRetrigger) {
+        _showFreeSpinTransition = false;
+      } else {
+        _deferInitialFreeSpinVisualMode = true;
       }
     });
+    _pendingFreeSpinAwardPopup = _PendingFreeSpinAward(
+      value: popupValue,
+      isRetrigger: isRetrigger,
+      winAmount: winAmount,
+    );
   }
 
   void _quickStopReels() {
@@ -389,14 +417,141 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             _freeSpinWinPopupEntry = null;
           }
           entry.remove();
-          if (!isRetrigger) {
-            _viewModel.startFreeSpinAutoSpin(10);
-          }
         },
       ),
     );
     _freeSpinWinPopupEntry = entry;
     overlay.insert(entry);
+  }
+
+  void _showPendingFreeSpinAwardPopup() {
+    final pending = _pendingFreeSpinAwardPopup;
+    if (pending == null || _freeSpinWinPopupEntry != null) return;
+    _pendingFreeSpinAwardPopup = null;
+    _showFreeSpinAwardSequence(pending);
+  }
+
+  void _showFreeSpinAwardSequence(_PendingFreeSpinAward pending) {
+    if (pending.isRetrigger) {
+      _showScatterPulse(
+        minScatterCount: 3,
+        onComplete: () => _showFreeSpinWinPopup(
+          value: pending.value,
+          isRetrigger: pending.isRetrigger,
+          winAmount: pending.winAmount,
+        ),
+      );
+      return;
+    }
+
+    _showScatterPulse(
+      minScatterCount: 4,
+      onComplete: () => _startInitialFreeSpinVisualTransition(pending),
+    );
+  }
+
+  void _startInitialFreeSpinVisualTransition(_PendingFreeSpinAward pending) {
+    if (!mounted) return;
+    setState(() => _showFreeSpinTransition = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !_showFreeSpinTransition) return;
+      setState(() => _deferInitialFreeSpinVisualMode = false);
+    });
+    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() => _showFreeSpinTransition = false);
+      _showFreeSpinWinPopup(
+        value: pending.value,
+        isRetrigger: pending.isRetrigger,
+        winAmount: pending.winAmount,
+      );
+    });
+  }
+
+  void _showScatterPulse({
+    required int minScatterCount,
+    required VoidCallback onComplete,
+  }) {
+    final scatterCells = _currentScatterCells();
+    if (scatterCells.length < minScatterCount) {
+      onComplete();
+      return;
+    }
+
+    _scatterPulseTimer?.cancel();
+    setState(() => _scatterPulseTrigger++);
+    _scatterPulseTimer = Timer(const Duration(milliseconds: 1050), () {
+      if (!mounted) return;
+      // Reset the trigger so the next spin doesn't re-wrap scatter cells
+      // in _ScatterPulse (which would auto-start even with 1–2 cupcakes).
+      setState(() => _scatterPulseTrigger = 0);
+      onComplete();
+    });
+  }
+
+  List<_ScatterCell> _currentScatterCells() {
+    final scatterPath = SymbolRegistry.all
+        .firstWhere((s) => s.isScatter)
+        .assetPath;
+    final cells = <_ScatterCell>[];
+    final grid = _viewModel.grid;
+
+    for (var col = 0; col < grid.length; col++) {
+      final column = grid[col];
+      for (var row = 0; row < column.length; row++) {
+        if (column[row] == scatterPath) {
+          cells.add(_ScatterCell(column: col, row: row));
+        }
+      }
+    }
+
+    return cells;
+  }
+
+  void _showFreeSpinSummaryPopup() {
+    if (_fsSummaryPopupVisible) return;
+    final overlay = _stageOverlayKey.currentState;
+    if (overlay == null) {
+      _playFreeSpinExitTransitionThenRelease();
+      return;
+    }
+
+    _freeSpinWinPopupEntry?.remove();
+    _freeSpinWinPopupEntry = null;
+    _pendingFreeSpinAwardPopup = null;
+
+    setState(() => _fsSummaryPopupVisible = true);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _FreeSpinSummaryPopup(
+        totalWin: _fsAccumulatedWin,
+        totalFreeSpins: _fsAwardedThisRound,
+        onDismiss: () {
+          if (_freeSpinWinPopupEntry == entry) {
+            _freeSpinWinPopupEntry = null;
+          }
+          entry.remove();
+          if (!mounted) return;
+          setState(() => _fsSummaryPopupVisible = false);
+          _playFreeSpinExitTransitionThenRelease();
+        },
+      ),
+    );
+    _freeSpinWinPopupEntry = entry;
+    overlay.insert(entry);
+  }
+
+  void _playFreeSpinExitTransitionThenRelease() {
+    _freeSpinTransitionTimer?.cancel();
+    setState(() => _showFreeSpinTransition = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !_showFreeSpinTransition) return;
+      _viewModel.releaseFsRoundHold();
+    });
+    _freeSpinTransitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() => _showFreeSpinTransition = false);
+    });
   }
 
   void _showAutoPlaySettings(BuildContext context) {
@@ -449,6 +604,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       });
     }
     _lastSeenLastWinNormal = lastWin;
+  }
+
+  /// Pops a confirmation overlay over the slot screen instead of
+  /// charging the Buy FS fee on first tap — keeps the player from
+  /// dropping ₺10k on a stray press. Confirming runs the actual
+  /// buy; cancelling just closes the dialog.
+  Future<void> _promptBuyFreeSpinsConfirm() async {
+    if (_viewModel.anteBetActive ||
+        _isBigWinShowing ||
+        _viewModel.isBusy ||
+        _isCelebrationActive ||
+        !_viewModel.canBuyFreeSpinsForUi) {
+      return;
+    }
+    final confirmed = await Navigator.of(context).push<bool>(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, _, _) => BuyFreeSpinsConfirmScreen(
+          spinCount: 10,
+          price: _viewModel.buyFeaturePrice,
+        ),
+        transitionsBuilder: (_, anim, _, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await _viewModel.buyFreeSpins();
   }
 
   void _maybeShowBigWin(double amount) {
@@ -514,6 +699,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (_celebrationLocked) {
         setState(() => _celebrationLocked = false);
       }
+      // A pending watchdog from the previous spin would otherwise stay
+      // armed across the new spin's setup — cancel it so the next
+      // cascade end gets a fresh timer rather than racing the stale
+      // one for the unlock callback.
+      _celebrationLockWatchdog?.cancel();
+      _celebrationLockWatchdog = null;
       _lingeringClusterTimer?.cancel();
       _lingeringClusterTimer = null;
       if (_lingeringCluster != null) {
@@ -529,6 +720,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       // [lastSpinResult], at which point we unlock immediately when
       // there's nothing to celebrate.
       setState(() => _celebrationLocked = true);
+      _celebrationLockWatchdog?.cancel();
+      _celebrationLockWatchdog = Timer(_celebrationLockMaxHold, () {
+        if (!mounted) return;
+        if (_celebrationLocked) {
+          // No release path fired in time — clear everything so the
+          // respin button can re-arm. Indicates a hung animation
+          // callback worth investigating further.
+          _releaseCelebrationLock();
+        }
+      });
       Future.microtask(() {
         if (!mounted) return;
         final result = _viewModel.lastSpinResult;
@@ -538,15 +739,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             result.finalMultipliers.isNotEmpty;
         final hasBigWin =
             result != null &&
+            !_viewModel.isCurrentSpinFromBuy &&
             result.totalWin > 0 &&
             _viewModel.betAmount > 0 &&
             WinTier.forMultiplier(result.totalWin / _viewModel.betAmount) !=
                 null;
         // FS rounds always run the TUMBLE WIN → Kazanç flight + the
         // top-row count-up after every winning spin, so the lock must
-        // hold past phase=done until the count-up settles.
+        // hold past phase=done until the count-up settles. Buy-trigger
+        // spins are the exception: their payout folds directly into
+        // KazanÃ§ so the FS-entry burst stays unobstructed and the first
+        // real free spin can be started immediately.
         final hasFsFlight =
-            _viewModel.isInFreeSpins && result != null && result.totalWin > 0;
+            _viewModel.isInFreeSpins &&
+            !_viewModel.isCurrentSpinFromBuy &&
+            result != null &&
+            result.totalWin > 0;
         if (!hasSequence && !hasBigWin && !hasFsFlight) {
           _releaseCelebrationLock();
         }
@@ -562,6 +770,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       setState(() {
         _fsAccumulatedWin = 0;
         _pendingFsSpinWin = 0;
+        _fsAwardedThisRound = 0;
+        _fsSummaryPopupVisible = false;
       });
     }
     _wasInFs = isInFs;
@@ -570,35 +780,47 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     final lastWin = _viewModel.lastWin;
     if (lastWin > 0 && _lastSeenLastWin == 0) {
-      setState(() => _pendingFsSpinWin = lastWin);
-      // The viewmodel notifies via balanceCtrl from inside awardWin,
-      // but the new `lastSpinResult` is assigned a couple of lines
-      // later — reading it synchronously here would still see the
-      // previous spin's data. A microtask defers the hasSequence
-      // check until that assignment has run.
-      Future.microtask(() {
-        if (!mounted) return;
-        final result = _viewModel.lastSpinResult;
-        final hasSequence =
-            result != null &&
-            result.baseWin > 0 &&
-            result.finalMultipliers.isNotEmpty;
-        if (!hasSequence) {
-          // No multiplier collect to wait on — give the player a
-          // brief beat to read the TUMBLE WIN value, then fly it
-          // up. Multiplier spins instead wait for phase=done from
-          // [_onWinCtrlChange] before triggering the flight. The
-          // big-win overlay pops alongside the flight kick-off so
-          // the celebration starts the moment the value visibly
-          // begins moving.
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) {
-              _maybeShowBigWin(lastWin);
-              _commitPendingFsWin();
-            }
-          });
-        }
-      });
+      if (_viewModel.isCurrentSpinFromBuy) {
+        // Buy CTA's trigger spin: skip the TUMBLE WIN → Kazanç flight
+        // entirely. The FS-entry cupcake burst overlay would otherwise
+        // be covered by the flight sprite mid-animation (the flight
+        // overlay sits above the burst in the stage stack), and the
+        // burst is the player's main visual cue that the round has
+        // started. Folding the payout straight into the round-total
+        // readout lets the burst play uninterrupted and unlocks the
+        // respin button immediately for the first real FS spin.
+        setState(() => _fsAccumulatedWin = lastWin);
+      } else {
+        setState(() => _pendingFsSpinWin = lastWin);
+        // The viewmodel notifies via balanceCtrl from inside awardWin,
+        // but the new `lastSpinResult` is assigned a couple of lines
+        // later — reading it synchronously here would still see the
+        // previous spin's data. A microtask defers the hasSequence
+        // check until that assignment has run.
+        Future.microtask(() {
+          if (!mounted) return;
+          final result = _viewModel.lastSpinResult;
+          final hasSequence =
+              result != null &&
+              result.baseWin > 0 &&
+              result.finalMultipliers.isNotEmpty;
+          if (!hasSequence) {
+            // No multiplier collect to wait on — give the player a
+            // brief beat to read the TUMBLE WIN value, then fly it
+            // up. Multiplier spins instead wait for phase=done from
+            // [_onWinCtrlChange] before triggering the flight. The
+            // big-win overlay pops alongside the flight kick-off so
+            // the celebration starts the moment the value visibly
+            // begins moving.
+            Future.delayed(const Duration(milliseconds: 600), () {
+              if (mounted) {
+                _maybeShowBigWin(lastWin);
+                _commitPendingFsWin();
+              }
+            });
+          }
+        });
+      }
     }
     _lastSeenLastWin = lastWin;
   }
@@ -660,12 +882,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _freeSpinWinPopupEntry = null;
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
+    _scatterPulseTimer?.cancel();
     _lingeringClusterTimer?.cancel();
+    _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.balanceCtrl.removeListener(_onViewModelChange);
     _viewModel.gridCtrl.removeListener(_onViewModelChange);
+    _viewModel.fsCtrl.removeListener(_onViewModelChange);
     _viewModel.fsCtrl.removeListener(_onFreeSpinStateChange);
+    _viewModel.removeListener(_onFreeSpinStateChange);
     _winCtrl.removeListener(_onWinCtrlChange);
     _winCtrl.dispose();
     super.dispose();
@@ -683,13 +909,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (phase == WinPresentationPhase.done &&
         _lastWinCtrlPhase != WinPresentationPhase.done) {
       if (_viewModel.isInFreeSpins) {
-        // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
-        // count-up that follows it) is still to come. Leave
-        // _celebrationLocked raised — the flight's onComplete handler
-        // releases it after the count-up settles.
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) _commitPendingFsWin();
-        });
+        if (_viewModel.isCurrentSpinFromBuy) {
+          _releaseCelebrationLock();
+        } else {
+          // FS round: the TUMBLE WIN → Kazanç flight (and the top-row
+          // count-up that follows it) is still to come. Leave
+          // _celebrationLocked raised — the flight's onComplete handler
+          // releases it after the count-up settles.
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) _commitPendingFsWin();
+          });
+        }
       } else {
         // Normal round: no flight follows, so the lock can drop the
         // instant the final count-up reaches its target. The big-win
@@ -810,11 +1040,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   /// the last FS spin — by deferring it until every celebration
   /// timeline has unwound the FS UI never tears down mid-sequence.
   void _releaseCelebrationLock() {
+    _celebrationLockWatchdog?.cancel();
+    _celebrationLockWatchdog = null;
     if (_celebrationLocked) {
       setState(() => _celebrationLocked = false);
     }
+    if (_bigWinEntry != null) {
+      return;
+    }
     _viewModel.commitPendingFsConsume();
+    if (_viewModel.isInFreeSpins && _viewModel.freeSpinsRemaining == 0) {
+      _showFreeSpinSummaryPopup();
+      return;
+    }
     _viewModel.releaseFsRoundHold();
+    _showPendingFreeSpinAwardPopup();
   }
 
   void _handleLogout(BuildContext context) {
@@ -882,9 +1122,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // round is active, so the round's distinct atmosphere is
                 // visible the moment FS starts.
                 child: ListenableBuilder(
-                  listenable: _viewModel.fsCtrl,
+                  listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
                   builder: (context, _) {
-                    final bgPath = _viewModel.isInFreeSpins
+                    final bgPath = _isFreeSpinVisualMode
                         ? 'lib/images/slot_main_screen/freespin arka plan.png'
                         : 'lib/images/slot_main_screen/nihai arka plan.png';
                     return RepaintBoundary(
@@ -945,7 +1185,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   // / cluster info line sits flush beneath it, and
                   // the round Kazanç readout sits at the bottom past
                   // a transparent gap.
-                  final isFs = _viewModel.isInFreeSpins;
+                  final isFs = _isFreeSpinVisualMode;
                   const bandHeight = 31.0;
                   const wideGap = 31.0;
                   // Tumble + info share one continuous black panel,
@@ -1037,18 +1277,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
+                    if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
                     }
+                    final betButtonPassive =
+                        _isBigWinShowing ||
+                        _viewModel.isBusy ||
+                        _isCelebrationActive;
                     return RepaintBoundary(
                       child: BuyFeatureButton(
                         price: _viewModel.buyFeaturePrice,
                         disabled:
-                            _isBigWinShowing ||
-                            !_viewModel.canBuyFreeSpinsForUi ||
-                            _viewModel.anteBetActive,
+                            _viewModel.anteBetActive ||
+                            betButtonPassive ||
+                            !_viewModel.canBuyFreeSpinsForUi,
                         vibrationEnabled: _viewModel.vibration,
-                        onTap: _viewModel.buyFreeSpins,
+                        onTap: () {
+                          _promptBuyFreeSpinsConfirm();
+                        },
                         width: screenW * 0.39,
                         height: screenW * 0.22,
                       ),
@@ -1067,7 +1313,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _viewModel.fsCtrl,
                   ]),
                   builder: (context, _) {
-                    if (_viewModel.isInFreeSpins) {
+                    if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
                     }
                     return RepaintBoundary(
@@ -1279,44 +1525,39 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Widget _buildSlotGrid() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: List.generate(GameViewModel.columns, (col) {
-            return Expanded(
-              // Per-column RepaintBoundary so a reel's drop animation
-              // doesn't invalidate sibling columns or the grid frame.
-              child: RepaintBoundary(
-                child: SlotReel(
-                  columnIndex: col,
-                  controller: _reelControllers[col],
-                  // Pass column lists by reference; List.generate
-                  // here was producing fresh refs every rebuild.
-                  previousItems: _viewModel.previousGrid[col],
-                  targetItems: _viewModel.grid[col],
-                  spinning: _viewModel.isSpinning,
-                  fadingPaths: _viewModel.fadingPaths,
-                  clearedPositions: _viewModel.clearedPositions,
-                  speedMultiplier: _viewModel.speedMultiplier,
-                  soundEffectsEnabled: _viewModel.soundEffects,
-                  pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
-                  onComplete: col == GameViewModel.columns - 1
-                      ? () => _viewModel.onSpinComplete()
-                      : null,
-                  // Only the first column triggers the residue wipe; the
-                  // grid controller no-ops if it's already empty so the
-                  // other columns calling later is harmless either way.
-                  onDropInStart: col == 0
-                      ? () => _viewModel.clearMultiplierResidues()
-                      : null,
-                ),
+      child: Row(
+        children: List.generate(GameViewModel.columns, (col) {
+          return Expanded(
+            // Per-column RepaintBoundary so a reel's drop animation
+            // doesn't invalidate sibling columns or the grid frame.
+            child: RepaintBoundary(
+              child: SlotReel(
+                columnIndex: col,
+                controller: _reelControllers[col],
+                // Pass column lists by reference; List.generate
+                // here was producing fresh refs every rebuild.
+                previousItems: _viewModel.previousGrid[col],
+                targetItems: _viewModel.grid[col],
+                spinning: _viewModel.isSpinning,
+                fadingPaths: _viewModel.fadingPaths,
+                clearedPositions: _viewModel.clearedPositions,
+                speedMultiplier: _viewModel.speedMultiplier,
+                soundEffectsEnabled: _viewModel.soundEffects,
+                pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
+                scatterPulseTrigger: _scatterPulseTrigger,
+                onComplete: col == GameViewModel.columns - 1
+                    ? () => _viewModel.onSpinComplete()
+                    : null,
+                // Only the first column triggers the residue wipe; the
+                // grid controller no-ops if it's already empty so the
+                // other columns calling later is harmless either way.
+                onDropInStart: col == 0
+                    ? () => _viewModel.clearMultiplierResidues()
+                    : null,
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -1331,7 +1572,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final liveWin = _viewModel.liveTumbleWin;
     final isBusy = _viewModel.isBusy;
     final isTumbling = _viewModel.isTumbling;
-    final isFs = _viewModel.isInFreeSpins;
+    final isFs = _isFreeSpinVisualMode;
 
     if (_viewModel.showInsufficientFundsHint) {
       return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
@@ -1390,7 +1631,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       final hasMultiplierSequence =
           result != null &&
           result.baseWin > 0 &&
-          result.finalMultipliers.isNotEmpty;
+          result.finalMultipliers.isNotEmpty &&
+          !(_viewModel.lastSpinWasFreeSpin && !_isFreeSpinVisualMode);
 
       if (hasMultiplierSequence) {
         return WinPresentation(
@@ -2108,6 +2350,25 @@ class _ClockText extends StatelessWidget {
   }
 }
 
+class _PendingFreeSpinAward {
+  final int value;
+  final bool isRetrigger;
+  final double winAmount;
+
+  const _PendingFreeSpinAward({
+    required this.value,
+    required this.isRetrigger,
+    required this.winAmount,
+  });
+}
+
+class _ScatterCell {
+  final int column;
+  final int row;
+
+  const _ScatterCell({required this.column, required this.row});
+}
+
 class _FreeSpinWinPopup extends StatefulWidget {
   final int value;
   final bool isRetrigger;
@@ -2129,7 +2390,109 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     with SingleTickerProviderStateMixin {
   static const _initialAssetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
-  static const _retriggerAssetPath =
+
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    )..forward();
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width * 0.88;
+    // Always use FreeSpinWin.png — both initial trigger and retrigger.
+    const assetPath = _initialAssetPath;
+    // Centre offset for the spin-count circle (purple area).
+    final valueOffset = Offset(0, width * 0.035);
+    final valueFontSize = width * 0.16;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onDismiss,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.36),
+        alignment: Alignment.center,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.18, end: 1.0).animate(_scale),
+          child: SizedBox(
+            width: width,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.asset(
+                  assetPath,
+                  width: width,
+                  filterQuality: FilterQuality.medium,
+                ),
+                // Show the awarded free-spin count in the purple centre area.
+                Transform.translate(
+                  offset: valueOffset,
+                  child: Text(
+                    '${widget.value}',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: valueFontSize,
+                      fontWeight: FontWeight.w900,
+                      height: 1.0,
+                      color: const Color(0xFFFFB72E),
+                      shadows: [
+                        Shadow(
+                          color: const Color(
+                            0xFF9C5A00,
+                          ).withValues(alpha: 0.95),
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                        Shadow(
+                          color: const Color(
+                            0xFFFFF0A8,
+                          ).withValues(alpha: 0.85),
+                          offset: const Offset(0, -2),
+                          blurRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FreeSpinSummaryPopup extends StatefulWidget {
+  final double totalWin;
+  final int totalFreeSpins;
+  final VoidCallback onDismiss;
+
+  const _FreeSpinSummaryPopup({
+    required this.totalWin,
+    required this.totalFreeSpins,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_FreeSpinSummaryPopup> createState() => _FreeSpinSummaryPopupState();
+}
+
+class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
+    with SingleTickerProviderStateMixin {
+  static const _assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
 
   late final AnimationController _controller;
@@ -2154,15 +2517,9 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width * 0.88;
-    final assetPath = widget.isRetrigger
-        ? _retriggerAssetPath
-        : _initialAssetPath;
-    final valueOffset = widget.isRetrigger
-        ? Offset(width * -0.155, width * 0.174)
-        : Offset(0, width * 0.035);
-    final winOffset = Offset(0, width * 0.035);
-    final valueFontSize = widget.isRetrigger ? width * 0.064 : width * 0.16;
-    final winFontSize = widget.isRetrigger ? width * 0.078 : width * 0.16;
+    final amountFontSize = width * 0.115;
+    final spinFontSize = width * 0.060;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onDismiss,
@@ -2177,67 +2534,69 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
               alignment: Alignment.center,
               children: [
                 Image.asset(
-                  assetPath,
+                  _assetPath,
                   width: width,
                   filterQuality: FilterQuality.medium,
                 ),
-                if (widget.isRetrigger && widget.winAmount > 0)
-                  Transform.translate(
-                    offset: winOffset,
-                    child: MoneyText(
-                      text: formatMoney(widget.winAmount),
-                      spacing: width * 0.008,
-                      symbolOffset: Offset(0, width * 0.006),
-                      lineYOffset: width * 0.010,
-                      lineLengthScale: 0.96,
-                      lineTopExtend: width * 0.004,
-                      symbolTextYOffset: width * 0.007,
-                      style: GoogleFonts.outfit(
-                        fontSize: winFontSize,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        color: const Color(0xFFFFB72E),
+                Transform.translate(
+                  offset: Offset(0, width * 0.025),
+                  child: SizedBox(
+                    width: width * 0.46,
+                    height: width * 0.12,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: MoneyText(
+                        text: formatMoney(widget.totalWin),
+                        spacing: width * 0.007,
+                        symbolOffset: Offset(0, width * 0.005),
+                        lineYOffset: width * 0.009,
+                        lineLengthScale: 0.96,
+                        lineTopExtend: width * 0.004,
+                        symbolTextYOffset: width * 0.006,
+                        style: GoogleFonts.outfit(
+                          fontSize: amountFontSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: const Color(0xFFFFD13B),
+                          shadows: [
+                            Shadow(
+                              color: const Color(
+                                0xFF9C5A00,
+                              ).withValues(alpha: 0.95),
+                              offset: const Offset(0, 4),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                ),
                 Transform.translate(
-                  offset: valueOffset,
-                  child: MoneyText(
-                    text: '${widget.value}',
-                    spacing: width * 0.008,
-                    symbolOffset: Offset(
-                      0,
-                      widget.isRetrigger ? 0 : width * 0.006,
-                    ),
-                    lineYOffset: widget.isRetrigger
-                        ? width * 0.004
-                        : width * 0.010,
-                    lineLengthScale: 0.96,
-                    lineTopExtend: width * 0.004,
-                    symbolTextYOffset: widget.isRetrigger ? 0 : width * 0.007,
-                    style: GoogleFonts.outfit(
-                      fontSize: valueFontSize,
-                      fontWeight: FontWeight.w900,
-                      height: 1.0,
-                      color: const Color(0xFFFFB72E),
-                      shadows: widget.isRetrigger
-                          ? null
-                          : [
-                              Shadow(
-                                color: const Color(
-                                  0xFF9C5A00,
-                                ).withValues(alpha: 0.95),
-                                offset: const Offset(0, 4),
-                                blurRadius: 8,
-                              ),
-                              Shadow(
-                                color: const Color(
-                                  0xFFFFF0A8,
-                                ).withValues(alpha: 0.85),
-                                offset: const Offset(0, -2),
-                                blurRadius: 3,
-                              ),
-                            ],
+                  offset: Offset(width * -0.14, width * 0.17),
+                  child: SizedBox(
+                    width: width * 0.11,
+                    height: width * 0.07,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${widget.totalFreeSpins}',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: spinFontSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: const Color(0xFFFFD13B),
+                          letterSpacing: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.85),
+                              offset: const Offset(0, 3),
+                              blurRadius: 5,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -2325,12 +2684,12 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
           (noise(index * 17 + 9) - 0.5) * 0.26;
       final sizeVar = cellSize + noise(index * 19 + 11) * 0.13;
       final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
-      final delay = (radius * 0.30 + noise(index * 29 + 15) * 0.18).clamp(
+      final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
         0.0,
-        0.38,
+        0.28,
       );
 
-      final localProgress = ((_controller.value - delay) / 0.65).clamp(
+      final localProgress = ((_controller.value - delay) / 0.52).clamp(
         0.0,
         1.0,
       );

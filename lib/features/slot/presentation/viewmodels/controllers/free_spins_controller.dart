@@ -51,6 +51,17 @@ class FreeSpinsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tags the FS round just awarded via a natural scatter trigger as
+  /// originating from the Buy CTA, so the engine continues to apply
+  /// the buy multiplier boost across the round. Used by the buy flow
+  /// when the trigger spin's scatters award an initial round rather
+  /// than the round being granted directly.
+  void markCurrentRoundFromBuy() {
+    if (_currentRoundFromBuy) return;
+    _currentRoundFromBuy = true;
+    notifyListeners();
+  }
+
   /// Clears the buy flag. Called when the FS round ends.
   void clearRoundFlag() {
     if (!_currentRoundFromBuy) return;
