@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
+final RegExp _priceSeparatorPattern = RegExp(r'(\d)(?=(\d{3})+$)');
+
 /// Glossy candy-style "BUY FEATURE" button. Tapping toggles between an
 /// opaque candy face and a translucent glass face — both states share
 /// the same shape, gradient family, and embossed lettering.
@@ -30,7 +32,7 @@ class BuyFeatureButton extends StatefulWidget {
 
   String get _formattedPrice => price
       .toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+      .replaceAllMapped(_priceSeparatorPattern, (m) => '${m[1]},');
 
   @override
   State<BuyFeatureButton> createState() => _BuyFeatureButtonState();
@@ -95,24 +97,24 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
         opacity: isDisabled ? 0.55 : 1.0,
         child: RepaintBoundary(
           child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => _pressCtrl.forward(),
-          onTapUp: (_) {
-            _pressCtrl.reverse();
-          },
-          onTapCancel: () => _pressCtrl.reverse(),
-          onTap: () {
-            _glassCtrl.reverse();
-            UiClickSound.play();
-            if (widget.vibrationEnabled) HapticFeedback.lightImpact();
-            widget.onTap?.call();
-          },
-          child: ScaleTransition(
-            scale: _scale,
-            child: AnimatedBuilder(
-              animation: _glassCtrl,
-              builder: (context, _) {
-                return Container(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => _pressCtrl.forward(),
+            onTapUp: (_) {
+              _pressCtrl.reverse();
+            },
+            onTapCancel: () => _pressCtrl.reverse(),
+            onTap: () {
+              _glassCtrl.reverse();
+              UiClickSound.play();
+              if (widget.vibrationEnabled) HapticFeedback.lightImpact();
+              widget.onTap?.call();
+            },
+            child: ScaleTransition(
+              scale: _scale,
+              child: AnimatedBuilder(
+                animation: _glassCtrl,
+                builder: (context, _) {
+                  return Container(
                     width: w,
                     height: h,
                     decoration: BoxDecoration(
