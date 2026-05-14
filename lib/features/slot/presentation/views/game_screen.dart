@@ -2623,10 +2623,18 @@ class _FreeSpinScatterTransition extends StatefulWidget {
 
 class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     with SingleTickerProviderStateMixin {
+  static const _cupcakeAssetPath =
+      'lib/images/slot_main_screen/Items/cupCake.png';
+  static const int _cupcakeCount = 420;
+  static const double _cupcakeCellSize = 0.19;
+
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
   late final Animation<double> _rotation;
+  Size? _burstLayoutSize;
+  late List<_CupcakeBurstParticle> _cupcakeParticles = const [];
+  late List<Widget> _cupcakeImages = const [];
 
   @override
   void initState() {
@@ -2656,22 +2664,18 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
     super.dispose();
   }
 
-  List<Widget> _buildCupcakeBurst(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    const assetPath = 'lib/images/slot_main_screen/Items/cupCake.png';
-
-    const int count = 420;
-    const double cellSize = 0.19;
-
+  void _ensureCupcakeBurstLayout(Size size) {
+    if (_burstLayoutSize == size) return;
     double noise(int seed) {
       final raw = math.sin(seed * 12.9898) * 43758.5453;
       return raw - raw.floorToDouble();
     }
 
-    final List<Widget> cupcakes = [];
+    final particles = <_CupcakeBurstParticle>[];
+    final images = <Widget>[];
 
-    for (int index = 0; index < count; index++) {
-      final t = index / count;
+    for (int index = 0; index < _cupcakeCount; index++) {
+      final t = index / _cupcakeCount;
       final angleBase = index * 2.399963229728653;
       final angle = angleBase + (noise(index * 7 + 3) - 0.5) * 1.15;
       final radius = math.sqrt(t) * (0.95 + noise(index * 11 + 5) * 0.58);
@@ -2682,14 +2686,45 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
       final y =
           math.sin(angle) * radius * 0.88 / aspect +
           (noise(index * 17 + 9) - 0.5) * 0.26;
-      final sizeVar = cellSize + noise(index * 19 + 11) * 0.13;
+      final sizeVar = _cupcakeCellSize + noise(index * 19 + 11) * 0.13;
       final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
       final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
         0.0,
         0.28,
       );
+      final width = size.width * sizeVar;
 
-      final localProgress = ((_controller.value - delay) / 0.52).clamp(
+      particles.add(
+        _CupcakeBurstParticle(
+          left: size.width * (0.5 + x) - (width / 2),
+          top: size.height * (0.46 + y) - (width / 2),
+          driftX: (noise(index * 31 + 17) - 0.5) * 95,
+          driftY: -85 - noise(index * 37 + 19) * 95,
+          rotation: rotation,
+          delay: delay,
+        ),
+      );
+      images.add(
+        Image.asset(
+          _cupcakeAssetPath,
+          width: width,
+          filterQuality: FilterQuality.medium,
+        ),
+      );
+    }
+
+    _burstLayoutSize = size;
+    _cupcakeParticles = particles;
+    _cupcakeImages = images;
+  }
+
+  List<Widget> _buildCupcakeBurst(Size size) {
+    _ensureCupcakeBurstLayout(size);
+
+    final cupcakes = <Widget>[];
+    for (int index = 0; index < _cupcakeParticles.length; index++) {
+      final particle = _cupcakeParticles[index];
+      final localProgress = ((_controller.value - particle.delay) / 0.52).clamp(
         0.0,
         1.0,
       );
@@ -2698,22 +2733,18 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
 
       cupcakes.add(
         Positioned(
-          left: size.width * (0.5 + x) - (size.width * sizeVar / 2),
-          top: size.height * (0.46 + y) - (size.width * sizeVar / 2),
+          left: particle.left,
+          top: particle.top,
           child: Transform.translate(
             offset: Offset(
-              (noise(index * 31 + 17) - 0.5) * 95 * (1 - drift),
-              (1 - drift) * (-85 - noise(index * 37 + 19) * 95),
+              particle.driftX * (1 - drift),
+              particle.driftY * (1 - drift),
             ),
             child: Transform.scale(
               scale: (0.34 + pop * 0.84) * _scale.value.clamp(0.9, 1.22),
               child: Transform.rotate(
-                angle: rotation + _rotation.value,
-                child: Image.asset(
-                  assetPath,
-                  width: size.width * sizeVar,
-                  filterQuality: FilterQuality.medium,
-                ),
+                angle: particle.rotation + _rotation.value,
+                child: _cupcakeImages[index],
               ),
             ),
           ),
@@ -2726,21 +2757,47 @@ class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return Opacity(
-            opacity: _fade.value,
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.38),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [..._buildCupcakeBurst(context)],
-              ),
-            ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final size =
+              constraints.hasBoundedWidth && constraints.hasBoundedHeight
+              ? constraints.biggest
+              : MediaQuery.sizeOf(context);
+          return AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Opacity(
+                opacity: _fade.value,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.38),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: _buildCupcakeBurst(size),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
     );
   }
+}
+
+class _CupcakeBurstParticle {
+  final double left;
+  final double top;
+  final double driftX;
+  final double driftY;
+  final double rotation;
+  final double delay;
+
+  const _CupcakeBurstParticle({
+    required this.left,
+    required this.top,
+    required this.driftX,
+    required this.driftY,
+    required this.rotation,
+    required this.delay,
+  });
 }
