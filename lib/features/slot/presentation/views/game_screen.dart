@@ -176,6 +176,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final TextStyle _bottomValueStyle;
   late final TextStyle _bottomClockStyle;
 
+  late final Listenable _freeSpinVisualListenable;
+  late final Listenable _gridVisualListenable;
+  late final Listenable _balanceStatusListenable;
+  late final Listenable _fsInfoListenable;
+  late final Listenable _buyFeatureListenable;
+  late final Listenable _anteToggleListenable;
+  late final Listenable _spinControlsListenable;
+  late final Listenable _tumbleWinListenable;
+
   @override
   void initState() {
     super.initState();
@@ -183,6 +192,44 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       GameViewModel.columns,
       (_) => SlotReelController(),
     );
+    _freeSpinVisualListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.fsCtrl,
+    ]);
+    _gridVisualListenable = Listenable.merge([_viewModel, _viewModel.gridCtrl]);
+    _balanceStatusListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+    ]);
+    _fsInfoListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.fsCtrl,
+      _viewModel.gridCtrl,
+    ]);
+    _buyFeatureListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.anteCtrl,
+      _viewModel.fsCtrl,
+    ]);
+    _anteToggleListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.anteCtrl,
+      _viewModel.balanceCtrl,
+      _viewModel.fsCtrl,
+    ]);
+    _spinControlsListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.fsCtrl,
+      _winCtrl,
+    ]);
+    _tumbleWinListenable = Listenable.merge([
+      _viewModel,
+      _viewModel.balanceCtrl,
+      _viewModel.gridCtrl,
+      _winCtrl,
+    ]);
     WidgetsBinding.instance.addObserver(this);
     UiClickSound.enabled = _viewModel.soundEffects;
     unawaited(UiClickSound.preload());
@@ -1122,7 +1169,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // round is active, so the round's distinct atmosphere is
                 // visible the moment FS starts.
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
+                  listenable: _freeSpinVisualListenable,
                   builder: (context, _) {
                     final bgPath = _isFreeSpinVisualMode
                         ? 'lib/images/slot_main_screen/freespin arka plan.png'
@@ -1148,19 +1195,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   children: [
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
+                        listenable: _gridVisualListenable,
                         builder: (context, _) => _buildSlotGrid(),
                       ),
                     ),
                     Positioned.fill(
                       child: ListenableBuilder(
-                        listenable: Listenable.merge([
-                          _viewModel,
-                          _viewModel.gridCtrl,
-                        ]),
+                        listenable: _gridVisualListenable,
                         builder: (context, _) {
                           return RepaintBoundary(
                             child: FloatingWinOverlay(
@@ -1177,7 +1218,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               ListenableBuilder(
-                listenable: Listenable.merge([_viewModel, _viewModel.fsCtrl]),
+                listenable: _freeSpinVisualListenable,
                 builder: (context, _) {
                   // In free-spin rounds the strip splits into three
                   // black bands of the original height: top hosts the
@@ -1196,10 +1237,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   final totalHeight = isFs ? fsTotalHeight : bandHeight;
                   final kazancBand = _buildStatusBand(
                     child: ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _viewModel,
-                        _viewModel.balanceCtrl,
-                      ]),
+                      listenable: _balanceStatusListenable,
                       builder: (context, _) => _buildStatusText(
                         screenH: screenH,
                         gridLeft: gridLeftPx,
@@ -1237,11 +1275,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             height: bandHeight,
                             child: _buildStatusBand(
                               child: ListenableBuilder(
-                                listenable: Listenable.merge([
-                                  _viewModel,
-                                  _viewModel.fsCtrl,
-                                  _viewModel.gridCtrl,
-                                ]),
+                                listenable: _fsInfoListenable,
                                 builder: (context, _) => _buildFsInfoLine(),
                               ),
                             ),
@@ -1270,12 +1304,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.55,
                 left: screenW * 0.08,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                    _viewModel.anteCtrl,
-                    _viewModel.fsCtrl,
-                  ]),
+                  listenable: _buyFeatureListenable,
                   builder: (context, _) {
                     if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
@@ -1306,12 +1335,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 top: screenH * 0.55,
                 right: screenW * 0.08,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.anteCtrl,
-                    _viewModel.balanceCtrl,
-                    _viewModel.fsCtrl,
-                  ]),
+                  listenable: _anteToggleListenable,
                   builder: (context, _) {
                     if (_isFreeSpinVisualMode) {
                       return const SizedBox.shrink();
@@ -1338,12 +1362,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _viewModel,
-                    _viewModel.balanceCtrl,
-                    _viewModel.fsCtrl,
-                    _winCtrl,
-                  ]),
+                  listenable: _spinControlsListenable,
                   builder: (context, _) {
                     final autoActive = _viewModel.isAutoSpinning;
                     return Row(
@@ -1734,12 +1753,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       children: [
         Center(
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              _viewModel,
-              _viewModel.balanceCtrl,
-              _viewModel.gridCtrl,
-              _winCtrl,
-            ]),
+            listenable: _tumbleWinListenable,
             builder: (context, _) => _buildTumbleWinLine(),
           ),
         ),
