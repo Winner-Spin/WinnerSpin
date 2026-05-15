@@ -1687,6 +1687,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           accentStyle: _statusKazancStyle,
           soundEnabled: _viewModel.soundEffects,
           vibrationEnabled: _viewModel.vibration,
+          speedMultiplier: _viewModel.speedMultiplier,
           onMultiplierLifted: (col, row) {
             _viewModel.gridCtrl.clearMultiplierPosition(col, row);
           },
@@ -1797,6 +1798,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             baseStyle: _statusBaseStyle,
             accentStyle: _statusKazancStyle,
             soundEnabled: _viewModel.soundEffects,
+            speedMultiplier: _viewModel.speedMultiplier,
             onMultiplierLifted: (col, row) {
               _viewModel.gridCtrl.clearMultiplierPosition(col, row);
             },

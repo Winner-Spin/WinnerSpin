@@ -48,6 +48,7 @@ class WinPresentation extends StatefulWidget {
   final bool formulaOnly;
   final bool soundEnabled;
   final bool vibrationEnabled;
+  final int speedMultiplier;
 
   /// Optional externally-supplied flight target. If provided, the
   /// multiplier collect flights aim at this key's render rect instead
@@ -71,6 +72,7 @@ class WinPresentation extends StatefulWidget {
     this.formulaOnly = false,
     this.soundEnabled = true,
     this.vibrationEnabled = false,
+    this.speedMultiplier = 1,
     this.flightTargetKey,
   });
 
@@ -245,6 +247,7 @@ class _WinPresentationState extends State<WinPresentation> {
       cellSize: cellSize,
       multiplierValue: landing.value,
       soundEnabled: widget.soundEnabled,
+      speedMultiplier: widget.speedMultiplier,
       onBlast: () {
         if (!blastCompleter.isCompleted) blastCompleter.complete();
       },

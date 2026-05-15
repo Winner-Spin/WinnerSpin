@@ -394,7 +394,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   Widget _buildBuyGameMoneyButton() {
     return ListenableBuilder(
-      listenable: widget.viewModel,
+      listenable: Listenable.merge([widget.viewModel, widget.viewModel.fsCtrl]),
       builder: (context, _) {
         final disabled = widget.viewModel.isInFreeSpins;
         return GestureDetector(

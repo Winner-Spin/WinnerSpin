@@ -37,6 +37,7 @@ class MultiplierBombAnimation {
     required double cellSize,
     required int multiplierValue,
     bool soundEnabled = true,
+    int speedMultiplier = 1,
     VoidCallback? onBlast,
   }) async {
     final overlay = Overlay.of(context);
@@ -63,6 +64,7 @@ class MultiplierBombAnimation {
               child: _BombPlayer(
                 multiplierValue: multiplierValue,
                 soundEnabled: soundEnabled,
+                speedMultiplier: speedMultiplier,
                 onBlast: onBlast,
                 onComplete: () {
                   if (entry.mounted) entry.remove();
@@ -99,11 +101,13 @@ class _BombPlayer extends StatefulWidget {
   final VoidCallback onComplete;
   final int multiplierValue;
   final bool soundEnabled;
+  final int speedMultiplier;
 
   const _BombPlayer({
     required this.onComplete,
     required this.multiplierValue,
     required this.soundEnabled,
+    this.speedMultiplier = 1,
     this.onBlast,
   });
 
@@ -209,8 +213,11 @@ class _BombPlayerState extends State<_BombPlayer>
             controller: _ctrl,
             fit: BoxFit.contain,
             onLoaded: (composition) {
+              final speed = widget.speedMultiplier.clamp(1, 3).toInt();
+              final durationMs = (composition.duration.inMilliseconds / speed)
+                  .round();
               _ctrl
-                ..duration = composition.duration
+                ..duration = Duration(milliseconds: durationMs)
                 ..forward().then((_) {
                   if (!mounted || _bombEnded) return;
                   _bombEnded = true;
