@@ -4,13 +4,6 @@ import 'package:flutter/services.dart';
 import '../../../../../core/format/money_format.dart';
 import '../../../../../core/widgets/money_text.dart';
 
-/// Counts up to [to], smoothly re-animating from the currently
-/// displayed value whenever [to] changes. Drives both the cascade's
-/// live running-win read-out (target bumped per tumble) and the
-/// post-cascade reveals (single fixed [to]). [from] is honoured on the
-/// first build only — subsequent target changes chase from whatever
-/// the counter is currently displaying, so the value never snaps back
-/// to zero.
 class WinAmountCounter extends StatefulWidget {
   final double from;
   final double to;
@@ -19,10 +12,6 @@ class WinAmountCounter extends StatefulWidget {
   final Curve curve;
   final bool vibrationEnabled;
 
-  /// When flipped true after construction, snaps the displayed value
-  /// to [to] immediately and stops the running animation — used by
-  /// the big-win overlay's tap-to-skip path so the player can dismiss
-  /// the count-up without waiting out the full duration.
   final bool forceComplete;
 
   const WinAmountCounter({

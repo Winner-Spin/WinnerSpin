@@ -5,14 +5,9 @@ import 'grid_generator.dart';
 import 'rtp_config.dart';
 import 'weighted_random.dart';
 
-/// Cascade refill helpers — random fill, safe (no new wins) fill, and
-/// forced-chain fill that seeds a guaranteed next-tumble cluster.
 class ChainForcer {
   ChainForcer._();
 
-  /// FS forced-chain probability tapered by tumble depth — keeps the long
-  /// tail (5+ tumbles) under ~5% of wins while letting natural cascades
-  /// hit industry-standard depth distribution.
   static double fsForcedChainProb(int tumblesSoFar) {
     if (tumblesSoFar <= 1) return 0.55;
     if (tumblesSoFar == 2) return 0.42;
@@ -21,9 +16,6 @@ class ChainForcer {
     return 0.08;
   }
 
-  /// Refills empty cells with 8–10 copies of one regular symbol so the next
-  /// tumble has a guaranteed cluster. Target picked from low-tier (frequent,
-  /// low-payout) symbols to bound the RTP impact of forced chains.
   static void fillEmptyForcedChain(
     List<List<String>> grid,
     List<WeightedSymbol> weights,
@@ -60,7 +52,6 @@ class ChainForcer {
       }
     }
 
-    // 8 guarantees a chain; 9–10 vary the payout magnitude.
     final desiredTotal = 8 + engineRng.nextInt(3);
     final toPlace = (desiredTotal - existing).clamp(0, emptyPositions.length);
 
@@ -73,8 +64,6 @@ class ChainForcer {
     fillEmptyRandom(grid, weights, maxMults, isFreeSpins: isFreeSpins);
   }
 
-  /// Refills empty cells while capping regular-symbol counts to prevent any
-  /// new winning cluster from forming.
   static void fillEmptySafe(
     List<List<String>> grid,
     List<WeightedSymbol> weights,
@@ -113,8 +102,6 @@ class ChainForcer {
     }
   }
 
-  /// Refills empty cells with weighted random picks. Allows new cascades to
-  /// form naturally; multiplier and scatter caps still respected.
   static void fillEmptyRandom(
     List<List<String>> grid,
     List<WeightedSymbol> weights,
@@ -125,7 +112,9 @@ class ChainForcer {
 
     int totalMults = 0;
     int totalScatters = 0;
-    final scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
+    final scatterPath = SymbolRegistry.all
+        .firstWhere((s) => s.isScatter)
+        .assetPath;
 
     for (int c = 0; c < kEngineColumns; c++) {
       for (int r = 0; r < kEngineRows; r++) {
@@ -163,14 +152,13 @@ class ChainForcer {
               break;
             }
           }
-          // Hard fallback — never leak a scatter or multiplier into a cell
-          // that violated its cap during all 20 retries.
           if (grid[c][r].isEmpty) {
-            grid[c][r] = SymbolRegistry.all.firstWhere((s) => s.isRegular).assetPath;
+            grid[c][r] = SymbolRegistry.all
+                .firstWhere((s) => s.isRegular)
+                .assetPath;
           }
         }
       }
     }
   }
-
 }

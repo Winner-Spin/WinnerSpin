@@ -17,9 +17,6 @@ class _Particle {
   });
 }
 
-/// Golden particle burst effect that plays when symbols explode.
-/// Uses a single AnimationController driving a CustomPainter repaint
-/// instead of calling setState every frame.
 class SymbolExplosionEffect extends StatefulWidget {
   final bool active;
   final double size;
@@ -45,7 +42,6 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
   @override
   void initState() {
     super.initState();
-    // Total burst life: ~800ms at 1x, shorter at higher speeds.
     final int durationMs = (800 ~/ widget.speedMultiplier).clamp(250, 800);
     _controller = AnimationController(
       vsync: this,
@@ -74,8 +70,8 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
       final speed = (_random.nextDouble() * 3.0 + 1.0) * widget.speedMultiplier;
 
       final pColor = _random.nextBool()
-          ? const Color(0xFFFFFF00) // Bright yellow
-          : const Color(0xFFFFAB40); // Orange accent
+          ? const Color(0xFFFFFF00)
+          : const Color(0xFFFFAB40);
 
       _particles.add(
         _Particle(
@@ -118,12 +114,9 @@ class _SymbolExplosionEffectState extends State<SymbolExplosionEffect>
   }
 }
 
-/// Paints the particle burst. Instead of mutating particles each frame via
-/// setState, physics are computed purely from the normalized [progress] value
-/// (0→1). This keeps the widget tree stable and avoids layout-phase assertions.
 class _ExplosionPainter extends CustomPainter {
   final List<_Particle> particles;
-  final double progress; // 0 → 1
+  final double progress;
   final int speedMultiplier;
 
   _ExplosionPainter({
@@ -137,24 +130,20 @@ class _ExplosionPainter extends CustomPainter {
     if (progress >= 1.0 || particles.isEmpty) return;
 
     for (final p in particles) {
-      // Life decays linearly from 1 → 0 over the controller duration.
       final life = (1.0 - progress).clamp(0.0, 1.0);
       if (life <= 0) continue;
 
-      // Position: initial center + velocity * progress (with easeOut feel).
       final t = Curves.easeOutCubic.transform(progress);
       final px = (p.x + p.vx * t * 0.12) * size.width;
-      final py = (p.y + p.vy * t * 0.12 + t * t * 0.8) * size.height; // gravity
+      final py = (p.y + p.vy * t * 0.12 + t * t * 0.8) * size.height;
 
       final alpha = (p.color.a * life).clamp(0.0, 1.0);
 
-      // Core particle
       final paint = Paint()
         ..color = p.color.withValues(alpha: alpha)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(Offset(px, py), p.size * life, paint);
 
-      // Glow halo
       final glowPaint = Paint()
         ..color = p.color.withValues(alpha: alpha * 0.4)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)

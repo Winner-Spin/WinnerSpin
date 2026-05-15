@@ -6,12 +6,10 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 
 class LoginViewModel extends ChangeNotifier {
-  // Singleton pattern — production-only single instance.
   static final LoginViewModel _instance = LoginViewModel._internal();
   factory LoginViewModel() => _instance;
   LoginViewModel._internal() : _authRepository = FirebaseAuthRepository();
 
-  /// Test-only constructor — lets tests inject a mock repository.
   @visibleForTesting
   LoginViewModel.withRepository(this._authRepository);
 
@@ -47,10 +45,7 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── LOGIN ─────────────────────────────────────────────────
-
   Future<void> login() async {
-    // Clear previous state
     _errorMessage = null;
     _loginSuccess = false;
 
@@ -69,7 +64,6 @@ class LoginViewModel extends ChangeNotifier {
         password: passwordController.text,
       );
 
-      // Login successful
       _errorMessage = null;
       emailController.clear();
       passwordController.clear();
@@ -83,22 +77,15 @@ class LoginViewModel extends ChangeNotifier {
     }
   }
 
-  /// Resets the loginSuccess flag after navigation is handled.
   void resetLoginSuccess() {
     _loginSuccess = false;
   }
 
-  /// Clears the currently surfaced error message. The login screen
-  /// calls this after the in-screen error banner has been on screen
-  /// long enough for the player to read it, so a fresh login attempt
-  /// doesn't have to re-render against a stale error.
   void clearError() {
     if (_errorMessage == null) return;
     _errorMessage = null;
     notifyListeners();
   }
-
-  // ─── MUSIC ─────────────────────────────────────────────────
 
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
@@ -110,28 +97,23 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pauses music when navigating away from the login screen.
   Future<void> onNavigatingAway() async {
     if (!_isMusicMuted) {
       await _audioPlayer.pause();
     }
   }
 
-  /// Resumes music when returning to the login screen.
   Future<void> onReturned() async {
     if (!_isMusicMuted) {
       await _audioPlayer.resume();
     }
   }
 
-  // ─── HELPERS ───────────────────────────────────────────────
-
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
   }
 
-  /// Maps domain-level auth error codes to user-facing messages.
   String _friendlyError(AuthErrorCode code) {
     switch (code) {
       case AuthErrorCode.userNotFound:

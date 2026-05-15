@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Renders the multiplier badge (e.g. "2x", "10x", "50x") as a sprite,
-/// choosing the asset based on the multiplier's actual value. Used both
-/// on the resting bomb in the grid and on the bomb overlay during the
-/// fuse + blast.
 class MultiplierLabel extends StatelessWidget {
   final int value;
   final BoxFit fit;
@@ -28,8 +24,6 @@ class MultiplierLabel extends StatelessWidget {
 
   static String assetPathFor(int value) => _assets[value] ?? _assets[5]!;
 
-  /// Per-value bomb body scale. Higher multipliers get a slightly bigger
-  /// bomb to telegraph their weight without changing the badge in front.
   static const Map<int, double> _bombScales = {
     2: 1.00,
     3: 1.04,
@@ -42,8 +36,6 @@ class MultiplierLabel extends StatelessWidget {
 
   static double bombScaleFor(int value) => _bombScales[value] ?? 1.0;
 
-  /// Per-value extra label scale to compensate for sprite art that reads
-  /// visually smaller than its peers.
   static const Map<int, double> _labelExtraScale = {
     2: 1.13,
     50: 1.42,
@@ -52,9 +44,6 @@ class MultiplierLabel extends StatelessWidget {
 
   static double labelScaleFor(int value) => _labelExtraScale[value] ?? 1.0;
 
-  /// Per-value horizontal/vertical offset used by callers and the paint
-  /// transform to nudge sprites whose visual centre doesn't sit at the
-  /// canvas centre.
   static const double _defaultLabelXOffset = -0.12;
   static const double _defaultLabelYOffset = -0.04;
 

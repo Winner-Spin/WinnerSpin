@@ -5,24 +5,13 @@ import '../../../../../core/widgets/money_text.dart';
 import 'win_amount_counter.dart';
 import 'win_presentation_controller.dart';
 
-/// Renders the current phase of [WinPresentationController] inside the
-/// status bar slot. Stays under one widget so the bar's GlobalKey can
-/// hand back a stable target rect for the multiplier flights.
 class WinSequenceBar extends StatelessWidget {
   final WinPresentationController controller;
   final TextStyle baseStyle;
   final TextStyle accentStyle;
 
-  /// Anchor for the running-sum text. Multipliers in flight aim at this
-  /// key's centre so the asset lands on the same spot the sum lives,
-  /// instead of the bar's geometric centre. The key follows whichever
-  /// child currently holds that slot (placeholder before the first
-  /// landing, the live sum after).
   final GlobalKey sumAnchorKey;
 
-  /// When true the bar omits the Kazanç readout rows and only renders
-  /// the running multiplier formula. Used by the free-spin layout where
-  /// the strip's top half already shows the live total.
   final bool formulaOnly;
   final bool vibrationEnabled;
 
@@ -42,9 +31,6 @@ class WinSequenceBar extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         if (formulaOnly) {
-          // The host slot owns its own readout — this widget is only
-          // mounted to drive the orchestration (controller / bomb /
-          // collect overlays) and stays visually silent.
           return const SizedBox.shrink();
         }
 
@@ -53,9 +39,6 @@ class WinSequenceBar extends StatelessWidget {
             return const SizedBox.shrink();
 
           case WinPresentationPhase.baseCounting:
-            // Static hold — the live cascade counter already counted
-            // up to baseWin during the tumbles, so the bar just keeps
-            // showing the value while the player reads it.
             return _kazancRow(
               accentStyle: accentStyle,
               valueWidget: MoneyText(
@@ -79,9 +62,6 @@ class WinSequenceBar extends StatelessWidget {
 
           case WinPresentationPhase.finalCounting:
           case WinPresentationPhase.done:
-            // Final reveal counts from the base (already on screen at
-            // the end of the multiplier formula) up to the total —
-            // never resets to zero.
             return _kazancRow(
               accentStyle: accentStyle,
               valueWidget: WinAmountCounter(
@@ -120,12 +100,6 @@ class WinSequenceBar extends StatelessWidget {
     required TextStyle baseStyle,
     required TextStyle accentStyle,
   }) {
-    // Layout — left half always shows the base. Right half evolves:
-    //   • flight not started yet → empty
-    //   • flight started, sum still 0 → bare "×" placeholder
-    //   • after first landing → "× N = total"; the running sum pops
-    //     1.0 → 1.5 → 1.0 in place and the trailing money amount
-    //     reels up to base*sum on every new landing.
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: Row(
@@ -145,10 +119,6 @@ class WinSequenceBar extends StatelessWidget {
             const SizedBox(width: 8),
             Text('×', style: baseStyle),
             const SizedBox(width: 6),
-            // Anchor for incoming multiplier flights. Holds a small
-            // invisible placeholder before the first landing so the
-            // anchor exists; once sum > 0 the live pulsing value
-            // takes over the same slot.
             Container(
               key: sumAnchorKey,
               child: sum > 0
@@ -179,10 +149,6 @@ class WinSequenceBar extends StatelessWidget {
   }
 }
 
-/// Shows [value] and runs a brief 1.0 → 1.5 → 1.0 scale pulse every
-/// time [value] changes (and once on first mount). The text widget is
-/// stable across updates so there's no crossfade — the player reads
-/// the same running total being bumped up.
 class _PulsingValue extends StatefulWidget {
   final int value;
   final TextStyle style;
@@ -220,7 +186,6 @@ class _PulsingValueState extends State<_PulsingValue>
         weight: 55,
       ),
     ]).animate(_ctrl);
-    // First appearance pulses immediately.
     _ctrl.forward();
   }
 

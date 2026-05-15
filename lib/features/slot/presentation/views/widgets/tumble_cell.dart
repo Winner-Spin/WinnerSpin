@@ -11,15 +11,6 @@ import '../../../domain/models/symbol_registry.dart';
 import 'multiplier_bomb_animation.dart';
 import 'multiplier_label.dart';
 
-/// A single grid cell that handles four cascade-tumble effects independently
-/// of the column-wide spin in [SlotReel]:
-///   • Symbol pre-burst wobble (spring scale + rotation), then fade.
-///   • Particle burst — gold sparks radiate outward as the symbol fades.
-///   • Drop-in from above when [path] changes (new symbol falls into place).
-///
-/// Used by [SlotReel] only in the static (post-drop-in) state. During the
-/// initial reel spin, the column-wide drop-out / drop-in animation runs
-/// instead.
 class TumbleCell extends StatefulWidget {
   final String path;
   final bool isFading;
@@ -48,8 +39,6 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final Animation<double> _imageOpacity;
   late final Animation<double> _dropAnimation;
 
-  // Regenerated on each fade event so consecutive wins on the same cell
-  // get distinct burst patterns; palette refreshes when [path] changes.
   late List<_Particle> _particles;
   late _GlowPalette _palette;
 
@@ -69,14 +58,10 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1950),
     );
 
-    // Give the player a readable "this one is about to pop" wobble before the
-    // dust burst starts, then make the symbol vanish quickly as it breaks apart.
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: const Interval(0.36, 0.52, curve: Curves.easeOut),
     );
-    // Drive the fade via Image.opacity so it goes through the image
-    // shader's alpha channel — no per-cell saveLayer during a cascade.
     _imageOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(_fadeAnimation);
     _dropAnimation = CurvedAnimation(
       parent: _dropController,
@@ -88,9 +73,6 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
     _dropController.value = 1.0;
 
-    // If the cell is created already in fading state (first tumble after spin),
-    // animate the fade instead of snapping to fully transparent — the player
-    // needs to see the symbol + glow before it disappears.
     if (widget.isFading) {
       _playPopSound();
       _fadeController.forward(from: 0.0);
@@ -180,17 +162,12 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
           final dy = (1.0 - _dropAnimation.value) * -widget.itemH;
           final scale = _preBurstScale(_fadeController.value) * perSymbolScale;
           final rotation = _preBurstRotation(_fadeController.value);
-          // Particles begin as the original item disappears so the symbol
-          // reads as dissolving into dust rather than fading under an effect.
           final particleProgress = ((_fadeController.value - 0.34) / 0.66)
               .clamp(0.0, 1.0);
 
           return Transform.translate(
             offset: Offset(0, dy),
             child: Stack(
-              // Allow particles to fly past the cell bounds without being
-              // clipped — the burst feels far more dramatic if sparks escape
-              // the cell box and trail through the gap to the next column.
               clipBehavior: Clip.none,
               fit: StackFit.expand,
               children: [
@@ -281,16 +258,11 @@ class _ItemExplosionPopSound {
       ));
       await pool.start(volume: _volume);
     } catch (_) {
-      // Item pop audio should never interrupt the tumble animation.
+      // Ignore audio failures during animation.
     }
   }
 }
 
-/// Bomb sprite shown frozen on frame 0 in place of the multiplier face.
-/// The animated detonation runs in [MultiplierBombAnimation] as a root
-/// overlay when the win presentation reaches this cell, so this widget
-/// only needs to render the static bomb body. Wrapped in [Opacity] so
-/// the cell's existing fade-out path keeps working.
 class _FrozenBomb extends StatelessWidget {
   final Animation<double> opacity;
   final double itemH;
@@ -303,19 +275,10 @@ class _FrozenBomb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Static PNG snapshot of the bomb body — drops the per-frame Skia
-    // path-replay cost of the full Lottie composition. The animated
-    // detonation runs in [MultiplierBombAnimation] overlay; this cell's
-    // PNG is hidden via [GameViewModel.clearedPositions] the moment that
-    // overlay starts, so there is no overlap during the fuse phase.
     return AnimatedBuilder(
       animation: opacity,
       builder: (context, child) =>
           Opacity(opacity: opacity.value, child: child),
-      // Render the Lottie in a 1.3x cell-sized box so the rope can
-      // overflow into the row above (Clip.none lets it spill). The
-      // bomb's own scale was counter-shrunk in the composition so the
-      // visible bomb body stays the same size as before.
       child: Center(
         child: SizedBox(
           width: itemH * 1.3,
@@ -333,11 +296,6 @@ class _FrozenBomb extends StatelessWidget {
                     animate: false,
                   ),
                 ),
-                // The bomb body sits ~22% below the Lottie box's
-                // geometric centre. We wrap the 5x label in Align
-                // (with the same y-bias) because Stack's `alignment`
-                // is ignored when StackFit.expand gives non-positioned
-                // children tight constraints.
                 Align(
                   alignment: Alignment(
                     MultiplierLabel.labelXOffsetFor(multiplierValue),
@@ -361,9 +319,6 @@ class _FrozenBomb extends StatelessWidget {
   }
 }
 
-/// Per-symbol dust palette. Each symbol's sweep, sparkle, and spark
-/// colours mirror its dominant on-asset hue so the win effect reads as
-/// "this symbol popped" rather than as a generic tier-coloured flash.
 class _GlowPalette {
   final List<Color> sweep;
   final Color sparkle;
@@ -505,8 +460,6 @@ class _GlowPalette {
   }
 }
 
-/// One radiating gold spark. Direction + speed picked at construction time
-/// so every cell burst has a distinct fan pattern.
 class _Particle {
   final double originX;
   final double originY;
@@ -548,8 +501,6 @@ class _Particle {
   }
 }
 
-/// Paints the radiating spark burst. Each particle starts near the cell
-/// centre, accelerates outward along its [angle], shrinks, and fades.
 class _ParticleBurstPainter extends CustomPainter {
   final double progress;
   final List<_Particle> particles;

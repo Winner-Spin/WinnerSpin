@@ -4,9 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
-/// CTA that purchases a Free Spins round at 100× the base bet. Disabled
-/// while busy, in an existing FS round, balance is short, or the pool
-/// guard refuses (see GameViewModel.canBuyFreeSpins).
 class BuyFsButton extends StatelessWidget {
   final double price;
   final bool disabled;
@@ -34,22 +31,17 @@ class BuyFsButton extends StatelessWidget {
       borderColor = Colors.grey.shade400;
       glow = Colors.transparent;
     } else {
-      // Glossy pink gradient matching the "Buy Feature" image
       gradient = [
-        const Color(0xFFFF66B2), // Bright pink top highlight
-        const Color(0xFFFF1A8C), // Main pink
-        const Color(0xFFE60073), // Darker pink bottom
+        const Color(0xFFFF66B2),
+        const Color(0xFFFF1A8C),
+        const Color(0xFFE60073),
       ];
-      borderColor = const Color(0xFF99004D); // Deep pink border
+      borderColor = const Color(0xFF99004D);
       glow = const Color(0xFFFF1A8C).withValues(alpha: 0.5);
     }
 
-    final textColor = disabled
-        ? Colors.grey.shade300
-        : const Color(0xFFFFF8E1); // Creamy yellow
-    final textShadow = disabled
-        ? Colors.transparent
-        : const Color(0xFF660033); // Dark pink shadow
+    final textColor = disabled ? Colors.grey.shade300 : const Color(0xFFFFF8E1);
+    final textShadow = disabled ? Colors.transparent : const Color(0xFF660033);
 
     return GestureDetector(
       onTap: disabled
@@ -72,9 +64,7 @@ class BuyFsButton extends StatelessWidget {
           border: Border.all(
             color: disabled
                 ? borderColor
-                : const Color(
-                    0xFFFFB3D9,
-                  ).withValues(alpha: 0.6), // Inner top reflection effect
+                : const Color(0xFFFFB3D9).withValues(alpha: 0.6),
             width: 1.5,
           ),
           boxShadow: glow == Colors.transparent
@@ -86,7 +76,7 @@ class BuyFsButton extends StatelessWidget {
                     offset: const Offset(0, 4),
                   ),
                   BoxShadow(
-                    color: borderColor, // Outer darker rim shadow
+                    color: borderColor,
                     blurRadius: 0,
                     spreadRadius: 2,
                     offset: const Offset(0, 1),

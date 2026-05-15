@@ -23,8 +23,6 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   static const Color _panelAccent = Color(0xFFE2BED8);
   static const Color _textColor = Color(0xFF2C2530);
 
-  // Using GameViewModel for states
-
   final ScrollController _scrollController = ScrollController();
   bool _isExiting = false;
   bool _showGameHistory = false;

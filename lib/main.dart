@@ -16,10 +16,7 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Warm the Lottie cache in the background — the bomb composition is
-  // ~1.4 MB and parsing it inline on the first multiplier landing leaves
-  // a visible gap between the underlying PNG vanishing and the overlay
-  // painting its first frame.
+  // Pre-parse bomb Lottie to avoid first-frame delay on multiplier landing.
   unawaited(AssetLottie(MultiplierBombAnimation.assetPath).load());
 
   runApp(const WinnerSpinApp());

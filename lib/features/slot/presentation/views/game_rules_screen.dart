@@ -11,10 +11,7 @@ import 'widgets/multiplier_bomb_animation.dart';
 import 'widgets/multiplier_label.dart';
 import 'widgets/spring_popup_card.dart';
 
-/// Full-screen overlay showing game rules and symbol payout tables.
-/// Opened from the info button on the game screen.
 class GameRulesScreen extends StatefulWidget {
-  /// Current bet amount — payouts are shown as bet × multiplier.
   final double betAmount;
 
   const GameRulesScreen({super.key, required this.betAmount});
@@ -128,7 +125,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Header with title and close button.
   Widget _buildHeader(BuildContext context) {
     return Container(
       height: 74,
@@ -174,8 +170,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Builds the payout grid — high-tier symbols at top (2 per row),
-  /// then mid-tier, then low-tier (3 per row), matching the reference layout.
   Widget _buildSymbolPayoutGrid() {
     final kalp = SymbolRegistry.all.firstWhere((s) => s.id == 'kalp');
     final yesilAyi = SymbolRegistry.all.firstWhere((s) => s.id == 'yesil_ayi');
@@ -189,7 +183,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
     return Column(
       children: [
-        // Row 1: Kalp, Yeşil Ayı
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -210,7 +203,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 2: Pembe Ayı, Çilek
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -231,7 +223,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 3: Elma, Şeftali (Portakal), Karpuz
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
           child: Row(
@@ -258,7 +249,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 4: Üzüm, Muz
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -282,7 +272,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Bottom description text explaining the payout mechanics.
   Widget _buildRulesDescription() {
     return Text(
       'Symbols pay anywhere on the 6x5 grid. Each tumble checks the total '
@@ -667,7 +656,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
   }
 }
 
-/// A single symbol card showing the image and its payout tiers.
 class _SymbolPayoutCard extends StatelessWidget {
   final SlotSymbol symbol;
   final double betAmount;
@@ -682,7 +670,6 @@ class _SymbolPayoutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payouts = symbol.isScatter ? symbol.scatterPayouts : symbol.payouts;
-    // Sort thresholds descending (12+, 10-11, 8-9) to match reference
     final sortedThresholds = payouts.keys.toList()
       ..sort((a, b) => b.compareTo(a));
 
@@ -728,15 +715,11 @@ class _SymbolPayoutCard extends StatelessWidget {
     );
   }
 
-  /// Formats the range label. E.g., for threshold 12 -> "12+",
-  /// for 10 (next is 12) -> "10 - 11", for 8 (next is 10) -> "8 - 9".
   String _getRangeText(int threshold, List<int> sortedThresholds) {
     final idx = sortedThresholds.indexOf(threshold);
     if (idx == 0) {
-      // Highest threshold — open-ended
       return '$threshold+';
     }
-    // Range ends just before the next higher threshold
     final nextHigher = sortedThresholds[idx - 1];
     return '$threshold - ${nextHigher - 1}';
   }
@@ -748,7 +731,6 @@ class _SymbolPayoutCard extends StatelessWidget {
   }
 
   String _formatPayout(double value) {
-    // Format with two decimals, using comma as decimal separator
     final parts = value.toStringAsFixed(2).split('.');
     return '${parts[0]},${parts[1]}';
   }

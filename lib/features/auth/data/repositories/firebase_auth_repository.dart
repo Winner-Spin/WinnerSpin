@@ -3,9 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../domain/repositories/auth_repository.dart';
 
-/// FirebaseAuth + Firestore implementation of [AuthRepository].
-/// Translates [FirebaseAuthException] into the domain-level [AuthException]
-/// so the presentation layer never imports Firebase types.
+/// Firebase implementation of [AuthRepository].
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
     : _auth = auth ?? FirebaseAuth.instance,
@@ -77,7 +75,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (doc.exists) return doc.data();
       return null;
     } catch (_) {
-      // Silently swallow — caller falls back to defaults.
+
       return null;
     }
   }
@@ -99,8 +97,7 @@ class FirebaseAuthRepository implements AuthRepository {
   }) async {
     final patch = <String, dynamic>{};
     if (userBalance != null) {
-      // Round to 2 decimal places (cents) so accumulated float-precision
-      // drift from engine math doesn't leak into the persisted balance.
+      // Round to cents to avoid float-precision drift.
       final roundedBalance = (userBalance * 100).round() / 100;
       patch['userBalance'] = roundedBalance;
       patch['balance'] = roundedBalance;

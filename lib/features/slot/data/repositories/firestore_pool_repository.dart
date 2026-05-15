@@ -4,12 +4,9 @@ import '../../domain/models/pool_state.dart';
 import '../../domain/repositories/pool_repository.dart';
 
 /// Firestore implementation of [PoolRepository].
-/// Pool state is stored under a `pool` field on the user document.
-/// Reads happen once per login; writes happen on the engine's save interval
-/// (every 10 spins) plus once on logout/background.
 class FirestorePoolRepository implements PoolRepository {
   FirestorePoolRepository({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -23,9 +20,7 @@ class FirestorePoolRepository implements PoolRepository {
       if (doc.exists) {
         final data = doc.data();
         if (data != null && data.containsKey(_poolField)) {
-          return PoolState.fromMap(
-            Map<String, dynamic>.from(data[_poolField]),
-          );
+          return PoolState.fromMap(Map<String, dynamic>.from(data[_poolField]));
         }
       }
     } catch (_) {
@@ -37,10 +32,9 @@ class FirestorePoolRepository implements PoolRepository {
   @override
   Future<void> save(String uid, PoolState state) async {
     try {
-      await _db.collection(_collection).doc(uid).set(
-        {_poolField: state.toMap()},
-        SetOptions(merge: true),
-      );
+      await _db.collection(_collection).doc(uid).set({
+        _poolField: state.toMap(),
+      }, SetOptions(merge: true));
       state.markSaved();
     } catch (_) {
       // Fail silently — will retry on next save interval.

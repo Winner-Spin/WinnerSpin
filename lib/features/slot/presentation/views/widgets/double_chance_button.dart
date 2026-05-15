@@ -6,9 +6,6 @@ import '../../../../../core/format/money_format.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
-/// Glossy candy-style "DOUBLE CHANCE" button. Same multi-layer construction
-/// as [BuyFeatureButton] but in a green-and-gold palette and with an
-/// ON/OFF capsule replacing the price line.
 class DoubleChanceButton extends StatefulWidget {
   final double betAmount;
   final bool isOn;
@@ -81,8 +78,6 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
         scale: _scale,
         child: Opacity(
           opacity: disabled ? 0.55 : 1.0,
-          // Cache the multi-layer button raster so the press scale and
-          // toggle slide don't re-paint every gradient on each frame.
           child: RepaintBoundary(
             child: Container(
               width: w,
@@ -328,9 +323,6 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
   }
 }
 
-/// Frosted-glass capsule with a slightly pill-shaped green knob that
-/// slides between left (OFF) and right (ON), with the label sitting on
-/// the opposite side. Knob sits flush against the capsule edge.
 class _OnOffCapsule extends StatelessWidget {
   final bool isOn;
   final double height;
@@ -346,13 +338,9 @@ class _OnOffCapsule extends StatelessWidget {
     const animDuration = Duration(milliseconds: 220);
     const animCurve = Curves.easeInOut;
 
-    // RepaintBoundary so the toggle slide stays in its own layer and
-    // doesn't pull the parent button's gradient tree into its repaint.
     return RepaintBoundary(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(height / 2),
-        // Static gradient instead of a live blur — the blur re-sampled
-        // the parent every frame while the capsule slid.
         child: Container(
           width: w,
           height: height,
@@ -455,8 +443,6 @@ class _OnOffCapsule extends StatelessWidget {
   }
 }
 
-/// Two-layer text: dark-green stroke layer behind a cream/white fill so
-/// the lettering reads as embossed against the glossy green panel.
 class _EmbossedText extends StatelessWidget {
   final String text;
   final double fontSize;
@@ -581,9 +567,6 @@ class _EmbossedMoneyText extends StatelessWidget {
   }
 }
 
-/// Chunky filled right-pointing arrow — shaft (rectangle body) plus a
-/// triangular arrowhead, drawn as a single closed path. Set [reversed]
-/// to flip horizontally for a left-pointing arrow.
 class _SolidArrowPainter extends CustomPainter {
   final Color color;
   final bool reversed;

@@ -22,7 +22,7 @@ class UiClickSound {
         audioContext: AppAudioContext.game,
       ));
     } catch (_) {
-      // UI click audio should never block app startup.
+
     }
   }
 
@@ -43,7 +43,7 @@ class UiClickSound {
       ));
       await pool.start(volume: _volume);
     } catch (_) {
-      // UI click audio should never block or break a button action.
+
     }
   }
 }

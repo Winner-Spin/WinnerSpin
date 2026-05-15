@@ -3,9 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../audio/ui_click_sound.dart';
 
-/// The big SPIN call-to-action. Stateful so it owns its own press-down
-/// scale animation. Disabled visual is shown when [busy] is true or when
-/// [affordable] is false.
 class SpinButton extends StatefulWidget {
   final bool busy;
   final bool affordable;

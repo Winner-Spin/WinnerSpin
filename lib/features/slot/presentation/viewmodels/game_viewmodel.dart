@@ -61,13 +61,6 @@ class GameHistoryEntry {
   }
 }
 
-/// Top-level orchestrator for the slot screen. Composes four focused
-/// sub-controllers (balance, ante, free spins, grid) and coordinates the
-/// engine, repositories, and animation lifecycle. Each sub-controller is
-/// itself a ChangeNotifier and is exposed via a public getter so views
-/// can subscribe only to the slice of state they care about. This
-/// ViewModel notifies for state it owns directly: spinning/tumbling
-/// flags, auto-spin, speed, and user-profile fields.
 class GameViewModel extends ChangeNotifier {
   static const double _ambientMusicVolume = 0.48;
 
@@ -98,7 +91,6 @@ class GameViewModel extends ChangeNotifier {
   final PoolRepository _poolRepository;
   StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
-  // ── Composed controllers ──
   final BalanceController _balanceCtrl = BalanceController();
   final AnteController _anteCtrl = AnteController();
   final FreeSpinsController _fsCtrl = FreeSpinsController();
@@ -108,8 +100,6 @@ class GameViewModel extends ChangeNotifier {
   AnteController get anteCtrl => _anteCtrl;
   FreeSpinsController get fsCtrl => _fsCtrl;
   GridController get gridCtrl => _gridCtrl;
-
-  // ── User profile ──
 
   String _username = 'Loading...';
   String get username => _username;
@@ -123,12 +113,9 @@ class GameViewModel extends ChangeNotifier {
   bool _loggedOut = false;
   bool get loggedOut => _loggedOut;
 
-  // ── Grid + animation state ──
-
   static const int columns = SlotEngine.columns;
   static const int rows = SlotEngine.rows;
 
-  /// Grid state (delegated to [GridController]).
   List<List<String>> get grid => _gridCtrl.grid;
   List<List<String>> get previousGrid => _gridCtrl.previousGrid;
   Set<String> get fadingPaths => _gridCtrl.fadingPaths;
@@ -151,7 +138,6 @@ class GameViewModel extends ChangeNotifier {
   int _autoSpinsRemaining = 0;
   int get autoSpinsRemaining => _autoSpinsRemaining;
 
-  /// True while any spin or its cascade is still animating.
   bool get isBusy => _isSpinning || _isTumbling;
 
   int _speedMultiplier = 1;
@@ -161,15 +147,8 @@ class GameViewModel extends ChangeNotifier {
   bool get showInsufficientFundsHint => _showInsufficientFundsHint;
   Timer? _insufficientHintTimer;
 
-  /// Running cluster-win total reported live as each tumble step pops.
-  /// Drives the status-bar counter so the player watches the value
-  /// climb in lock-step with each cluster's celebration animation,
-  /// instead of the old behaviour where the counter only ticked up
-  /// once after every tumble had finished.
   double _liveTumbleWin = 0;
   double get liveTumbleWin => _liveTumbleWin;
-
-  // ── Balance & bet (delegated to BalanceController) ──
 
   double get balance => _balanceCtrl.balance;
   double get userBalance => _balanceCtrl.userBalance;
@@ -181,88 +160,45 @@ class GameViewModel extends ChangeNotifier {
   bool get canDecreaseBet => _balanceCtrl.canDecreaseBet;
   bool get canIncreaseBet => _balanceCtrl.canIncreaseBet;
 
-  // ── Ante (delegated to AnteController) ──
-
   bool get anteBetActive => _anteCtrl.active;
-
-  // ── Free spins (delegated to FreeSpinsController) ──
 
   int get freeSpinsRemaining => _fsCtrl.remaining;
 
-  /// Held true from the moment an FS spin starts until its full
-  /// post-spin celebration settles. Keeps [isInFreeSpins] reporting
-  /// true on the very last FS spin even after the counter consumes
-  /// to zero, so the FS chrome stays on screen through the multiplier
-  /// collect, flight, and Kazanç count-up. The consume itself fires
-  /// earlier — at the lingering-cluster timer end — so the displayed
-  /// counter updates immediately without holding the chrome flip.
   bool _fsRoundHoldActive = false;
 
   bool get isInFreeSpins => _fsCtrl.isActive || _fsRoundHoldActive;
 
-  /// True only when the buy CTA can fire. Pool health is intentionally
-  /// not gated here — the engine still chooses recovery/jackpot/normal
-  /// mode based on pool state, so a buy on an unhealthy pool simply
-  /// runs the FS round in the mode pool dictates instead of being
-  /// blocked at the button level.
   bool get canBuyFreeSpins =>
       !isBusy &&
       !_isAutoSpinning &&
       !isInFreeSpins &&
       _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
 
-  /// User-facing buy availability. Mirrors the displayed credit (not
-  /// the canonical balance) so the button doesn't go grey while the
-  /// player still sees enough credit to cover the buy. Skips the
-  /// engine pool guard for the same reason — the actual buyFreeSpins()
-  /// call still re-runs the full canBuyFreeSpins check before charging.
   bool get canBuyFreeSpinsForUi =>
       !isBusy &&
       !_isAutoSpinning &&
       !isInFreeSpins &&
       _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
 
-  /// User-facing spin availability. Same rationale as
-  /// [canBuyFreeSpinsForUi] — uses the displayed balance.
   bool get canSpinForUi =>
       isInFreeSpins || _balanceCtrl.canAffordDisplayed(effectiveBetCost);
 
-  /// True when the spin CTA can fire — free spins always allow it
-  /// (cost-free), otherwise the player must cover the per-spin cost.
   bool get canSpin => isInFreeSpins || _balanceCtrl.canAfford(effectiveBetCost);
-
-  // ── Pool + pending result ──
 
   PoolState _pool = PoolState();
   SpinResult? _pendingResult;
   double _pendingHistoryBet = 0;
   bool _pendingFsConsume = false;
 
-  /// Latches true for the duration of the buy-trigger spin so the FS
-  /// round started by its scatters carries the buy origin flag through
-  /// to the engine for the buy multiplier boost. Held through the
-  /// post-spin celebration too — the screen reads it to skip the FS
-  /// accumulator flight on the trigger spin (its win goes to balance,
-  /// not the FS round total) and unlock the respin button as soon as
-  /// the cascade settles instead of waiting on a flight that never
-  /// runs. Cleared at the start of the next spin.
   bool _currentSpinFromBuy = false;
   bool get isCurrentSpinFromBuy => _currentSpinFromBuy;
   String? _historyUserId;
   final List<GameHistoryEntry> _gameHistory = [];
   List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
 
-  /// Exposed result of the most recently completed spin. The win
-  /// presentation layer reads `baseWin`, `finalMultipliers`, and
-  /// `totalWin` off this to drive the staged collect-and-multiply
-  /// reveal.
   SpinResult? _lastSpinResult;
   SpinResult? get lastSpinResult => _lastSpinResult;
   bool get shouldPulseLandingScatters {
-    // During an active FS round the scatter-pulse sequence is driven
-    // entirely by _showScatterPulse() in game_screen.dart (triggered
-    // after the spin settles). Firing the drop-animation pulse here
-    // too would cause single-cupcake pulses on every FS spin.
     if (isInFreeSpins) return false;
 
     final pending = _pendingResult;
@@ -280,13 +216,9 @@ class GameViewModel extends ChangeNotifier {
     return scatterCount >= 4;
   }
 
-  // ── Tumble animation timing ──
-  /// Window for the winning-cell glow + fade. First half is the gold-glow
-  /// celebration, second half is the symbol fade-out — see [TumbleCell].
   static const Duration _tumbleFadeDuration = Duration(milliseconds: 1750);
   static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
 
-  // ── Settings ──
   bool _vibration = true;
   bool get vibration => _vibration;
   void setVibration(bool value) {
@@ -322,12 +254,6 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── User actions ──
-
-  /// Flashes a transient "deposit funds" hint in the status bar for a
-  /// couple of seconds. Used when the player taps spin without enough
-  /// credit — the spin button stays visually enabled so the tap can
-  /// surface this guidance instead of silently no-op'ing.
   void _flashInsufficientFundsHint() {
     _showInsufficientFundsHint = true;
     notifyListeners();
@@ -373,7 +299,6 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Flips Ante Bet on/off. Blocked while spinning, cascading, or in FS.
   void toggleAnteBet() {
     if (isBusy || isInFreeSpins || _isAutoSpinning) return;
     _anteCtrl.toggle();
@@ -404,8 +329,6 @@ class GameViewModel extends ChangeNotifier {
       );
     }
   }
-
-  // ── User data lifecycle ──
 
   Future<void> fetchUserData() async {
     try {
@@ -457,15 +380,9 @@ class GameViewModel extends ChangeNotifier {
     });
   }
 
-  // ── Spin ──
-
-  /// Deducts the bet, runs the engine, and stages the result for animation.
   Future<void> spin() async {
     if (isBusy) return;
 
-    // Any leftover buy-trigger marker from the previous spin clears
-    // here so the next manual / auto spin runs through the normal
-    // celebration paths.
     _currentSpinFromBuy = false;
 
     final bool isFreeSpin = isInFreeSpins;
@@ -485,13 +402,6 @@ class GameViewModel extends ChangeNotifier {
       _balanceCtrl.charge(cost);
       _pool.recordBet(cost);
     } else {
-      // FS round — no charge, so the history entry records a zero
-      // stake. The counter consume is deferred (the screen fires it
-      // when the lingering-cluster line clears, so the displayed FS
-      // counter updates as soon as the cluster pay line steps off),
-      // and the round-hold flag keeps [isInFreeSpins] reporting true
-      // on the last FS spin even after the counter hits zero so the
-      // FS chrome holds through the full post-spin celebration.
       _pendingHistoryBet = 0;
       _pendingFsConsume = true;
       _fsRoundHoldActive = true;
@@ -505,16 +415,12 @@ class GameViewModel extends ChangeNotifier {
     if (_vibration) HapticFeedback.lightImpact();
     notifyListeners();
 
-    // anteBet/buyFs flags propagate the round's origin so multiplier scaling
-    // stays consistent across every spin (incl. retriggers).
     final bool anteFlag = isFreeSpin
         ? _anteCtrl.currentRoundFromAnte
         : _anteCtrl.active;
     final bool buyFlag = isFreeSpin && _fsCtrl.currentRoundFromBuy;
 
-    // Engine runs on a background isolate so the rejection-sampling loop
-    // (up to 150 simulated cascades on jackpot/FS spins) doesn't block the
-    // tap-down ripple or any in-flight cascade animation.
+    // Run engine off UI isolate.
     final taskOutput = await compute(
       runSlotSpinTask,
       SpinTaskInput(
@@ -526,21 +432,12 @@ class GameViewModel extends ChangeNotifier {
       ),
     );
 
-    // Replace the pool reference so the isolate-side session-mode mutation
-    // survives the boundary.
     _pool = taskOutput.pool;
     _pendingResult = taskOutput.result;
 
     _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
-  /// Buys an FS round at 100× bet. Charges the fee, then immediately
-  /// fires a trigger spin that's guaranteed to land scatters — the
-  /// player watches the cupcakes drop in, any clusters resolve, and
-  /// the FS round starts naturally off the scatter trigger rather
-  /// than being awarded out of view. The buy origin is recorded on
-  /// the awarded round so the engine still applies the buy boost
-  /// across the FS spins that follow.
   Future<void> buyFreeSpins() async {
     if (_isAutoSpinning) {
       _isAutoSpinning = false;
@@ -585,16 +482,10 @@ class GameViewModel extends ChangeNotifier {
     _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
-  /// Wipes the dust residue left by last round's exploded multipliers.
-  /// SlotReel calls this the moment the drop-in phase begins so the
-  /// drop-out can finish showing the residue but the static state
-  /// renders the new symbol cleanly.
   void clearMultiplierResidues() {
     _gridCtrl.clearMultiplierResidues();
   }
 
-  /// Plays back cascade tumbles, awards the win, and persists state.
-  /// Called by SlotReel once the initial drop-in animation completes.
   Future<void> onSpinComplete() async {
     final result = _pendingResult;
     _gridCtrl.clearMultiplierResidues();
@@ -610,9 +501,6 @@ class GameViewModel extends ChangeNotifier {
       _isTumbling = true;
       notifyListeners();
       for (final tumble in result.tumbles) {
-        // Bump the live counter target right when the cluster starts
-        // popping so the bar climbs in lock-step with the cell
-        // celebration instead of waiting for every tumble to finish.
         _liveTumbleWin += tumble.winAmount;
         _gridCtrl.startTumble(
           fadingPaths: tumble.winningPaths,
@@ -654,32 +542,19 @@ class GameViewModel extends ChangeNotifier {
         _fsCtrl.awardRetrigger();
       } else {
         _fsCtrl.awardInitial();
-        // Only an initial trigger captures ante state — retriggers inherit
-        // the existing round's flag.
         _anteCtrl.captureForNewRound();
-        // The buy CTA's trigger spin lights up the FS round with the buy
-        // origin so the engine applies the buy multiplier boost across
-        // every spin in this round.
         if (_currentSpinFromBuy) {
           _fsCtrl.markCurrentRoundFromBuy();
         }
       }
     }
-    // [_currentSpinFromBuy] stays raised until the next spin starts —
-    // the celebration code reads it to skip the FS accumulator flight
-    // on the trigger spin so its win lands on balance and the lock
-    // releases the moment the cascade settles.
 
-    // Round ended? Clear the FS-source flags.
     if (!isInFreeSpins) {
       _anteCtrl.clearRoundFlag();
       _fsCtrl.clearRoundFlag();
     }
 
     _pool.recordPayout(result.totalWin);
-    // Player state is persisted on the same cadence as the pool (every 10
-    // base spins). Lifecycle hooks force-save the latest state on background,
-    // app close, and logout to cover edge cases between save intervals.
     _savePoolIfNeeded();
 
     _pendingResult = null;
@@ -702,30 +577,17 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Commits the deferred FS counter consume queued by an FS spin's
-  /// start. The screen calls this when the lingering cluster line
-  /// clears (~1s after the cascade settles) so the displayed counter
-  /// updates immediately, decoupled from the chrome transition which
-  /// stays raised through [_fsRoundHoldActive] until the celebration
-  /// fully unwinds.
   void commitPendingFsConsume() {
     if (!_pendingFsConsume) return;
     _pendingFsConsume = false;
     _fsCtrl.consumeOne();
   }
 
-  /// Drops the round-hold flag once the post-spin celebration has
-  /// fully unwound. After this clears, [isInFreeSpins] falls back to
-  /// the raw [FreeSpinsController.isActive] flag — so the FS chrome
-  /// only flips off the screen at the very end of the last FS spin's
-  /// visual sequence, never mid-presentation.
   void releaseFsRoundHold() {
     if (!_fsRoundHoldActive) return;
     _fsRoundHoldActive = false;
     notifyListeners();
   }
-
-  // ── Sign out ──
 
   Future<void> signOut() async {
     await _forceSavePool();
@@ -739,8 +601,6 @@ class GameViewModel extends ChangeNotifier {
   void resetLoggedOut() {
     _loggedOut = false;
   }
-
-  // ── Persistence ──
 
   Future<File?> _gameHistoryFile() async {
     final uid = _historyUserId;
@@ -798,8 +658,6 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Fire-and-forget pool + player save once the save interval has elapsed
-  /// (every [PoolState.saveInterval] base spins).
   void _savePoolIfNeeded() {
     if (_pool.shouldSave) {
       final uid = _authRepository.currentUserId;
@@ -810,7 +668,6 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Awaited pool save used at logout / app background.
   Future<void> _forceSavePool() async {
     final uid = _authRepository.currentUserId;
     if (uid != null) {
@@ -823,20 +680,14 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  /// Force-save hook for app lifecycle transitions (background, hidden,
-  /// detached/killed). Ensures the latest balance + pool state are persisted
-  /// even if fewer than [PoolState.saveInterval] spins have elapsed since
-  /// the last incremental save.
   Future<void> onAppLifecycleEvent() async {
     await _forceSavePool();
-    // Pause music if backgrounded
     if (_ambientMusic) {
       await _audioPlayer.pause();
     }
   }
 
   void onAppResumed() {
-    // Resume music if it should be playing
     if (_ambientMusic) {
       _audioPlayer.setVolume(_ambientMusicVolume);
       _audioPlayer.resume();

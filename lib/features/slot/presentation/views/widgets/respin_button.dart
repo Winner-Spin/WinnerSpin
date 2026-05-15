@@ -198,8 +198,7 @@ class _RespinArrowsPainter extends CustomPainter {
 
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // Two 130° arcs with 50° gaps on each side so the icon reads as two
-    // distinct refresh arrows, not a closed spinner ring.
+    // Two 130° arcs with 50° gaps for a dual-arrow refresh icon.
     const sweep = math.pi * 13 / 18;
     const topStart = math.pi * 41 / 36;
     const botStart = math.pi * 77 / 36;

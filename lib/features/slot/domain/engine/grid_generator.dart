@@ -5,12 +5,9 @@ import 'engine_runtime.dart';
 import 'rtp_config.dart';
 import 'weighted_random.dart';
 
-/// Builds initial 6×5 grids — safe (guaranteed losing) or winning (with a
-/// forced cluster of 8–12 of one symbol).
 class GridGenerator {
   GridGenerator._();
 
-  /// Generates a grid where no regular symbol reaches 8 and scatters are capped.
   static List<List<String>> generateSafe(
     List<WeightedSymbol> weights,
     int maxMults, {
@@ -33,7 +30,6 @@ class GridGenerator {
     });
   }
 
-  /// Generates a grid with exactly 8–12 of one symbol, rest safe.
   static List<List<String>> generateWinning(
     List<WeightedSymbol> weights,
     GameMode mode,
@@ -45,7 +41,8 @@ class GridGenerator {
     final winCount = _pickWinCount();
     final cells = List<String>.filled(kEngineTotalSlots, '');
 
-    final positions = List.generate(kEngineTotalSlots, (i) => i)..shuffle(engineRng);
+    final positions = List.generate(kEngineTotalSlots, (i) => i)
+      ..shuffle(engineRng);
 
     int posIndex = 0;
     for (int i = 0; i < winCount && posIndex < kEngineTotalSlots; i++) {
@@ -59,7 +56,6 @@ class GridGenerator {
 
       final r = engineRng.nextDouble();
       if (isFreeSpins) {
-        // Retrigger: 90% for 3, 8% for 4, 2% for 5.
         if (r < 0.90) {
           scatterCount = 3;
         } else if (r < 0.98) {
@@ -68,7 +64,6 @@ class GridGenerator {
           scatterCount = 5;
         }
       } else {
-        // Initial trigger: 90% for 4, 8% for 5, 2% for 6.
         if (r < 0.90) {
           scatterCount = 4;
         } else if (r < 0.98) {
@@ -103,16 +98,13 @@ class GridGenerator {
     }
 
     return List.generate(kEngineColumns, (col) {
-      return List.generate(kEngineRows, (row) => cells[col * kEngineRows + row]);
+      return List.generate(
+        kEngineRows,
+        (row) => cells[col * kEngineRows + row],
+      );
     });
   }
 
-  /// Per-spin cap on multiplier-symbol count. FS allows 1–6, base 2–6.
-  /// FS cap was rebalanced (avg 3.16 → 2.63) so high-mode FS rounds don't
-  /// crowd 4+ multipliers per spin. Paired with the higher-value baseWeight
-  /// shift in [SymbolRegistry] so each placed multiplier averages a larger
-  /// face value — visual count goes down, individual impact goes up, total
-  /// multiplier sum (and therefore RTP) stays intact.
   static int rollMaxMultipliers({bool isFreeSpins = false}) {
     final r = engineRng.nextDouble();
     if (isFreeSpins) {
@@ -130,15 +122,14 @@ class GridGenerator {
     return 6;
   }
 
-  /// Weighted-random symbol pick that enforces per-grid caps.
-  /// Public so [ChainForcer] can reuse the same cap-aware picker without
-  /// duplicating the logic.
   static String pickSafe(
     List<WeightedSymbol> weights,
     double totalWeight,
-    Map<String, int> counts,
-    {required int maxRegular, required int maxScatter, required int maxMultiplier}
-  ) {
+    Map<String, int> counts, {
+    required int maxRegular,
+    required int maxScatter,
+    required int maxMultiplier,
+  }) {
     for (int attempt = 0; attempt < 20; attempt++) {
       final picked = WeightedRandom.pick(weights, totalWeight);
       final sym = SymbolRegistry.byPath(picked);
@@ -169,19 +160,18 @@ class GridGenerator {
       }
     }
 
-    // Pick the first under-cap regular as a deterministic fallback.
     for (final w in weights) {
       final sym = SymbolRegistry.byPath(w.assetPath);
-      if (sym != null && sym.isRegular && (counts[w.assetPath] ?? 0) < maxRegular) {
+      if (sym != null &&
+          sym.isRegular &&
+          (counts[w.assetPath] ?? 0) < maxRegular) {
         counts[w.assetPath] = (counts[w.assetPath] ?? 0) + 1;
         return w.assetPath;
       }
     }
-    // Hard fallback — never leak a scatter or multiplier into a "safe" cell.
     return SymbolRegistry.all.firstWhere((s) => s.isRegular).assetPath;
   }
 
-  /// Picks the winning symbol on a winning spin, weighted by mode tier.
   static SlotSymbol _pickWinningSymbol(GameMode mode) {
     final regular = SymbolRegistry.all.where((s) => s.isRegular).toList();
     final multipliers = SymbolRegistry.weightMultipliers[mode] ?? {};
@@ -205,7 +195,6 @@ class GridGenerator {
     return regular.first;
   }
 
-  /// Picks the winning-symbol count (8–12) biased toward the minimum payout.
   static int _pickWinCount() {
     final r = engineRng.nextDouble();
     if (r < 0.75) return 8;

@@ -1,5 +1,4 @@
-/// Formats [amount] as a thousand-grouped money value with two decimals.
-/// Example: 9875.5 → "9,875.50"; 1234567.89 → "1,234,567.89".
+/// Formats [amount] as a comma-grouped currency string (e.g. "9,875.50").
 String formatMoney(double amount) {
   final fixed = amount.toStringAsFixed(2);
   final parts = fixed.split('.');

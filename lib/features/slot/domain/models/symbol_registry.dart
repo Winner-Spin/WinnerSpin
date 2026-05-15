@@ -2,7 +2,6 @@ import '../enums/game_mode.dart';
 import 'slot_symbol.dart';
 import '../enums/symbol_tier.dart';
 
-/// Single source of truth for every symbol in the game.
 class SymbolRegistry {
   SymbolRegistry._();
 
@@ -89,10 +88,7 @@ class SymbolRegistry {
       displayScale: 1.40,
     ),
 
-    // Multipliers — weights shifted toward higher values so FS rounds show
-    // fewer-but-bigger multipliers (avg face value 4.48 → 5.44). Paired with
-    // the lowered FS cap distribution in [GridGenerator.rollMaxMultipliers]
-    // to keep the (count × value) product — and therefore RTP — intact.
+    // Multipliers
     SlotSymbol(
       id: 'multi_2x',
       assetPath: 'lib/images/slot_main_screen/Items/2x_carpan.png',
@@ -144,14 +140,12 @@ class SymbolRegistry {
     ),
   ];
 
-  /// Asset-path → symbol lookup, built once for O(1) access.
   static final Map<String, SlotSymbol> _byPath = {
     for (final s in all) s.assetPath: s,
   };
 
   static SlotSymbol? byPath(String path) => _byPath[path];
 
-  /// Per-mode tier weight multipliers applied on top of [SlotSymbol.baseWeight].
   static const Map<GameMode, Map<SymbolTier, double>> weightMultipliers = {
     GameMode.recovery: {
       SymbolTier.low: 1.4,

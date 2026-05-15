@@ -5,9 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
-/// Glossy candy-style "BUY FEATURE" button. Tapping toggles between an
-/// opaque candy face and a translucent glass face — both states share
-/// the same shape, gradient family, and embossed lettering.
 class BuyFeatureButton extends StatefulWidget {
   final String title;
   final double price;
@@ -43,7 +40,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
   late final AnimationController _pressCtrl;
   late final Animation<double> _scale;
 
-  /// Drives the candy ↔ glass transition. 0 = opaque candy, 1 = glass.
   late final AnimationController _glassCtrl;
 
   @override
@@ -88,8 +84,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     final isDimmed = widget.dimmed;
     const g = 0.0;
 
-    // Opaque value only. The previous candy/glass toggle could leave
-    // the button looking passive after a cancelled buy dialog.
     double mix(double opaque, double glass) => opaque + (glass - opaque) * g;
 
     return IgnorePointer(
@@ -187,7 +181,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Top-left specular point.
                           Positioned(
                             top: h * 0.10,
                             left: w * 0.09,
@@ -209,7 +202,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Mid-top organic blob — opaque mode only.
                           Positioned(
                             top: h * 0.04,
                             left: w * 0.36,
@@ -231,7 +223,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Top-right ambient glow.
                           Positioned(
                             top: h * 0.04,
                             right: w * 0.06,
@@ -255,8 +246,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Bottom inner shadow — opaque mode only (fades out so
-                          // glass mode can stay see-through).
                           Positioned(
                             bottom: 0,
                             left: 0,
@@ -284,8 +273,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Inner edge glow ring — opaque mode bright, glass mode
-                          // softens to keep the contour readable but not bright.
                           Positioned.fill(
                             child: IgnorePointer(
                               child: Container(
@@ -305,7 +292,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Inner pink highlight stroke.
                           Positioned.fill(
                             child: IgnorePointer(
                               child: Container(
@@ -325,8 +311,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                             ),
                           ),
 
-                          // Title + price — fades to ~0.55 in glass mode so the
-                          // label reads as part of the see-through surface.
                           Center(
                             child: Opacity(
                               opacity: mix(1.0, 0.55),
@@ -377,9 +361,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
   }
 }
 
-/// Two-layer text: a soft pink-mauve stroke layer behind a cream fill
-/// layer creates the embossed casino-game look that a single shadow
-/// can't reproduce.
 class _EmbossedText extends StatelessWidget {
   final String text;
   final double fontSize;

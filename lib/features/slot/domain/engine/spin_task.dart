@@ -27,9 +27,7 @@ class SpinTaskOutput {
   const SpinTaskOutput({required this.result, required this.pool});
 }
 
-// The pool returned here carries the isolate-side mutations from
-// PoolState.currentMode (session-mode lock), which would otherwise be lost
-// across the isolate boundary. Callers must replace their pool reference.
+// Returns pool with isolate-side mutations; callers must replace their reference.
 SpinTaskOutput runSlotSpinTask(SpinTaskInput input) {
   final result = SlotEngine.spin(
     input.pool,
