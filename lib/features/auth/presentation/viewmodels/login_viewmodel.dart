@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
+import '../../../../core/audio/ambient_music_preference.dart';
 import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
@@ -27,7 +28,7 @@ class LoginViewModel extends ChangeNotifier {
   bool _loginSuccess = false;
   bool get loginSuccess => _loginSuccess;
 
-  bool _isMusicMuted = false;
+  bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
   bool _isMusicInitialized = false;
@@ -35,13 +36,24 @@ class LoginViewModel extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   void initMusic() async {
-    if (_isMusicInitialized) return;
+    if (_isMusicInitialized) {
+      _isMusicMuted = !AmbientMusicPreference.enabled;
+      if (_isMusicMuted) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.resume();
+      }
+      notifyListeners();
+      return;
+    }
     _isMusicInitialized = true;
 
     await _audioPlayer.setAudioContext(AppAudioContext.game);
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
-    _isMusicMuted = false;
+    if (AmbientMusicPreference.enabled) {
+      await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
+    }
+    _isMusicMuted = !AmbientMusicPreference.enabled;
     notifyListeners();
   }
 
@@ -89,6 +101,7 @@ class LoginViewModel extends ChangeNotifier {
 
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
+    AmbientMusicPreference.enabled = !_isMusicMuted;
     if (_isMusicMuted) {
       _audioPlayer.pause();
     } else {

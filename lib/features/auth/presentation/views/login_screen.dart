@@ -200,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     if (_viewModel.loginSuccess) {
       _viewModel.resetLoginSuccess();
+      unawaited(_viewModel.onNavigatingAway());
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const GameScreen()),

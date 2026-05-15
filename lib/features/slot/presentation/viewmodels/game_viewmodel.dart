@@ -2,9 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:audioplayers/audioplayers.dart';
 
-import '../../../../core/audio/app_audio_context.dart';
+import '../../../../core/audio/ambient_music_preference.dart';
 import '../../data/repositories/local_game_history_repository.dart';
 import '../../domain/models/game_history_entry.dart';
 import '../../domain/models/pool_state.dart';
@@ -12,6 +11,7 @@ import '../../domain/models/spin_result.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/data/repositories/firebase_auth_repository.dart';
+import '../audio/game_music_service.dart';
 import '../audio/ui_click_sound.dart';
 import '../../data/repositories/firestore_pool_repository.dart';
 import '../../domain/repositories/game_history_repository.dart';
@@ -25,32 +25,25 @@ import 'controllers/free_spins_controller.dart';
 import 'controllers/grid_controller.dart';
 
 class GameViewModel extends ChangeNotifier {
-  static const double _ambientMusicVolume = 0.48;
-
   GameViewModel({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
     GameHistoryRepository? gameHistoryRepository,
+    GameMusicService? musicService,
   }) : _authRepository = authRepository ?? FirebaseAuthRepository(),
        _poolRepository = poolRepository ?? FirestorePoolRepository(),
        _gameHistoryRepository =
-           gameHistoryRepository ?? LocalGameHistoryRepository() {
+           gameHistoryRepository ?? LocalGameHistoryRepository(),
+       _musicService = musicService ?? GameMusicService() {
     final result = SlotEngine.spin(_pool, 0);
     _gridCtrl = GridController(result.initialGrid);
     _initMusic();
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isMusicInitialized = false;
+  final GameMusicService _musicService;
 
   Future<void> _initMusic() async {
-    _isMusicInitialized = true;
-    await _audioPlayer.setAudioContext(AppAudioContext.game);
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.setVolume(_ambientMusicVolume);
-    if (_ambientMusic) {
-      await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
-    }
+    await _musicService.initialize(playWhenReady: _ambientMusic);
   }
 
   final AuthRepository _authRepository;
@@ -193,21 +186,13 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool _ambientMusic = true;
+  bool _ambientMusic = AmbientMusicPreference.enabled;
   bool get ambientMusic => _ambientMusic;
   void setAmbientMusic(bool value) {
     if (_ambientMusic == value) return;
     _ambientMusic = value;
-    if (_ambientMusic) {
-      if (!_isMusicInitialized) {
-        _initMusic();
-      } else {
-        _audioPlayer.setVolume(_ambientMusicVolume);
-        _audioPlayer.resume();
-      }
-    } else {
-      _audioPlayer.pause();
-    }
+    AmbientMusicPreference.enabled = value;
+    unawaited(_musicService.setEnabled(_ambientMusic));
     notifyListeners();
   }
 
@@ -644,22 +629,17 @@ class GameViewModel extends ChangeNotifier {
   }
 
   Future<void> onAppLifecycleEvent() async {
+    await _musicService.pauseForLifecycle(enabled: _ambientMusic);
     await _forceSavePool();
-    if (_ambientMusic) {
-      await _audioPlayer.pause();
-    }
   }
 
   void onAppResumed() {
-    if (_ambientMusic) {
-      _audioPlayer.setVolume(_ambientMusicVolume);
-      _audioPlayer.resume();
-    }
+    unawaited(_musicService.resumeAfterLifecycle(enabled: _ambientMusic));
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    unawaited(_musicService.dispose());
     _userSubscription?.cancel();
     _insufficientHintTimer?.cancel();
     _balanceCtrl.dispose();

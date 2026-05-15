@@ -1,18 +1,18 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/format/money_format.dart';
 import '../../../../core/widgets/money_text.dart';
 
+import '../../data/repositories/local_first_launch_disclaimer_repository.dart';
 import '../../domain/models/cluster_win.dart';
 import '../../domain/models/symbol_registry.dart';
+import '../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
@@ -21,6 +21,7 @@ import 'widgets/slot_reel.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
 import 'widgets/plus_button.dart';
+import 'widgets/pulsing_multiplier_sum.dart';
 import 'widgets/auto_spin_button.dart';
 import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
@@ -28,6 +29,9 @@ import 'widgets/speed_button.dart';
 import 'widgets/spring_popup_card.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
+import 'widgets/first_launch_disclaimer_dialog.dart';
+import 'widgets/flying_tumble_sprite.dart';
+import 'widgets/footer_clock_text.dart';
 import 'widgets/multiplier_label.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
@@ -49,6 +53,8 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
+  final FirstLaunchDisclaimerRepository _firstLaunchDisclaimerRepository =
+      LocalFirstLaunchDisclaimerRepository();
 
   final WinPresentationController _winCtrl = WinPresentationController();
 
@@ -328,15 +334,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<File> _firstLaunchDisclaimerFile() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/first_launch_disclaimer_seen.txt');
-  }
-
   Future<void> _maybeShowFirstLaunchDisclaimer() async {
     try {
-      final file = await _firstLaunchDisclaimerFile();
-      if (await file.exists()) return;
+      if (await _firstLaunchDisclaimerRepository.hasSeenDisclaimer()) return;
       if (!mounted) return;
       await showGeneralDialog<void>(
         context: context,
@@ -344,10 +344,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         barrierDismissible: false,
         barrierLabel: 'Disclaimer',
         transitionDuration: const Duration(milliseconds: 280),
-        pageBuilder: (context, _, child) => _FirstLaunchDisclaimerDialog(
+        pageBuilder: (context, _, child) => FirstLaunchDisclaimerDialog(
           onOkay: () async {
             UiClickSound.play();
-            await file.writeAsString('seen');
+            await _firstLaunchDisclaimerRepository.markDisclaimerSeen();
             if (context.mounted) Navigator.of(context).pop();
           },
         ),
@@ -912,7 +912,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
       late OverlayEntry entry;
       entry = OverlayEntry(
-        builder: (ctx) => _FlyingTumbleSprite(
+        builder: (ctx) => FlyingTumbleSprite(
           amount: amount,
           start: startCenter,
           end: endCenter,
@@ -1717,7 +1717,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               Container(
                 key: _tumbleWinAnchorKey,
                 child: sum > 0
-                    ? _PulsingMultiplierSum(
+                    ? PulsingMultiplierSum(
                         value: sum,
                         style: _statusKazancStyle,
                       )
@@ -1814,7 +1814,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           builder: (context, _) => _buildBottomMoneyRow(),
         ),
         const SizedBox(height: 1),
-        _ClockText(style: _bottomClockStyle),
+        FooterClockText(style: _bottomClockStyle),
       ],
     );
   }
@@ -1848,332 +1848,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FirstLaunchDisclaimerDialog extends StatelessWidget {
-  final VoidCallback onOkay;
-
-  const _FirstLaunchDisclaimerDialog({required this.onOkay});
-
-  static const Color _panelColor = Color(0xFFF0CDE6);
-  static const Color _textColor = Color(0xFF2C2530);
-  static const String _bodyText =
-      'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.';
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.42)),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 18),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: SpringPopupCard(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.92,
-                          maxHeight: MediaQuery.of(context).size.height * 0.45,
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _panelColor,
-                            borderRadius: BorderRadius.circular(26),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.35),
-                                blurRadius: 28,
-                                offset: const Offset(0, 14),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(26),
-                            child: Column(
-                              children: [
-                                _buildHeader(),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      22,
-                                      24,
-                                      22,
-                                      24,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        Text(
-                                          _bodyText,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.barlowCondensed(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: _textColor,
-                                            height: 1.18,
-                                            letterSpacing: 0.2,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 24),
-                                        _buildOkayButton(),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      height: 74,
-      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6D7EB),
-        border: Border(bottom: BorderSide(color: Color(0x1A2C2530))),
-      ),
-      child: Center(
-        child: Text(
-          'DISCLAIMER',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 27,
-            fontWeight: FontWeight.w900,
-            color: _textColor,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOkayButton() {
-    return GestureDetector(
-      onTap: onOkay,
-      child: Container(
-        width: double.infinity,
-        height: 46,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF00C76A),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.32),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Text(
-          'OKAY',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 23,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: 1.1,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FlyingTumbleSprite extends StatefulWidget {
-  final double amount;
-  final Offset start;
-  final Offset end;
-  final TextStyle style;
-  final Duration duration;
-  final VoidCallback onComplete;
-
-  const _FlyingTumbleSprite({
-    required this.amount,
-    required this.start,
-    required this.end,
-    required this.style,
-    required this.duration,
-    required this.onComplete,
-  });
-
-  @override
-  State<_FlyingTumbleSprite> createState() => _FlyingTumbleSpriteState();
-}
-
-class _FlyingTumbleSpriteState extends State<_FlyingTumbleSprite>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: widget.duration);
-    _ctrl.forward().then((_) {
-      if (mounted) widget.onComplete();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final raw = _ctrl.value;
-        final t = Curves.easeInOutCubic.transform(raw);
-        final pos = Offset.lerp(widget.start, widget.end, t)!;
-        final scale = 1.0 - 0.25 * t;
-        final opacity = raw < 0.85 ? 1.0 : (1.0 - raw) / 0.15;
-        return Positioned(
-          left: pos.dx,
-          top: pos.dy,
-          child: IgnorePointer(
-            child: FractionalTranslation(
-              translation: const Offset(-0.5, -0.5),
-              child: Opacity(
-                opacity: opacity.clamp(0.0, 1.0),
-                child: Transform.scale(
-                  scale: scale,
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: MoneyText(
-                      text: formatMoney(widget.amount),
-                      style: widget.style,
-                      symbolOffset: const Offset(0, 1.5),
-                      lineYOffset: 0.75,
-                      lineLengthScale: 0.94,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PulsingMultiplierSum extends StatefulWidget {
-  final int value;
-  final TextStyle style;
-
-  const _PulsingMultiplierSum({required this.value, required this.style});
-
-  @override
-  State<_PulsingMultiplierSum> createState() => _PulsingMultiplierSumState();
-}
-
-class _PulsingMultiplierSumState extends State<_PulsingMultiplierSum>
-    with SingleTickerProviderStateMixin {
-  static const Duration _pulseDuration = Duration(milliseconds: 380);
-
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: _pulseDuration);
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 1.0,
-          end: 1.5,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: 45,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 1.5,
-          end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeIn)),
-        weight: 55,
-      ),
-    ]).animate(_ctrl);
-    _ctrl.forward();
-  }
-
-  @override
-  void didUpdateWidget(covariant _PulsingMultiplierSum old) {
-    super.didUpdateWidget(old);
-    if (old.value != widget.value) {
-      _ctrl.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _scale,
-      builder: (context, _) => Transform.scale(
-        scale: _scale.value,
-        alignment: Alignment.center,
-        child: Text('${widget.value}', style: widget.style),
-      ),
-    );
-  }
-}
-
-class _ClockText extends StatelessWidget {
-  final TextStyle style;
-
-  const _ClockText({required this.style});
-
-  static final Stream<DateTime> _ticker = Stream<DateTime>.periodic(
-    const Duration(seconds: 10),
-    (_) => DateTime.now().toUtc().add(const Duration(hours: 3)),
-  ).asBroadcastStream();
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DateTime>(
-      stream: _ticker,
-      initialData: DateTime.now().toUtc().add(const Duration(hours: 3)),
-      builder: (context, snapshot) {
-        final now = snapshot.data!;
-        final timeString =
-            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-        return Text(
-          'WINNER SPIN · $timeString',
-          textAlign: TextAlign.center,
-          style: style,
-        );
-      },
     );
   }
 }
