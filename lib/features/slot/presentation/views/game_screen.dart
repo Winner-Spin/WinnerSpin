@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,6 +23,7 @@ import 'widgets/auto_spin_button.dart';
 import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
+import 'widgets/spring_popup_card.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/win_amount_counter.dart';
@@ -306,7 +306,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         barrierColor: Colors.transparent,
         barrierDismissible: false,
         barrierLabel: 'Disclaimer',
-        transitionDuration: const Duration(milliseconds: 220),
+        transitionDuration: const Duration(milliseconds: 280),
         pageBuilder: (context, _, child) => _FirstLaunchDisclaimerDialog(
           onOkay: () async {
             UiClickSound.play();
@@ -315,15 +315,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           },
         ),
         transitionBuilder: (context, anim, _, child) {
-          return FadeTransition(
-            opacity: anim,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.96, end: 1).animate(
-                CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-              ),
-              child: child,
-            ),
-          );
+          return _buildSpringPopupTransition(anim, child);
         },
       );
     } catch (_) {
@@ -564,19 +556,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       barrierColor: Colors.transparent,
       barrierDismissible: true,
       barrierLabel: 'Auto Play Settings',
-      transitionDuration: const Duration(milliseconds: 220),
+      transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, _, child) =>
           AutoPlaySettingsScreen(viewModel: _viewModel),
       transitionBuilder: (context, anim, _, child) {
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            child: child,
-          ),
-        );
+        return _buildSpringPopupTransition(anim, child);
       },
     );
   }
@@ -602,22 +586,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       barrierColor: Colors.transparent,
       barrierDismissible: true,
       barrierLabel: 'Deposit Money',
-      transitionDuration: const Duration(milliseconds: 220),
+      transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, _, child) =>
           DepositMoneyScreen(viewModel: _viewModel),
       transitionBuilder: (context, anim, _, child) {
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            child: child,
-          ),
-        );
+        return _buildSpringPopupTransition(anim, child);
       },
     );
     _depositPromptShowing = false;
+  }
+
+  Widget _buildSpringPopupTransition(Animation<double> anim, Widget child) {
+    final fade = CurvedAnimation(
+      parent: anim,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(opacity: fade, child: child);
   }
 
   void _trackNormalBigWin() {
@@ -678,8 +663,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           price: _viewModel.buyFeaturePrice,
         ),
         transitionsBuilder: (_, anim, _, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 200),
+            _buildSpringPopupTransition(anim, child),
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
       ),
     );
     if (!mounted || confirmed != true) return;
@@ -1476,13 +1462,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     ),
                                 transitionsBuilder:
                                     (context, anim, animation, child) {
-                                      return FadeTransition(
-                                        opacity: anim,
-                                        child: child,
+                                      return _buildSpringPopupTransition(
+                                        anim,
+                                        child,
                                       );
                                     },
                                 transitionDuration: const Duration(
-                                  milliseconds: 250,
+                                  milliseconds: 280,
+                                ),
+                                reverseTransitionDuration: const Duration(
+                                  milliseconds: 220,
                                 ),
                               ),
                             );
@@ -1503,15 +1492,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             barrierDismissible: true,
                             barrierLabel: 'Settings',
                             transitionDuration: const Duration(
-                              milliseconds: 250,
+                              milliseconds: 280,
                             ),
                             pageBuilder: (context, _, child) =>
                                 SystemSettingsScreen(viewModel: _viewModel),
                             transitionBuilder: (context, anim, _, child) {
-                              return FadeTransition(
-                                opacity: anim,
-                                child: child,
-                              );
+                              return _buildSpringPopupTransition(anim, child);
                             },
                           );
                         },
@@ -2090,10 +2076,7 @@ class _FirstLaunchDisclaimerDialog extends StatelessWidget {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(color: Colors.black.withValues(alpha: 0.42)),
-            ),
+            child: Container(color: Colors.black.withValues(alpha: 0.42)),
           ),
           SafeArea(
             child: Column(
@@ -2102,59 +2085,61 @@ class _FirstLaunchDisclaimerDialog extends StatelessWidget {
                 Expanded(
                   child: Align(
                     alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.45,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.45,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    22,
-                                    24,
-                                    22,
-                                    24,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        _bodyText,
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.barlowCondensed(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: _textColor,
-                                          height: 1.18,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      _buildOkayButton(),
-                                    ],
-                                  ),
-                                ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
                               ),
                             ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      22,
+                                      24,
+                                      22,
+                                      24,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          _bodyText,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.barlowCondensed(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: _textColor,
+                                            height: 1.18,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        _buildOkayButton(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2447,6 +2432,8 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
 
   late final AnimationController _controller;
   late final Animation<double> _scale;
+  late final Animation<double> _fade;
+  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -2454,14 +2441,31 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 520),
+      reverseDuration: const Duration(milliseconds: 220),
     )..forward();
-    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+    _scale = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+      reverseCurve: Curves.easeInBack,
+    );
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _dismiss() async {
+    if (_isDismissing) return;
+    _isDismissing = true;
+    await _controller.reverse();
+    if (mounted) widget.onDismiss();
   }
 
   @override
@@ -2474,53 +2478,56 @@ class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
     final valueFontSize = width * 0.16;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onDismiss,
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.36),
-        alignment: Alignment.center,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.18, end: 1.0).animate(_scale),
-          child: SizedBox(
-            width: width,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(
-                  assetPath,
-                  width: width,
-                  filterQuality: FilterQuality.medium,
-                ),
-                // Show the awarded free-spin count in the purple centre area.
-                Transform.translate(
-                  offset: valueOffset,
-                  child: Text(
-                    '${widget.value}',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: valueFontSize,
-                      fontWeight: FontWeight.w900,
-                      height: 1.0,
-                      color: const Color(0xFFFFB72E),
-                      shadows: [
-                        Shadow(
-                          color: const Color(
-                            0xFF9C5A00,
-                          ).withValues(alpha: 0.95),
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                        Shadow(
-                          color: const Color(
-                            0xFFFFF0A8,
-                          ).withValues(alpha: 0.85),
-                          offset: const Offset(0, -2),
-                          blurRadius: 3,
-                        ),
-                      ],
+      onTap: _dismiss,
+      child: FadeTransition(
+        opacity: _fade,
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.36),
+          alignment: Alignment.center,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.86, end: 1.0).animate(_scale),
+            child: SizedBox(
+              width: width,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    assetPath,
+                    width: width,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                  // Show the awarded free-spin count in the purple centre area.
+                  Transform.translate(
+                    offset: valueOffset,
+                    child: Text(
+                      '${widget.value}',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: valueFontSize,
+                        fontWeight: FontWeight.w900,
+                        height: 1.0,
+                        color: const Color(0xFFFFB72E),
+                        shadows: [
+                          Shadow(
+                            color: const Color(
+                              0xFF9C5A00,
+                            ).withValues(alpha: 0.95),
+                            offset: const Offset(0, 4),
+                            blurRadius: 8,
+                          ),
+                          Shadow(
+                            color: const Color(
+                              0xFFFFF0A8,
+                            ).withValues(alpha: 0.85),
+                            offset: const Offset(0, -2),
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -2551,6 +2558,8 @@ class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
 
   late final AnimationController _controller;
   late final Animation<double> _scale;
+  late final Animation<double> _fade;
+  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -2558,14 +2567,31 @@ class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 520),
+      reverseDuration: const Duration(milliseconds: 220),
     )..forward();
-    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+    _scale = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+      reverseCurve: Curves.easeInBack,
+    );
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _dismiss() async {
+    if (_isDismissing) return;
+    _isDismissing = true;
+    await _controller.reverse();
+    if (mounted) widget.onDismiss();
   }
 
   @override
@@ -2576,85 +2602,88 @@ class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onDismiss,
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.36),
-        alignment: Alignment.center,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.18, end: 1.0).animate(_scale),
-          child: SizedBox(
-            width: width,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(
-                  _assetPath,
-                  width: width,
-                  filterQuality: FilterQuality.medium,
-                ),
-                Transform.translate(
-                  offset: Offset(0, width * 0.025),
-                  child: SizedBox(
-                    width: width * 0.46,
-                    height: width * 0.12,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: MoneyText(
-                        text: formatMoney(widget.totalWin),
-                        spacing: width * 0.007,
-                        symbolOffset: Offset(0, width * 0.005),
-                        lineYOffset: width * 0.009,
-                        lineLengthScale: 0.96,
-                        lineTopExtend: width * 0.004,
-                        symbolTextYOffset: width * 0.006,
-                        style: GoogleFonts.outfit(
-                          fontSize: amountFontSize,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                          color: const Color(0xFFFFD13B),
-                          shadows: [
-                            Shadow(
-                              color: const Color(
-                                0xFF9C5A00,
-                              ).withValues(alpha: 0.95),
-                              offset: const Offset(0, 4),
-                              blurRadius: 8,
-                            ),
-                          ],
+      onTap: _dismiss,
+      child: FadeTransition(
+        opacity: _fade,
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.36),
+          alignment: Alignment.center,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.86, end: 1.0).animate(_scale),
+            child: SizedBox(
+              width: width,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    _assetPath,
+                    width: width,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                  Transform.translate(
+                    offset: Offset(0, width * 0.025),
+                    child: SizedBox(
+                      width: width * 0.46,
+                      height: width * 0.12,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: MoneyText(
+                          text: formatMoney(widget.totalWin),
+                          spacing: width * 0.007,
+                          symbolOffset: Offset(0, width * 0.005),
+                          lineYOffset: width * 0.009,
+                          lineLengthScale: 0.96,
+                          lineTopExtend: width * 0.004,
+                          symbolTextYOffset: width * 0.006,
+                          style: GoogleFonts.outfit(
+                            fontSize: amountFontSize,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                            color: const Color(0xFFFFD13B),
+                            shadows: [
+                              Shadow(
+                                color: const Color(
+                                  0xFF9C5A00,
+                                ).withValues(alpha: 0.95),
+                                offset: const Offset(0, 4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Transform.translate(
-                  offset: Offset(width * -0.14, width * 0.17),
-                  child: SizedBox(
-                    width: width * 0.11,
-                    height: width * 0.07,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        '${widget.totalFreeSpins}',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: spinFontSize,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                          color: const Color(0xFFFFD13B),
-                          letterSpacing: 1.2,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.85),
-                              offset: const Offset(0, 3),
-                              blurRadius: 5,
-                            ),
-                          ],
+                  Transform.translate(
+                    offset: Offset(width * -0.14, width * 0.17),
+                    child: SizedBox(
+                      width: width * 0.11,
+                      height: width * 0.07,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${widget.totalFreeSpins}',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: spinFontSize,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                            color: const Color(0xFFFFD13B),
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.85),
+                                offset: const Offset(0, 3),
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

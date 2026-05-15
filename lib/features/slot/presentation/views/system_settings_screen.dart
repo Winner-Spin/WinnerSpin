@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -9,6 +7,7 @@ import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'deposit_money_screen.dart';
 import 'widgets/custom_switch.dart';
+import 'widgets/spring_popup_card.dart';
 
 class SystemSettingsScreen extends StatefulWidget {
   final GameViewModel viewModel;
@@ -43,15 +42,12 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop();
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           SafeArea(
@@ -61,185 +57,189 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.84,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.84,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(
-                                child: RawScrollbar(
-                                  controller: _scrollController,
-                                  thumbVisibility: true,
-                                  thumbColor: _textColor.withValues(
-                                    alpha: 0.25,
-                                  ),
-                                  thickness: 6,
-                                  radius: const Radius.circular(8),
-                                  padding: const EdgeInsets.only(
-                                    right: 4,
-                                    top: 4,
-                                    bottom: 4,
-                                  ),
-                                  child: SingleChildScrollView(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(
+                                  child: RawScrollbar(
                                     controller: _scrollController,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      22,
-                                      30,
-                                      22,
-                                      24,
+                                    thumbVisibility: true,
+                                    thumbColor: _textColor.withValues(
+                                      alpha: 0.25,
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        _buildGameHistory(),
-                                        const SizedBox(height: 24),
-                                        const Divider(
-                                          color: Color(0x332C2530),
-                                          height: 1,
-                                        ),
-                                        const SizedBox(height: 24),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'GENERAL SETTINGS',
-                                              style:
-                                                  GoogleFonts.barlowCondensed(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: const Color(
-                                                      0xFF2C2530,
-                                                    ),
-                                                    letterSpacing: 1.2,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ListenableBuilder(
-                                          listenable: widget.viewModel,
-                                          builder: (context, _) {
-                                            return Column(
-                                              children: [
-                                                _buildSettingRow(
-                                                  title: 'AMBIENT MUSIC',
-                                                  description:
-                                                      'TURN GAME MUSIC ON OR OFF',
-                                                  value: widget
-                                                      .viewModel
-                                                      .ambientMusic,
-                                                  onChanged: (v) => widget
-                                                      .viewModel
-                                                      .setAmbientMusic(v),
-                                                ),
-                                                const SizedBox(height: 24),
-                                                _buildSettingRow(
-                                                  title: 'SOUND EFFECTS',
-                                                  description:
-                                                      'TURN GAME SOUNDS ON OR OFF',
-                                                  value: widget
-                                                      .viewModel
-                                                      .soundEffects,
-                                                  onChanged: (v) => widget
-                                                      .viewModel
-                                                      .setSoundEffects(v),
-                                                ),
-                                                const SizedBox(height: 24),
-                                                _buildSettingRow(
-                                                  title: 'VIBRATION',
-                                                  description:
-                                                      'TURN IN-GAME VIBRATIONS ON OR OFF',
-                                                  value: widget
-                                                      .viewModel
-                                                      .vibration,
-                                                  onChanged: (v) => widget
-                                                      .viewModel
-                                                      .setVibration(v),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-
-                                        const SizedBox(height: 32),
-                                        const Divider(
-                                          color: Color(0x332C2530),
-                                          height: 1,
-                                        ),
-                                        const SizedBox(height: 24),
-
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'BET SETTINGS',
-                                              style:
-                                                  GoogleFonts.barlowCondensed(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: const Color(
-                                                      0xFF2C2530,
-                                                    ),
-                                                    letterSpacing: 1.2,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        _buildTotalBet(),
-                                        const SizedBox(height: 24),
-                                        _buildBuyGameMoneyButton(),
-                                        const SizedBox(height: 36),
-                                        Text(
-                                          'Made with ☕️ & 💻 by Hakan Güneş & Enes Eken',
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.barlowCondensed(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black,
-                                            letterSpacing: 0.3,
+                                    thickness: 6,
+                                    radius: const Radius.circular(8),
+                                    padding: const EdgeInsets.only(
+                                      right: 4,
+                                      top: 4,
+                                      bottom: 4,
+                                    ),
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        22,
+                                        30,
+                                        22,
+                                        24,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          _buildGameHistory(),
+                                          const SizedBox(height: 24),
+                                          const Divider(
+                                            color: Color(0x332C2530),
+                                            height: 1,
                                           ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.',
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.barlowCondensed(
-                                            fontSize: 8.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black.withValues(
-                                              alpha: 0.74,
-                                            ),
-                                            height: 1.08,
+                                          const SizedBox(height: 24),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'GENERAL SETTINGS',
+                                                style:
+                                                    GoogleFonts.barlowCondensed(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: const Color(
+                                                        0xFF2C2530,
+                                                      ),
+                                                      letterSpacing: 1.2,
+                                                    ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 16),
+                                          ListenableBuilder(
+                                            listenable: widget.viewModel,
+                                            builder: (context, _) {
+                                              return Column(
+                                                children: [
+                                                  _buildSettingRow(
+                                                    title: 'AMBIENT MUSIC',
+                                                    description:
+                                                        'TURN GAME MUSIC ON OR OFF',
+                                                    value: widget
+                                                        .viewModel
+                                                        .ambientMusic,
+                                                    onChanged: (v) => widget
+                                                        .viewModel
+                                                        .setAmbientMusic(v),
+                                                  ),
+                                                  const SizedBox(height: 24),
+                                                  _buildSettingRow(
+                                                    title: 'SOUND EFFECTS',
+                                                    description:
+                                                        'TURN GAME SOUNDS ON OR OFF',
+                                                    value: widget
+                                                        .viewModel
+                                                        .soundEffects,
+                                                    onChanged: (v) => widget
+                                                        .viewModel
+                                                        .setSoundEffects(v),
+                                                  ),
+                                                  const SizedBox(height: 24),
+                                                  _buildSettingRow(
+                                                    title: 'VIBRATION',
+                                                    description:
+                                                        'TURN IN-GAME VIBRATIONS ON OR OFF',
+                                                    value: widget
+                                                        .viewModel
+                                                        .vibration,
+                                                    onChanged: (v) => widget
+                                                        .viewModel
+                                                        .setVibration(v),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+
+                                          const SizedBox(height: 32),
+                                          const Divider(
+                                            color: Color(0x332C2530),
+                                            height: 1,
+                                          ),
+                                          const SizedBox(height: 24),
+
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'BET SETTINGS',
+                                                style:
+                                                    GoogleFonts.barlowCondensed(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: const Color(
+                                                        0xFF2C2530,
+                                                      ),
+                                                      letterSpacing: 1.2,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          _buildTotalBet(),
+                                          const SizedBox(height: 24),
+                                          _buildBuyGameMoneyButton(),
+                                          const SizedBox(height: 36),
+                                          Text(
+                                            'Made with ☕️ & 💻 by Hakan Güneş & Enes Eken',
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.barlowCondensed(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.',
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.barlowCondensed(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black.withValues(
+                                                alpha: 0.74,
+                                              ),
+                                              height: 1.08,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -373,21 +373,22 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       barrierColor: Colors.transparent,
       barrierDismissible: true,
       barrierLabel: 'Deposit Money',
-      transitionDuration: const Duration(milliseconds: 220),
+      transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, _, child) =>
           DepositMoneyScreen(viewModel: widget.viewModel),
       transitionBuilder: (context, anim, _, child) {
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            child: child,
-          ),
-        );
+        return _buildSpringPopupTransition(anim, child);
       },
     );
+  }
+
+  Widget _buildSpringPopupTransition(Animation<double> anim, Widget child) {
+    final fade = CurvedAnimation(
+      parent: anim,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(opacity: fade, child: child);
   }
 
   Widget _buildBuyGameMoneyButton() {

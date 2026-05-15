@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -7,6 +5,7 @@ import '../../../../core/format/money_format.dart';
 import '../../../../core/widgets/money_text.dart';
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
+import 'widgets/spring_popup_card.dart';
 
 class DepositMoneyScreen extends StatefulWidget {
   final GameViewModel viewModel;
@@ -66,15 +65,12 @@ class _DepositMoneyScreenState extends State<DepositMoneyScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop();
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           SafeArea(
@@ -84,57 +80,59 @@ class _DepositMoneyScreenState extends State<DepositMoneyScreen> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.54,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.54,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    22,
-                                    24,
-                                    22,
-                                    22,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _buildCreditLine(),
-                                      _buildMoneyAmount(),
-                                      Column(
-                                        children: [
-                                          _buildBuyButton(),
-                                          const SizedBox(height: 10),
-                                          _buildDepositDisclaimer(),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
                               ),
                             ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      22,
+                                      24,
+                                      22,
+                                      22,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildCreditLine(),
+                                        _buildMoneyAmount(),
+                                        Column(
+                                          children: [
+                                            _buildBuyButton(),
+                                            const SizedBox(height: 10),
+                                            _buildDepositDisclaimer(),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -11,6 +9,7 @@ import '../../domain/enums/symbol_tier.dart';
 import '../audio/ui_click_sound.dart';
 import 'widgets/multiplier_bomb_animation.dart';
 import 'widgets/multiplier_label.dart';
+import 'widgets/spring_popup_card.dart';
 
 /// Full-screen overlay showing game rules and symbol payout tables.
 /// Opened from the info button on the game screen.
@@ -44,15 +43,12 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop();
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           SafeArea(
@@ -62,59 +58,61 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.84,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.84,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(
-                                child: RawScrollbar(
-                                  controller: _scrollController,
-                                  thumbVisibility: true,
-                                  thumbColor: _textColor.withValues(
-                                    alpha: 0.25,
-                                  ),
-                                  thickness: 4,
-                                  radius: const Radius.circular(8),
-                                  child: SingleChildScrollView(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(
+                                  child: RawScrollbar(
                                     controller: _scrollController,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      18,
-                                      20,
-                                      18,
-                                      18,
+                                    thumbVisibility: true,
+                                    thumbColor: _textColor.withValues(
+                                      alpha: 0.25,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        const SizedBox(height: 4),
-                                        _buildSymbolPayoutGrid(),
-                                        const SizedBox(height: 10),
-                                        _buildRulesDescription(),
-                                        _buildExtraRules(),
-                                      ],
+                                    thickness: 4,
+                                    radius: const Radius.circular(8),
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        18,
+                                        20,
+                                        18,
+                                        18,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          const SizedBox(height: 4),
+                                          _buildSymbolPayoutGrid(),
+                                          const SizedBox(height: 10),
+                                          _buildRulesDescription(),
+                                          _buildExtraRules(),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

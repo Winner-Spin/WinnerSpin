@@ -1,11 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
 import '../audio/ui_click_sound.dart';
 import 'widgets/confirm_button.dart';
+import 'widgets/spring_popup_card.dart';
 
 const Color _panelColor = Color(0xFFF0CDE6);
 const Color _textColor = Color(0xFF2C2530);
@@ -39,62 +38,61 @@ class BuyFreeSpinsConfirmScreen extends StatelessWidget {
           // Tap-outside-to-dismiss backdrop. Transparent so the game
           // screen behind it stays visible through the dialog gap.
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop(false);
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop(false);
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: cardMaxHeight),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: _panelColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: size.width * 0.04,
-                  vertical: size.height * 0.04,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _ConfirmPrompt(spinCount: spinCount, price: price),
-                    SizedBox(height: size.height * 0.035),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ConfirmButton(
-                          label: 'YES',
-                          variant: ConfirmButtonVariant.yes,
-                          width: buttonWidth,
-                          height: buttonHeight,
-                          onTap: () => Navigator.of(context).pop(true),
-                        ),
-                        ConfirmButton(
-                          label: 'NO',
-                          variant: ConfirmButtonVariant.no,
-                          width: buttonWidth,
-                          height: buttonHeight,
-                          onTap: () => Navigator.of(context).pop(false),
-                        ),
-                      ],
-                    ),
-                  ],
+            child: SpringPopupCard(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: cardMaxHeight),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: _panelColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: size.width * 0.04,
+                    vertical: size.height * 0.04,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _ConfirmPrompt(spinCount: spinCount, price: price),
+                      SizedBox(height: size.height * 0.035),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ConfirmButton(
+                            label: 'YES',
+                            variant: ConfirmButtonVariant.yes,
+                            width: buttonWidth,
+                            height: buttonHeight,
+                            onTap: () => Navigator.of(context).pop(true),
+                          ),
+                          ConfirmButton(
+                            label: 'NO',
+                            variant: ConfirmButtonVariant.no,
+                            width: buttonWidth,
+                            height: buttonHeight,
+                            onTap: () => Navigator.of(context).pop(false),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -127,11 +125,7 @@ class _ConfirmPrompt extends StatelessWidget {
       height: 1.15,
       color: _textColor,
       shadows: const [
-        Shadow(
-          color: Color(0x66FFFFFF),
-          offset: Offset(0, 2),
-          blurRadius: 3,
-        ),
+        Shadow(color: Color(0x66FFFFFF), offset: Offset(0, 2), blurRadius: 3),
       ],
     );
     final accent = base.copyWith(
