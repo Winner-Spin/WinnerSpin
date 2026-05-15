@@ -125,6 +125,14 @@ class BalanceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds virtual game money to both local and canonical balances.
+  void depositGameMoney(double amount) {
+    if (amount <= 0) return;
+    _balance += amount;
+    _userBalance += amount;
+    notifyListeners();
+  }
+
   bool increaseBet() {
     final idx = _currentTierIndex();
     if (idx >= _betTiers.length - 1) return false;

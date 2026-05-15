@@ -390,6 +390,21 @@ class GameViewModel extends ChangeNotifier {
     _balanceCtrl.decreaseBet();
   }
 
+  Future<void> purchaseGameMoney(double amount) async {
+    if (amount <= 0) return;
+    _balanceCtrl.depositGameMoney(amount);
+    _showInsufficientFundsHint = false;
+    notifyListeners();
+    final uid = _authRepository.currentUserId;
+    if (uid != null) {
+      await _authRepository.savePlayerState(
+        uid,
+        userBalance: userBalance,
+        freeSpinsRemaining: freeSpinsRemaining,
+      );
+    }
+  }
+
   // ── User data lifecycle ──
 
   Future<void> fetchUserData() async {

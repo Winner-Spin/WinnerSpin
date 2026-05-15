@@ -7,6 +7,7 @@ import '../../../../core/format/money_format.dart';
 import '../../../../core/widgets/money_text.dart';
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
+import 'deposit_money_screen.dart';
 import 'widgets/custom_switch.dart';
 
 class SystemSettingsScreen extends StatefulWidget {
@@ -207,6 +208,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                         ),
                                         const SizedBox(height: 16),
                                         _buildTotalBet(),
+                                        const SizedBox(height: 24),
+                                        _buildBuyGameMoneyButton(),
                                         const SizedBox(height: 36),
                                         Text(
                                           'Made with ☕️ & 💻 by Hakan Güneş & Enes Eken',
@@ -272,10 +275,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _buildExitButton(),
-          ),
+          Align(alignment: Alignment.centerLeft, child: _buildExitButton()),
           Text(
             'SETTINGS',
             style: GoogleFonts.barlowCondensed(
@@ -333,11 +333,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             color: _panelAccent.withValues(alpha: 0.88),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
-            Icons.logout_rounded,
-            size: 30,
-            color: _textColor,
-          ),
+          child: const Icon(Icons.logout_rounded, size: 30, color: _textColor),
         ),
       ),
     );
@@ -366,6 +362,60 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             size: 24,
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDepositMoney() {
+    UiClickSound.play();
+    showGeneralDialog<void>(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'Deposit Money',
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, _, child) =>
+          DepositMoneyScreen(viewModel: widget.viewModel),
+      transitionBuilder: (context, anim, _, child) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(
+              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBuyGameMoneyButton() {
+    return GestureDetector(
+      onTap: _showDepositMoney,
+      child: Container(
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF00C76A),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.32),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          'BUY GAME MONEY',
+          style: GoogleFonts.barlowCondensed(
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 1.1,
+          ),
+        ),
       ),
     );
   }

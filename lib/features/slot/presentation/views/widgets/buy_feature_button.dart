@@ -14,6 +14,7 @@ class BuyFeatureButton extends StatefulWidget {
   final double width;
   final double height;
   final bool disabled;
+  final bool dimmed;
   final bool vibrationEnabled;
   final VoidCallback? onTap;
 
@@ -24,6 +25,7 @@ class BuyFeatureButton extends StatefulWidget {
     this.width = 235,
     this.height = 112,
     this.disabled = false,
+    this.dimmed = false,
     this.vibrationEnabled = true,
     this.onTap,
   });
@@ -83,6 +85,7 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     final w = widget.width;
     final h = widget.height;
     final isDisabled = widget.disabled;
+    final isDimmed = widget.dimmed;
     const g = 0.0;
 
     // Opaque value only. The previous candy/glass toggle could leave
@@ -92,27 +95,27 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
     return IgnorePointer(
       ignoring: isDisabled,
       child: Opacity(
-        opacity: isDisabled ? 0.55 : 1.0,
+        opacity: isDisabled || isDimmed ? 0.55 : 1.0,
         child: RepaintBoundary(
           child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => _pressCtrl.forward(),
-          onTapUp: (_) {
-            _pressCtrl.reverse();
-          },
-          onTapCancel: () => _pressCtrl.reverse(),
-          onTap: () {
-            _glassCtrl.reverse();
-            UiClickSound.play();
-            if (widget.vibrationEnabled) HapticFeedback.lightImpact();
-            widget.onTap?.call();
-          },
-          child: ScaleTransition(
-            scale: _scale,
-            child: AnimatedBuilder(
-              animation: _glassCtrl,
-              builder: (context, _) {
-                return Container(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => _pressCtrl.forward(),
+            onTapUp: (_) {
+              _pressCtrl.reverse();
+            },
+            onTapCancel: () => _pressCtrl.reverse(),
+            onTap: () {
+              _glassCtrl.reverse();
+              UiClickSound.play();
+              if (widget.vibrationEnabled) HapticFeedback.lightImpact();
+              widget.onTap?.call();
+            },
+            child: ScaleTransition(
+              scale: _scale,
+              child: AnimatedBuilder(
+                animation: _glassCtrl,
+                builder: (context, _) {
+                  return Container(
                     width: w,
                     height: h,
                     decoration: BoxDecoration(

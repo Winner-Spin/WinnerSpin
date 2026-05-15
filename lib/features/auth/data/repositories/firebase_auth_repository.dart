@@ -7,11 +7,9 @@ import '../../domain/repositories/auth_repository.dart';
 /// Translates [FirebaseAuthException] into the domain-level [AuthException]
 /// so the presentation layer never imports Firebase types.
 class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+  FirebaseAuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -103,7 +101,9 @@ class FirebaseAuthRepository implements AuthRepository {
     if (userBalance != null) {
       // Round to 2 decimal places (cents) so accumulated float-precision
       // drift from engine math doesn't leak into the persisted balance.
-      patch['userBalance'] = (userBalance * 100).round() / 100;
+      final roundedBalance = (userBalance * 100).round() / 100;
+      patch['userBalance'] = roundedBalance;
+      patch['balance'] = roundedBalance;
     }
     if (freeSpinsRemaining != null) {
       patch['freeSpinsRemaining'] = freeSpinsRemaining;

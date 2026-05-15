@@ -341,6 +341,12 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         _buildText(
           'Bought FREE SPINS rounds start with 10 free spins and use the same tumble and multiplier rules.',
         ),
+        _buildText(
+          'If CREDIT is not enough for BUY FEATURE, the Deposit Money screen opens so virtual game money can be added.',
+        ),
+        _buildText(
+          'This deposit action is not a real-money deposit. It only increases virtual in-game CREDIT with virtual game money that has no real-world value.',
+        ),
 
         const SizedBox(height: 16),
         _buildSectionTitle('TUMBLE FEATURE'),
@@ -465,6 +471,12 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
         ),
         _buildText(
           'Use the plus and minus buttons to move through the available bet levels.',
+        ),
+        _buildText(
+          'BUY GAME MONEY opens the Deposit Money screen, where the virtual game money amount can be increased or decreased before adding it to CREDIT.',
+        ),
+        _buildText(
+          'This deposit action is not a real-money deposit. It only increases virtual in-game CREDIT with virtual game money that has no real-world value.',
         ),
       ],
     );

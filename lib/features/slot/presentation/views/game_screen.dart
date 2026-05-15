@@ -32,6 +32,7 @@ import 'widgets/win_presentation_controller.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 import 'auto_play_settings_screen.dart';
 import 'buy_freespins_confirm_screen.dart';
+import 'deposit_money_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
 
@@ -102,6 +103,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // `showGeneralDialog` go to the root navigator above this layer, so
   // panels like Settings sit on top of any in-flight animation.
   final GlobalKey<OverlayState> _stageOverlayKey = GlobalKey<OverlayState>();
+  bool _depositPromptShowing = false;
+  bool _depositPromptShownForCurrentHint = false;
 
   // Per-column reel controllers so a screen tap can interrupt an
   // in-flight spin and snap each reel to its landing position.
@@ -331,6 +334,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _onViewModelChange() {
     UiClickSound.enabled = _viewModel.soundEffects;
     _handleLogout(context);
+    _maybeShowDepositMoneyPrompt();
     _trackSpinTransitions();
     _trackLingeringCluster();
     _trackFsAccumulator();
@@ -577,6 +581,45 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _maybeShowDepositMoneyPrompt() {
+    if (!_viewModel.showInsufficientFundsHint) {
+      _depositPromptShownForCurrentHint = false;
+      return;
+    }
+    if (_depositPromptShowing || _depositPromptShownForCurrentHint) return;
+    _depositPromptShownForCurrentHint = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _showDepositMoneyDialog();
+    });
+  }
+
+  Future<void> _showDepositMoneyDialog() async {
+    if (!mounted || _depositPromptShowing) return;
+    _depositPromptShowing = true;
+    await showGeneralDialog<void>(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'Deposit Money',
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, _, child) =>
+          DepositMoneyScreen(viewModel: _viewModel),
+      transitionBuilder: (context, anim, _, child) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(
+              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+    _depositPromptShowing = false;
+  }
+
   void _trackNormalBigWin() {
     if (_viewModel.isInFreeSpins) return;
     final lastWin = _viewModel.lastWin;
@@ -615,7 +658,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _isBigWinShowing ||
         _viewModel.isBusy ||
         _isCelebrationActive ||
-        !_viewModel.canBuyFreeSpinsForUi) {
+        _viewModel.isAutoSpinning ||
+        _viewModel.isInFreeSpins) {
+      return;
+    }
+    if (!_viewModel.balanceCtrl.canAffordDisplayed(
+      _viewModel.buyFeaturePrice,
+    )) {
+      await _showDepositMoneyDialog();
       return;
     }
     final confirmed = await Navigator.of(context).push<bool>(
@@ -1267,7 +1317,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 },
               ),
               Positioned(
-                top: screenH * 0.55,
+                top: screenH * 0.565,
                 left: screenW * 0.08,
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
@@ -1290,7 +1340,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         disabled:
                             _viewModel.anteBetActive ||
                             betButtonPassive ||
-                            !_viewModel.canBuyFreeSpinsForUi,
+                            _viewModel.isAutoSpinning ||
+                            _viewModel.isInFreeSpins,
+                        dimmed: !_viewModel.balanceCtrl.canAffordDisplayed(
+                          _viewModel.buyFeaturePrice,
+                        ),
                         vibrationEnabled: _viewModel.vibration,
                         onTap: () {
                           _promptBuyFreeSpinsConfirm();
@@ -1303,7 +1357,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.55,
+                top: screenH * 0.565,
                 right: screenW * 0.08,
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
@@ -1403,7 +1457,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.90,
+                top: screenH * 0.885,
                 left: 0,
                 child: ListenableBuilder(
                   listenable: _viewModel,
@@ -1437,7 +1491,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.90,
+                top: screenH * 0.885,
                 right: 0,
                 child: SettingsButton(
                   onTap: _isBigWinShowing
@@ -1464,7 +1518,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.90,
+                top: screenH * 0.885,
                 left: screenW * 0.30,
                 child: ListenableBuilder(
                   listenable: _viewModel,
@@ -1476,8 +1530,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                top: screenH * 0.90,
-                left: screenW * 0.5 + 42,
+                top: screenH * 0.885,
+                left: screenW * 0.5 + 34,
                 child: ListenableBuilder(
                   listenable: _viewModel,
                   builder: (context, _) => SpeedButton(
