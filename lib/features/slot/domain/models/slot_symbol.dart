@@ -1,14 +1,12 @@
 import '../enums/symbol_tier.dart';
 
-/// A single slot symbol — its asset, weight, and payout schedule.
 class SlotSymbol {
   final String id;
   final String assetPath;
   final double baseWeight;
   final SymbolTier tier;
 
-  /// Cluster-payout schedule keyed by minimum count.
-  /// {8: 0.25, 10: 0.75, 12: 2.0} → 8–9 symbols pay 0.25× bet, 10–11 pay 0.75×, 12+ pay 2×.
+  /// Cluster-payout schedule: min-count → bet multiplier.
   final Map<int, double> payouts;
 
   /// Numeric value of multiplier symbols (e.g. 25 for the 25× multiplier).
@@ -17,9 +15,7 @@ class SlotSymbol {
   /// Scatter-payout schedule, same key shape as [payouts].
   final Map<int, double> scatterPayouts;
 
-  /// Visual scale applied at render time only — does not affect engine
-  /// math, hit-test, or cluster detection. Useful for nudging individual
-  /// assets that look small/large relative to the rest of the set.
+  /// Render-time visual scale (does not affect engine math).
   final double displayScale;
 
   const SlotSymbol({
@@ -37,8 +33,7 @@ class SlotSymbol {
   bool get isScatter => tier == SymbolTier.scatter;
   bool get isRegular => !isMultiplier && !isScatter;
 
-  /// Resolves the payout multiplier for [count] regulars.
-  /// Walks thresholds in descending order so the highest tier matches first.
+  /// Payout multiplier for [count] regular symbols.
   double getPayoutForCount(int count) {
     if (count < 8) return 0.0;
     final thresholds = payouts.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -48,7 +43,7 @@ class SlotSymbol {
     return 0.0;
   }
 
-  /// Resolves the scatter payout multiplier for [count] scatters.
+  /// Payout multiplier for [count] scatter symbols.
   double getScatterPayoutForCount(int count) {
     if (scatterPayouts.isEmpty) return 0.0;
     final thresholds = scatterPayouts.keys.toList()

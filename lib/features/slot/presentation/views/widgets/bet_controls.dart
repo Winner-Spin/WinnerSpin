@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
 
-/// Row of [+ / current bet / -] controls.
 class BetControls extends StatelessWidget {
   final double betAmount;
   final VoidCallback onIncrease;
@@ -62,7 +61,7 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
 
   void _startTimer() {
     UiClickSound.play();
-    widget.onTap(); // Tetiklemeyi anında yap
+    widget.onTap();
     if (!widget.enableLongPress) return;
 
     _initialDelayTimer = Timer(const Duration(milliseconds: 400), () {
@@ -99,17 +98,11 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE1BEE7), // Bright purple highlight
-              Color(0xFFAB47BC), // Main purple
-              Color(0xFF6A1B9A), // Dark purple
-            ],
+            colors: [Color(0xFFE1BEE7), Color(0xFFAB47BC), Color(0xFF6A1B9A)],
             stops: [0.0, 0.4, 1.0],
           ),
           border: Border.all(
-            color: const Color(
-              0xFFF3E5F5,
-            ).withValues(alpha: 0.6), // Inner reflection
+            color: const Color(0xFFF3E5F5).withValues(alpha: 0.6),
             width: 1.5,
           ),
           boxShadow: [
@@ -119,7 +112,7 @@ class _BetCircleButtonState extends State<_BetCircleButton> {
               offset: const Offset(0, 3),
             ),
             const BoxShadow(
-              color: Color(0xFF4A148C), // Outer rim shadow
+              color: Color(0xFF4A148C),
               blurRadius: 0,
               spreadRadius: 1,
               offset: Offset(0, 1),
@@ -156,18 +149,12 @@ class _BetDisplay extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFCE93D8), // Bright purple highlight
-            Color(0xFF8E24AA), // Main purple
-            Color(0xFF4A148C), // Dark purple
-          ],
+          colors: [Color(0xFFCE93D8), Color(0xFF8E24AA), Color(0xFF4A148C)],
           stops: [0.0, 0.4, 1.0],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(
-            0xFFE1BEE7,
-          ).withValues(alpha: 0.6), // Inner reflection
+          color: const Color(0xFFE1BEE7).withValues(alpha: 0.6),
           width: 1.5,
         ),
         boxShadow: [
@@ -177,7 +164,7 @@ class _BetDisplay extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
           const BoxShadow(
-            color: Color(0xFF311B92), // Outer rim shadow
+            color: Color(0xFF311B92),
             blurRadius: 0,
             spreadRadius: 2,
             offset: Offset(0, 1),

@@ -11,9 +11,6 @@ import 'win_amount_counter.dart';
 
 const double _coinRainCycleProgress = 0.78;
 
-/// Tiers of celebratory overlay, ordered from lightest threshold to
-/// the game's theoretical max. Each tier carries its own headline
-/// artwork and the bet-multiplier at which it kicks in.
 enum WinTier {
   bigWin(
     threshold: 10,
@@ -42,14 +39,10 @@ enum WinTier {
 
   const WinTier({required this.threshold, required this.assetPath});
 
-  /// Bet multiplier at which the tier's overlay starts triggering.
   final double threshold;
 
-  /// PNG asset of the tier's stylized headline artwork.
   final String assetPath;
 
-  /// Highest tier the spin's bet-multiplier qualifies for, or null
-  /// if the win didn't even clear the lowest tier.
   static WinTier? forMultiplier(double multiplier) {
     if (multiplier >= maxWin.threshold) return maxWin;
     if (multiplier >= sensationalWin.threshold) return sensationalWin;
@@ -60,13 +53,10 @@ enum WinTier {
     return null;
   }
 
-  static Iterable<String> get assetPaths => values.map((tier) => tier.assetPath);
+  static Iterable<String> get assetPaths =>
+      values.map((tier) => tier.assetPath);
 }
 
-/// Celebratory overlay that pops in once a spin clears the big-win
-/// threshold. Renders 4 stars + the tier's headline artwork, a
-/// WINBOX amount panel, and a field of drifting yellow sparkles.
-/// Plays elastic-pop → hold → fade and self-removes via [onComplete].
 class BigWinOverlay extends StatefulWidget {
   static const amountBannerAssetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/WINBOX.png';
@@ -80,10 +70,6 @@ class BigWinOverlay extends StatefulWidget {
   final bool vibrationEnabled;
   final VoidCallback onComplete;
 
-  /// When true, the overlay opens with the count-up already settled at
-  /// [amount] and runs the same shortened dismissal flow the tap path
-  /// uses — added for the turbo speed level so big-win presentations
-  /// stay compact when the player has chosen the fastest pacing.
   final bool instantAmount;
 
   const BigWinOverlay({
@@ -111,33 +97,16 @@ class _BigWinOverlayState extends State<BigWinOverlay>
   late final Animation<double> _fadeAnim;
   late final List<_Coin> _coins;
 
-  // Drives the amount-banner pop sequence that fires once the count-up
-  // settles — independent from the main timeline so a tap-driven skip
-  // can run the pop immediately without disturbing the coin shower,
-  // star pulse, or headline breathing.
   late final AnimationController _amountPopCtrl;
   late final Animation<double> _amountPopScale;
   bool _amountPopStarted = false;
 
-  // Flipped true the moment the player taps anywhere on the overlay.
-  // The amount banner snaps to the final value while the coin shower,
-  // star pulse, headline breathing, and fade stay on their original
-  // schedule — the tap only short-circuits the count-up readout.
   bool _amountSkipped = false;
 
-  // Guards against [widget.onComplete] firing twice — once from the
-  // tap-driven shortcut and once when the main controller's natural
-  // forward run finishes.
   bool _completed = false;
 
-  // Count-up duration the [_AmountBanner] runs for. The natural
-  // post-count pop is scheduled against this value so it always
-  // fires the instant the counter lands.
   static const Duration _countDuration = Duration(seconds: 10);
 
-  // Hold the overlay sits after the count-up settles (or after a
-  // tap-driven skip) before tearing itself down — gives the player a
-  // beat to read the final amount and watch the banner pop.
   static const Duration _postCountHold = Duration(milliseconds: 2000);
 
   @override
@@ -146,8 +115,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     _celebrationPlayer = AudioPlayer();
     _ctrl = AnimationController(vsync: this, duration: widget.duration);
 
-    // Keep the original pop and breathing speed; the longer overlay
-    // breathing cycles (1.0 ↔ 1.08) so the headline pulses gently
     const popInMs = 384.0;
     const breathPhaseMs = 576.0;
     final totalMs = widget.duration.inMilliseconds.toDouble();
@@ -211,10 +178,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
 
     final rng = Random();
 
-    // Jeton-style coins drop from above the screen and fall through.
-    // Density now matches the reference shower — each coin's start
-    // progress is spread across the bulk of the timeline so a fresh
-    // wave is always entering as earlier ones leave the bottom.
     _coins = List.generate(80, (i) {
       final startProgress =
           ((i + rng.nextDouble()) / 80) * _coinRainCycleProgress;
@@ -235,9 +198,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
       if (mounted) _completeOnce();
     });
 
-    // Post-count pop runs whether the player waits the count-up out
-    // or skips it via tap. Schedule the natural-flow trigger now so
-    // the banner pops the instant the counter lands.
     _amountPopCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
@@ -292,9 +252,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
     });
 
     if (widget.instantAmount) {
-      // Turbo path: opening straight at the final amount, with the
-      // same post-count hold the tap-to-skip flow uses so the
-      // celebration still has a beat to read before tearing down.
       _amountSkipped = true;
       _startAmountPop();
       Future.delayed(_postCountHold, () {
@@ -342,17 +299,13 @@ class _BigWinOverlayState extends State<BigWinOverlay>
       await _celebrationPlayer.setAudioContext(AppAudioContext.game);
       await _celebrationPlayer.setReleaseMode(ReleaseMode.stop);
       await _celebrationPlayer.play(AssetSource(_celebrationSound));
-    } catch (_) {
-      // Audio failures should not interrupt the win celebration.
-    }
+    } catch (_) {}
   }
 
   Future<void> _stopCelebrationSound() async {
     try {
       await _celebrationPlayer.stop();
-    } catch (_) {
-      // The player may already be torn down while the overlay exits.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -378,9 +331,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Soft dimming layer so the headline + amount panel
-                  // read crisply against the candy backdrop without
-                  // hiding the grid completely.
                   Container(color: Colors.black.withValues(alpha: 0.45)),
                   CustomPaint(
                     painter: _CoinsPainter(
@@ -393,9 +343,6 @@ class _BigWinOverlayState extends State<BigWinOverlay>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Only the stars + headline pulse together;
-                        // the amount panel below stays at a fixed
-                        // size so the running counter stays steady.
                         Transform.scale(
                           scale: _scaleAnim.value,
                           child: Column(
@@ -471,21 +418,12 @@ class _TierHeadline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Same vertical footprint for every tier so the surrounding
-    // stars + amount banner stay at the same gaps. SENSATIONAL gets
-    // a wider box because its single-line script would otherwise
-    // read tiny next to the two-line tiers.
     final image = Image.asset(
       tier.assetPath,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       cacheWidth: BigWinOverlay.headlineCacheWidth,
     );
-    // Box stays at the same footprint for every tier so the
-    // surrounding stars and amount banner keep their original gaps —
-    // only the rendered output is scaled. BIG WIN and the wide-and-
-    // short SENSATIONAL get the strongest boost; the mid-ladder tiers
-    // get a softer 1.3x bump.
     final scale = (tier == WinTier.bigWin || tier == WinTier.sensationalWin)
         ? 1.7
         : 1.3;
@@ -537,8 +475,6 @@ class _AmountBanner extends StatelessWidget {
           cacheWidth: BigWinOverlay.amountBannerCacheWidth,
         ),
         Padding(
-          // Inset clears the candy-stripe rounded ends of the panel
-          // so the amount sits within the flat purple field.
           padding: const EdgeInsets.symmetric(horizontal: 56),
           child: WinAmountCounter(
             from: 0,
@@ -555,22 +491,14 @@ class _AmountBanner extends StatelessWidget {
 }
 
 class _Coin {
-  /// Horizontal column the coin falls in, normalized 0..1.
   final double x;
 
-  /// Overlay-progress at which the coin enters the screen — staggers
-  /// the field so coins arrive in waves rather than a single batch.
   final double startProgress;
 
-  /// Fraction of overlay duration the coin spends crossing the
-  /// screen — shorter values land it faster.
   final double fallDuration;
 
-  /// On-screen radius in logical pixels.
   final double size;
 
-  /// Horizontal sway amplitude in pixels — gives each coin a slight
-  /// drift so the field isn't a rigid column rain.
   final double sway;
 
   const _Coin({
@@ -588,8 +516,6 @@ class _CoinsPainter extends CustomPainter {
 
   _CoinsPainter({required this.coins, required this.progress});
 
-  // Layered palette so each coin reads as a stamped jeton — outer
-  // dark rim, brighter face, embossed centre symbol, soft highlight.
   static const _rimDark = Color(0xFF8B5A00);
   static const _faceTop = Color(0xFFFFEB99);
   static const _faceBottom = Color(0xFFFFB627);
@@ -604,12 +530,9 @@ class _CoinsPainter extends CustomPainter {
       final localT = cycleT / c.fallDuration;
       if (localT > 1) continue;
 
-      // Drop from above the top edge to below the bottom edge so
-      // the entry / exit happen off-screen.
       final cx = c.x * size.width + sin(localT * pi * 2) * c.sway;
       final cy = (-0.08 + 1.2 * localT) * size.height;
 
-      // Quick fade-in at the start, gentle fade-out near the end.
       final fadeIn = (localT * 6).clamp(0.0, 1.0);
       final fadeOut = ((1.0 - localT) * 5).clamp(0.0, 1.0);
       final alpha = (fadeIn * fadeOut).clamp(0.0, 1.0);
@@ -617,15 +540,12 @@ class _CoinsPainter extends CustomPainter {
       final r = c.size;
       final centre = Offset(cx, cy);
 
-      // Outer dark rim (the coin's edge).
       canvas.drawCircle(
         centre,
         r,
         Paint()..color = _rimDark.withValues(alpha: alpha),
       );
 
-      // Inner face — gradient from cream-top to gold-bottom for a
-      // subtle 3D feel.
       canvas.drawCircle(
         centre,
         r * 0.86,
@@ -640,7 +560,6 @@ class _CoinsPainter extends CustomPainter {
           ).createShader(Rect.fromCircle(center: centre, radius: r * 0.86)),
       );
 
-      // Inner ring etched into the face for the stamped look.
       canvas.drawCircle(
         centre,
         r * 0.74,
@@ -669,7 +588,6 @@ class _CoinsPainter extends CustomPainter {
       ).paint(canvas, stampSize);
       canvas.restore();
 
-      // Top-left specular highlight to read as a 3D coin.
       canvas.drawCircle(
         Offset(cx - r * 0.32, cy - r * 0.32),
         r * 0.22,

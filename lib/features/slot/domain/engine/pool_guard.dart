@@ -6,20 +6,19 @@ import 'ante_config.dart';
 import 'buy_config.dart';
 import 'rtp_config.dart';
 
-/// Pool-balance guards and per-mode max-win ceilings.
 class PoolGuard {
   PoolGuard._();
 
-  /// Estimated total xBet cost of awarding a FS round.
   static double expectedFsCostMultiplier(GameMode mode, bool isRetrigger) {
     final perSpin = RtpConfig.fsAvgPayoutPerSpin[mode] ?? 10.0;
-    final fsCount = isRetrigger ? RtpConfig.fsAwardRetrigger : RtpConfig.fsAwardInitial;
+    final fsCount = isRetrigger
+        ? RtpConfig.fsAwardRetrigger
+        : RtpConfig.fsAwardInitial;
     const scatterReward = 3.0;
     return scatterReward + (perSpin * fsCount);
   }
 
-  /// Virtual Cost guard. Bypassed during the 50-spin warmup.
-  /// [isAnte] picks the stricter ante safety factor.
+  /// Checks pool can cover an FS round. Bypassed during warmup.
   static bool canAffordFsRound(
     PoolState pool,
     double betAmount,
@@ -28,13 +27,15 @@ class PoolGuard {
     bool isAnte = false,
   }) {
     if (pool.totalSpins < 50) return true;
-    final safetyFactor = isAnte ? AnteConfig.fsSafetyFactor : RtpConfig.fsSafetyFactor;
-    final virtualCost = expectedFsCostMultiplier(mode, isRetrigger) * betAmount * safetyFactor;
+    final safetyFactor = isAnte
+        ? AnteConfig.fsSafetyFactor
+        : RtpConfig.fsSafetyFactor;
+    final virtualCost =
+        expectedFsCostMultiplier(mode, isRetrigger) * betAmount * safetyFactor;
     return pool.poolBalance >= virtualCost;
   }
 
-  /// Buy-FS variant. The 100×bet fee itself is incoming pool revenue, so
-  /// the guard checks the POST-fee headroom.
+  /// Buy-FS variant — checks POST-fee headroom.
   static bool canAffordBuyFs(PoolState pool, double betAmount) {
     if (pool.totalSpins < 50) return true;
     final mode = pool.currentMode;
@@ -44,10 +45,7 @@ class PoolGuard {
     return (pool.poolBalance + buyFee) >= virtualCost;
   }
 
-  /// Per-mode max win cap, FS-aware. Floors at the larger of:
-  ///   • mode ceiling
-  ///   • 50% of pool balance (post-warmup, prevents bankrupting drains)
-  ///   • a small absolute minimum that scales with pool health
+  /// Per-mode max win cap with pool-balance floor.
   static double getMaxWinMultiplier(
     GameMode mode,
     PoolState pool,
@@ -57,19 +55,39 @@ class PoolGuard {
     double modeCeiling;
     if (isFreeSpins) {
       switch (mode) {
-        case GameMode.recovery: modeCeiling = 60.0; break;
-        case GameMode.tight: modeCeiling = 400.0; break;
-        case GameMode.normal: modeCeiling = 8000.0; break;
-        case GameMode.generous: modeCeiling = 15000.0; break;
-        case GameMode.jackpot: modeCeiling = 21100.0; break;
+        case GameMode.recovery:
+          modeCeiling = 60.0;
+          break;
+        case GameMode.tight:
+          modeCeiling = 400.0;
+          break;
+        case GameMode.normal:
+          modeCeiling = 8000.0;
+          break;
+        case GameMode.generous:
+          modeCeiling = 15000.0;
+          break;
+        case GameMode.jackpot:
+          modeCeiling = 21100.0;
+          break;
       }
     } else {
       switch (mode) {
-        case GameMode.recovery: modeCeiling = 30.0; break;
-        case GameMode.tight: modeCeiling = 100.0; break;
-        case GameMode.normal: modeCeiling = 2500.0; break;
-        case GameMode.generous: modeCeiling = 5000.0; break;
-        case GameMode.jackpot: modeCeiling = 10000.0; break;
+        case GameMode.recovery:
+          modeCeiling = 30.0;
+          break;
+        case GameMode.tight:
+          modeCeiling = 100.0;
+          break;
+        case GameMode.normal:
+          modeCeiling = 2500.0;
+          break;
+        case GameMode.generous:
+          modeCeiling = 5000.0;
+          break;
+        case GameMode.jackpot:
+          modeCeiling = 10000.0;
+          break;
       }
     }
 

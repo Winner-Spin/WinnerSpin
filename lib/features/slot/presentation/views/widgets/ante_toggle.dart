@@ -3,9 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../widgets/particle_effect.dart';
 import '../../audio/ui_click_sound.dart';
 
-/// Pill that toggles Ante Bet ("Çifte Şans"). When ON, the player pays
-/// 1.25× per base spin and the FS trigger rate doubles. Disabled while
-/// busy or inside an FS round (toggle would be ignored anyway).
 class AnteToggle extends StatelessWidget {
   final bool active;
   final bool disabled;
@@ -37,22 +34,20 @@ class AnteToggle extends StatelessWidget {
       textShadow = Colors.transparent;
       glow = Colors.transparent;
     } else if (active) {
-      // Glossy bright green gradient matching the "Double Chance" image
       gradient = [
-        const Color(0xFFB2FF59), // Bright lime top highlight
-        const Color(0xFF76FF03), // Main lime green
-        const Color(0xFF388E3C), // Darker green bottom
+        const Color(0xFFB2FF59),
+        const Color(0xFF76FF03),
+        const Color(0xFF388E3C),
       ];
-      borderColor = const Color(0xFF1B5E20); // Deep green border
-      textColor = const Color(0xFFFFF8E1); // Creamy yellow
-      textShadow = const Color(0xFF003300); // Dark green shadow
+      borderColor = const Color(0xFF1B5E20);
+      textColor = const Color(0xFFFFF8E1);
+      textShadow = const Color(0xFF003300);
       glow = const Color(0xFF76FF03).withValues(alpha: 0.6);
     } else {
-      // Inactive but not disabled (still shiny green, just slightly less bright)
       gradient = [
-        const Color(0xFF9CCC65), // Muted lime
-        const Color(0xFF66BB6A), // Muted green
-        const Color(0xFF2E7D32), // Dark green
+        const Color(0xFF9CCC65),
+        const Color(0xFF66BB6A),
+        const Color(0xFF2E7D32),
       ];
       borderColor = const Color(0xFF1B5E20);
       textColor = const Color(0xFFF1F8E9);
@@ -83,9 +78,7 @@ class AnteToggle extends StatelessWidget {
             border: Border.all(
               color: disabled
                   ? borderColor
-                  : const Color(
-                      0xFFE8F5E9,
-                    ).withValues(alpha: 0.6), // Inner top reflection effect
+                  : const Color(0xFFE8F5E9).withValues(alpha: 0.6),
               width: 1.5,
             ),
             boxShadow: glow == Colors.transparent
@@ -97,7 +90,7 @@ class AnteToggle extends StatelessWidget {
                       offset: const Offset(0, 4),
                     ),
                     BoxShadow(
-                      color: borderColor, // Outer darker rim shadow
+                      color: borderColor,
                       blurRadius: 0,
                       spreadRadius: 2,
                       offset: const Offset(0, 1),

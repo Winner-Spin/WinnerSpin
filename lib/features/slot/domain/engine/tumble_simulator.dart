@@ -11,7 +11,6 @@ import 'multiplier_collector.dart';
 import 'rtp_config.dart';
 import 'weighted_random.dart';
 
-/// Runs the cascade tumble loop and produces the final [SpinResult].
 class TumbleSimulator {
   TumbleSimulator._();
 
@@ -98,8 +97,7 @@ class TumbleSimulator {
           isFreeSpins: isFreeSpins,
         );
       } else {
-        // Forced chain seeds 8+ of one symbol so the next tumble has a
-        // guaranteed winner — natural refill rarely reaches that threshold.
+        // Forced chain seeds 8+ of one symbol for a guaranteed next win.
         final chainProb = isFreeSpins
             ? ChainForcer.fsForcedChainProb(tumbleCount)
             : RtpConfig.chainProbBase;
@@ -133,8 +131,7 @@ class TumbleSimulator {
     final rawMultiplier = MultiplierCollector.rawSum(grid);
     final finalMultiplier = MultiplierCollector.finalize(rawMultiplier);
 
-    // Snapshot every multiplier symbol still on the final grid so the
-    // win-presentation layer can fly each face value out of its own cell.
+    // Snapshot multiplier positions for win-presentation animation.
     final finalMultipliers = <MultiplierLanding>[];
     for (int c = 0; c < kEngineColumns; c++) {
       for (int r = 0; r < kEngineRows; r++) {
@@ -147,8 +144,7 @@ class TumbleSimulator {
       }
     }
 
-    // Scatters are evaluated after all tumbles so cascades can build them up.
-    // Asymmetric: 4+ scatters trigger from base, 3+ retrigger from inside FS.
+    // Scatter evaluation: 4+ from base, 3+ for retrigger.
     final scatterCount = _countAsset(grid, scatterPath);
     final scatterPayout =
         scatterSymbol.getScatterPayoutForCount(scatterCount) * betAmount;
@@ -172,8 +168,6 @@ class TumbleSimulator {
       winningPositions: winningPositions,
     );
   }
-
-  // ── Grid utilities ──
 
   static Map<String, int> _countRegularSymbols(List<List<String>> grid) {
     final counts = <String, int>{};

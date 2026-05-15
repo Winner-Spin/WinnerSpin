@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Glossy candy-style confirm button. Shares the multi-layer
-/// construction of [DoubleChanceButton] but strips the on/off capsule
-/// and the dual-line label down to a single centered word. The green
-/// variant ("YES") keeps the original palette; the red variant ("NO")
-/// mirrors it with a tonally equivalent ruby palette.
 enum ConfirmButtonVariant { yes, no }
 
 class ConfirmButton extends StatefulWidget {
@@ -41,9 +36,10 @@ class _ConfirmButtonState extends State<ConfirmButton>
       duration: const Duration(milliseconds: 90),
       reverseDuration: const Duration(milliseconds: 130),
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut),
-    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.96,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
   }
 
   @override
@@ -101,11 +97,6 @@ class _ConfirmButtonState extends State<ConfirmButton>
               borderRadius: BorderRadius.circular(radius - 2),
               child: Stack(
                 children: [
-                  // Bottom-rising shadow gradient kept so the button
-                  // body still reads as a solid, weighted shape — the
-                  // glossy highlight layers above it have been
-                  // dropped per the confirm-dialog brief, leaving a
-                  // flatter, more dialog-appropriate look.
                   Positioned(
                     bottom: 0,
                     left: 0,
@@ -173,9 +164,6 @@ class _ConfirmButtonState extends State<ConfirmButton>
   }
 }
 
-/// Color set for a button variant. Each variant keeps the same
-/// lightness/saturation stops as the green original so the two
-/// buttons read as a balanced pair next to each other.
 class _Palette {
   final Color bodyTop;
   final Color bodyMid;
@@ -216,9 +204,7 @@ class _Palette {
       textStroke = const Color(0xFF3C0505);
 }
 
-/// Two-layer text: dark stroke layer behind a white fill so the
-/// label reads as embossed against the glossy panel — same trick
-/// the DoubleChanceButton labels use.
+/// Stroke + fill text for an embossed label effect.
 class _EmbossedText extends StatelessWidget {
   final String text;
   final double fontSize;

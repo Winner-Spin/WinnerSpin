@@ -1,6 +1,4 @@
-/// One multiplier symbol that landed on the final grid. The position
-/// lets the win-presentation layer fly the value out of the actual cell;
-/// [value] is the raw face number (2, 3, 5, 10, 25, 50, 100).
+/// Multiplier symbol on the final grid with its position and face value.
 class MultiplierLanding {
   final int column;
   final int row;

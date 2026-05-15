@@ -4,52 +4,26 @@ import 'package:flutter/material.dart';
 
 import 'multiplier_label.dart';
 
-/// One stylised multiplier face value flying out of its grid cell into
-/// the win bar. Three phases:
-///   1. **Settle** ([settleDuration]): the asset appears centred on the
-///      cell with a punch-in pop — overshoots to [punchScale] then
-///      eases back to 1.0. A radial glow halo + sparkle burst spawn
-///      around it for the same window so the symbol "comes alive"
-///      before lifting off.
-///   2. **Flight** ([flightDuration]): the asset travels along a soft
-///      quadratic Bezier curve from the cell centre to the bar centre,
-///      shrinking to [endSize] and fading out near the end.
-///   3. **Approach signal**: when flight crosses [approachThreshold]
-///      the [onApproaching] callback fires once — used by the bar to
-///      start its pulse before the asset has finished fading.
-///
-/// Visual: prefers `5x_yazi_transparan.png` from the symbol set; if that
-/// asset can't be loaded the widget falls back to a stylised pill so
-/// the sequence still reads correctly.
 class FloatingCollectText extends StatefulWidget {
   final Offset start;
   final Offset end;
   final int value;
 
-  /// Display side length of the asset when it's sitting on the cell.
   final double startSize;
 
-  /// Display side length when it arrives at the win bar.
   final double endSize;
 
-  /// Initial overshoot multiplier on top of [startSize] during settle.
   final double punchScale;
 
   final Duration settleDuration;
   final Duration flightDuration;
 
-  /// Burst effect window — independent of [settleDuration] so the
-  /// halo + particles linger past the asset's punch-in pop. Keeps the
-  /// candy explosion visually alive while the asset already lifts off
-  /// for the bar.
   final Duration burstDuration;
 
   final double approachThreshold;
   final VoidCallback? onApproaching;
   final VoidCallback? onArrived;
 
-  /// Fires once the settle pop completes — used by the host to clear
-  /// the multiplier symbol from the grid as the asset lifts off.
   final VoidCallback? onSettleComplete;
 
   const FloatingCollectText({
@@ -101,24 +75,18 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
     );
     _control = Offset(mid.dx, mid.dy - 60);
 
-    // Dense candy-slot burst: 36 dot-only sparkles in mixed
-    // pink/amber/white. Two rings (inner short-throw + outer
-    // long-throw) layered so the burst reads as a fan of dots rather
-    // than a single thin line at one radius.
     final rng = math.Random();
     const colors = [
-      Color(0xFFFFFFFF), // white
-      Color(0xFFFFE082), // light amber
-      Color(0xFFFFD54F), // amber
-      Color(0xFFFFC107), // deep amber
-      Color(0xFFFF80AB), // light pink
-      Color(0xFFFF4081), // pink
-      Color(0xFFFFAB91), // peach
+      Color(0xFFFFFFFF),
+      Color(0xFFFFE082),
+      Color(0xFFFFD54F),
+      Color(0xFFFFC107),
+      Color(0xFFFF80AB),
+      Color(0xFFFF4081),
+      Color(0xFFFFAB91),
     ];
     _sparks = List.generate(36, (i) {
       final angle = rng.nextDouble() * 2 * math.pi;
-      // Half the sparks throw further, half stay closer — gives the
-      // burst depth instead of a single ring.
       final speed = i.isEven
           ? 0.55 + rng.nextDouble() * 0.30
           : 0.85 + rng.nextDouble() * 0.45;
@@ -130,9 +98,6 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
       );
     });
 
-    // Burst plays in parallel with settle and continues past it so
-    // the candy explosion lingers on the cell after the asset has
-    // already left for the bar.
     _burst.forward();
 
     _settle.forward().then((_) {
@@ -203,9 +168,6 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
             ? 1.0
             : (flightT < 0.7 ? 1.0 : 1.0 - (flightT - 0.7) / 0.3);
 
-        // Burst is anchored to the original cell centre and runs on
-        // its own controller — outlives the settle pop, so the candy
-        // explosion lingers after the asset has already lifted off.
         final showEffect = !_burst.isCompleted;
         final effectSize = widget.startSize * 2.4;
 
@@ -321,17 +283,6 @@ class _Spark {
   });
 }
 
-/// Paints the on-cell candy burst behind the multiplier asset. Layers,
-/// from back to front:
-///   1. **Pink-amber glow halo** — fades in, holds, fades out across
-///      the settle window.
-///   2. **Central white flash** — bright pop in the first ~30%, decays
-///      fast.
-///   3. **Sparkle burst** — 36 mixed-colour dot particles (pink /
-///      amber / white / peach) radiating outward at two layered
-///      throw distances, each with a coloured glow halo and a white
-///      core. No line/ray geometry — keeps the effect reading as a
-///      cloud of dots rather than a thin starburst.
 class _SettleEffectPainter extends CustomPainter {
   final double progress;
   final List<_Spark> sparks;
@@ -344,7 +295,6 @@ class _SettleEffectPainter extends CustomPainter {
     final cy = size.height / 2;
     final maxRadius = size.width * 0.5;
 
-    // Halo — pink-amber, fade in / hold / fade out.
     double haloAlpha;
     if (progress < 0.2) {
       haloAlpha = progress / 0.2;
@@ -369,7 +319,6 @@ class _SettleEffectPainter extends CustomPainter {
           );
     canvas.drawCircle(Offset(cx, cy), maxRadius * 0.95, haloPaint);
 
-    // Central white flash — punchy, decays fast.
     final flashAlpha = (1.0 - progress * 1.6).clamp(0.0, 1.0);
     if (flashAlpha > 0) {
       final flashPaint = Paint()
@@ -387,7 +336,6 @@ class _SettleEffectPainter extends CustomPainter {
       canvas.drawCircle(Offset(cx, cy), maxRadius * 0.7, flashPaint);
     }
 
-    // Sparkle particles — coloured glow + white core, radiating outward.
     for (final s in sparks) {
       final dist = maxRadius * progress * s.speed;
       final px = cx + math.cos(s.angle) * dist;

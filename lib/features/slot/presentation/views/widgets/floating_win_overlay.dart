@@ -4,9 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../../domain/models/cluster_win.dart';
 
-/// Overlay that renders explosion particles and floating win amounts
-/// entirely via CustomPaint — no Positioned widgets, no layout-phase
-/// assertions. The host widget just needs to be the same size as the grid.
 class FloatingWinOverlay extends StatefulWidget {
   final List<ClusterWin> activeExplosions;
   final double gridWidth;
@@ -31,8 +28,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   final List<_WinEffect> _effects = [];
   final Random _rng = Random();
 
-  // Resolved once — the painter pulls this every frame and Google
-  // Fonts lookups are non-trivial under that cadence.
   static final TextStyle _baseTextStyle = GoogleFonts.outfit(
     color: const Color(0xFFFFD54F),
     fontSize: 28,
@@ -44,7 +39,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   @override
   void initState() {
     super.initState();
-    // Continuous ticker that drives all active effects.
     _ticker = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -57,7 +51,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
 
     if (widget.activeExplosions.isNotEmpty &&
         oldWidget.activeExplosions.isEmpty) {
-      // Delay the spawn so the glow plays on the TumbleCell first.
       final int delayMs = (300 ~/ widget.speedMultiplier).clamp(80, 300);
       final explosions = List.of(widget.activeExplosions);
       final gridW = widget.gridWidth;
@@ -91,7 +84,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       final cx = (avgC * colWidth) + (colWidth / 2);
       final cy = (avgR * rowHeight) + (rowHeight / 2);
 
-      // Spawn particles
       final particles = <_Particle>[];
       for (int i = 0; i < 30; i++) {
         final angle = _rng.nextDouble() * 2 * pi;
@@ -121,7 +113,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       );
     }
 
-    // Ensure ticker is running.
     if (!_ticker.isAnimating) _ticker.repeat();
   }
 
@@ -136,10 +127,6 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
       final elapsed = nowMs - e.startMs;
       return elapsed > e.totalMs;
     });
-
-    // No setState needed — we just mark the CustomPaint for repaint.
-    // The AnimationController listener already triggers a rebuild of
-    // AnimatedBuilder below.
   }
 
   String _formatAmount(double amount) {
@@ -210,11 +197,10 @@ class _EffectPainter extends CustomPainter {
       final t = (elapsed / e.totalMs).clamp(0.0, 1.0);
       final life = 1.0 - t;
 
-      // ── Particles ──
       final pt = Curves.easeOutCubic.transform(t);
       for (final p in e.particles) {
         final px = e.cx + p.vx * pt * 14;
-        final py = e.cy + p.vy * pt * 14 + pt * pt * 30; // gravity
+        final py = e.cy + p.vy * pt * 14 + pt * pt * 30;
 
         final alpha = (life * 0.9).clamp(0.0, 1.0);
         final paint = Paint()
@@ -222,7 +208,6 @@ class _EffectPainter extends CustomPainter {
           ..style = PaintingStyle.fill;
         canvas.drawCircle(Offset(px, py), p.size * life, paint);
 
-        // Glow
         final glow = Paint()
           ..color = p.color.withValues(alpha: alpha * 0.35)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
@@ -230,7 +215,6 @@ class _EffectPainter extends CustomPainter {
         canvas.drawCircle(Offset(px, py), p.size * 2 * life, glow);
       }
 
-      // ── Floating win text ──
       final textT = Curves.easeOutCubic.transform(t);
       final textY = e.cy - 20 - textT * 60; // float upward
       final textOpacity = life.clamp(0.0, 1.0);
@@ -249,7 +233,6 @@ class _EffectPainter extends CustomPainter {
       final symbolSize = Size(fontSize * 0.74, fontSize * 1.04);
       final symbolSpacing = 1.5 * scale;
 
-      // Draw text outline (dark stroke for readability)
       final strokeStyle = style.copyWith(
         fontSize: fontSize,
         foreground: Paint()

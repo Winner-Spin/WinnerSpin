@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -11,11 +9,9 @@ import '../../domain/enums/symbol_tier.dart';
 import '../audio/ui_click_sound.dart';
 import 'widgets/multiplier_bomb_animation.dart';
 import 'widgets/multiplier_label.dart';
+import 'widgets/spring_popup_card.dart';
 
-/// Full-screen overlay showing game rules and symbol payout tables.
-/// Opened from the info button on the game screen.
 class GameRulesScreen extends StatefulWidget {
-  /// Current bet amount — payouts are shown as bet × multiplier.
   final double betAmount;
 
   const GameRulesScreen({super.key, required this.betAmount});
@@ -44,15 +40,12 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop();
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           SafeArea(
@@ -62,59 +55,61 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.84,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.84,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(
-                                child: RawScrollbar(
-                                  controller: _scrollController,
-                                  thumbVisibility: true,
-                                  thumbColor: _textColor.withValues(
-                                    alpha: 0.25,
-                                  ),
-                                  thickness: 4,
-                                  radius: const Radius.circular(8),
-                                  child: SingleChildScrollView(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(
+                                  child: RawScrollbar(
                                     controller: _scrollController,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      18,
-                                      20,
-                                      18,
-                                      18,
+                                    thumbVisibility: true,
+                                    thumbColor: _textColor.withValues(
+                                      alpha: 0.25,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        const SizedBox(height: 4),
-                                        _buildSymbolPayoutGrid(),
-                                        const SizedBox(height: 10),
-                                        _buildRulesDescription(),
-                                        _buildExtraRules(),
-                                      ],
+                                    thickness: 4,
+                                    radius: const Radius.circular(8),
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        18,
+                                        20,
+                                        18,
+                                        18,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          const SizedBox(height: 4),
+                                          _buildSymbolPayoutGrid(),
+                                          const SizedBox(height: 10),
+                                          _buildRulesDescription(),
+                                          _buildExtraRules(),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -130,7 +125,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Header with title and close button.
   Widget _buildHeader(BuildContext context) {
     return Container(
       height: 74,
@@ -176,8 +170,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Builds the payout grid — high-tier symbols at top (2 per row),
-  /// then mid-tier, then low-tier (3 per row), matching the reference layout.
   Widget _buildSymbolPayoutGrid() {
     final kalp = SymbolRegistry.all.firstWhere((s) => s.id == 'kalp');
     final yesilAyi = SymbolRegistry.all.firstWhere((s) => s.id == 'yesil_ayi');
@@ -191,7 +183,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
 
     return Column(
       children: [
-        // Row 1: Kalp, Yeşil Ayı
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -212,7 +203,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 2: Pembe Ayı, Çilek
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -233,7 +223,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 3: Elma, Şeftali (Portakal), Karpuz
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
           child: Row(
@@ -260,7 +249,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Row 4: Üzüm, Muz
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Row(
@@ -284,7 +272,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
     );
   }
 
-  /// Bottom description text explaining the payout mechanics.
   Widget _buildRulesDescription() {
     return Text(
       'Symbols pay anywhere on the 6x5 grid. Each tumble checks the total '
@@ -657,7 +644,6 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
   }
 }
 
-/// A single symbol card showing the image and its payout tiers.
 class _SymbolPayoutCard extends StatelessWidget {
   final SlotSymbol symbol;
   final double betAmount;
@@ -672,7 +658,6 @@ class _SymbolPayoutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payouts = symbol.isScatter ? symbol.scatterPayouts : symbol.payouts;
-    // Sort thresholds descending (12+, 10-11, 8-9) to match reference
     final sortedThresholds = payouts.keys.toList()
       ..sort((a, b) => b.compareTo(a));
 
@@ -718,15 +703,11 @@ class _SymbolPayoutCard extends StatelessWidget {
     );
   }
 
-  /// Formats the range label. E.g., for threshold 12 -> "12+",
-  /// for 10 (next is 12) -> "10 - 11", for 8 (next is 10) -> "8 - 9".
   String _getRangeText(int threshold, List<int> sortedThresholds) {
     final idx = sortedThresholds.indexOf(threshold);
     if (idx == 0) {
-      // Highest threshold — open-ended
       return '$threshold+';
     }
-    // Range ends just before the next higher threshold
     final nextHigher = sortedThresholds[idx - 1];
     return '$threshold - ${nextHigher - 1}';
   }
@@ -738,7 +719,6 @@ class _SymbolPayoutCard extends StatelessWidget {
   }
 
   String _formatPayout(double value) {
-    // Format with two decimals, using comma as decimal separator
     final parts = value.toStringAsFixed(2).split('.');
     return '${parts[0]},${parts[1]}';
   }

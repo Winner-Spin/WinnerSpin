@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:winner_spin/features/slot/presentation/audio/ui_click_sound.dart';
 
-/// Custom Image Button with Scale Animation
 class AnimatedImageButton extends StatefulWidget {
   final VoidCallback onTap;
   final String imagePath;
@@ -74,7 +73,7 @@ class _AnimatedImageButtonState extends State<AnimatedImageButton>
             ),
             if (widget.isStrikeThrough)
               Transform.rotate(
-                angle: -0.785, // -45 degrees
+                angle: -0.785,
                 child: Container(
                   width: widget.width * 0.8,
                   height: 4,

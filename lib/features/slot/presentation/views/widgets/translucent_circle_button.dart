@@ -2,25 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../audio/ui_click_sound.dart';
 
-/// Shared visual chrome for the small translucent circle buttons used in
-/// the slot game (minus, plus, respin). Provides the press-scale gesture,
-/// shadow, radial-gradient face, top-left specular highlight, and the
-/// RepaintBoundary that isolates the cached layer from neighbour repaints.
-///
-/// The caller supplies the icon — fitted into a centered square sized at
-/// 74% of the button's diameter to match the original button proportions.
 class TranslucentCircleButton extends StatefulWidget {
-  /// Outer diameter (also the hit-test area).
   final double size;
 
-  /// Icon content placed in a centered square at 74% of [size].
   final Widget child;
 
   final VoidCallback? onTap;
   final bool playSoundOnTapDown;
 
-  /// Drives the radial gradient's alpha range. Default 0.5 produces a
-  /// translucent face (~45–56% alpha across the gradient stops).
   final double opacity;
 
   const TranslucentCircleButton({
@@ -91,9 +80,6 @@ class _TranslucentCircleButtonState extends State<TranslucentCircleButton>
           : null,
       child: ScaleTransition(
         scale: _scale,
-        // Layer-cache the heavy decoration (shadow blur + radial gradient
-        // + highlight) so neighbour repaints in the parent Stack don't
-        // re-rasterize this tree.
         child: RepaintBoundary(
           child: SizedBox(
             width: s,

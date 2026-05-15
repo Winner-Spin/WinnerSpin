@@ -1,10 +1,9 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
+import 'widgets/spring_popup_card.dart';
 
 class AutoPlaySettingsScreen extends StatefulWidget {
   const AutoPlaySettingsScreen({super.key, required this.viewModel});
@@ -52,15 +51,12 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: GestureDetector(
-                onTap: () {
-                  UiClickSound.play();
-                  Navigator.of(context).pop();
-                },
-                child: Container(color: Colors.black.withValues(alpha: 0.42)),
-              ),
+            child: GestureDetector(
+              onTap: () {
+                UiClickSound.play();
+                Navigator.of(context).pop();
+              },
+              child: Container(color: Colors.black.withValues(alpha: 0.42)),
             ),
           ),
           SafeArea(
@@ -70,59 +66,61 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.92,
-                        maxHeight: MediaQuery.of(context).size.height * 0.46,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _panelColor,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
+                    child: SpringPopupCard(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.92,
+                          maxHeight: MediaQuery.of(context).size.height * 0.46,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    22,
-                                    42,
-                                    22,
-                                    24,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        'AUTOSPIN COUNT',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.barlowCondensed(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
-                                          color: _textColor,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      _buildSpinCountSlider(),
-                                      const SizedBox(height: 40),
-                                      _buildStartButton(),
-                                    ],
-                                  ),
-                                ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _panelColor,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
                               ),
                             ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      22,
+                                      42,
+                                      22,
+                                      24,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          'AUTOSPIN COUNT',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.barlowCondensed(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w900,
+                                            color: _textColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        _buildSpinCountSlider(),
+                                        const SizedBox(height: 40),
+                                        _buildStartButton(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

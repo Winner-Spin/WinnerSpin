@@ -24,44 +24,25 @@ class SlotReelController {
   }
 }
 
-/// A single slot-machine reel column that animates symbols
-/// through drop-out, empty, and drop-in phases.
 class SlotReel extends StatefulWidget {
   final int columnIndex;
 
-  /// Items currently displayed (before spin).
   final List<String> previousItems;
 
-  /// Items to land on (after spin).
   final List<String> targetItems;
 
-  /// Set to true to trigger spin animation.
   final bool spinning;
 
-  /// Asset paths whose cells should fade out (during a cascade tumble).
-  /// Empty when no tumble is in progress.
   final Set<String> fadingPaths;
 
-  /// Positions (encoded as `column * 100 + row`) the reel should render
-  /// as empty even though the grid still holds a symbol there. The win
-  /// presentation layer fills this when a multiplier asset has lifted
-  /// off its cell — the cell reads as consumed for the rest of the spin.
   final Set<int> clearedPositions;
 
-  /// Stagger delay before this reel starts moving.
   final Duration delay;
 
-  /// How long the reel animates (after delay).
   final Duration duration;
 
-  /// Called when this reel's animation completes.
   final VoidCallback? onComplete;
 
-  /// Called the instant this reel starts the drop-in phase, so the
-  /// view-model can wipe last round's residue dust just before the
-  /// new symbols land — keeps the drop-out's residue visible while
-  /// stopping the static state from flashing dust before the new
-  /// symbol appears.
   final VoidCallback? onDropInStart;
 
   final bool pulseScattersOnLanding;
@@ -98,8 +79,6 @@ class SlotReel extends StatefulWidget {
 enum ReelState { static, droppingOut, empty, droppingIn }
 
 class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
-  /// Custom curve that provides a subtle recoil (bounce) effect.
-  /// Prevents the extreme overshoot caused by standard [Curves.easeOutBack].
   static const Curve _heftyBounceCurve = _HeftyBounceCurve();
 
   static const Duration _scatterPulseSettleDuration = Duration(
@@ -115,7 +94,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   bool _completeNotified = false;
   bool _quickStopDropIn = false;
 
-  /// Whether at least one spin has completed (to know which items to show).
   bool _hasCompleted = false;
 
   @override
@@ -159,7 +137,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       vsync: this,
       duration: Duration(milliseconds: dropOutDurationMs),
     );
-    // Main sequence is linear; specific curves are applied per-item via Intervals.
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
 
     setState(() => _state = ReelState.droppingOut);
@@ -169,7 +146,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     setState(() => _state = ReelState.empty);
 
-    // Synchronize global idle timing so all reels transition to drop-in seamlessly.
     final int globalEmptyTimeMs =
         (GameViewModel.columns - 1) * columnDelayMs + dropOutDurationMs;
     final int myDropOutEndTimeMs = dropOutDelayMs + dropOutDurationMs;
@@ -271,9 +247,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
         landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
       );
     } else if (isMultiplier) {
-      // Multiplier cells render the bomb (frozen on frame 0) already during
-      // the column-wide drop-in / drop-out so the player never sees a flash
-      // of the legacy multiplier sprite morph into a bomb in the static phase.
       symbolChild = MultiplierBombSymbol(
         itemH: itemH,
         multiplierValue: multiplierValue,
@@ -418,9 +391,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
             width: viewportW,
             height: viewportH,
             child: Stack(
-              // Clip.none lets winning-cell particle bursts spill past the
-              // column border into the gutter between reels — without this,
-              // sparks vanish at the column edge and the burst feels truncated.
               clipBehavior: Clip.none,
               children: List.generate(items.length, (i) {
                 final cleared = widget.clearedPositions.contains(
@@ -479,9 +449,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     required double itemH,
   }) {
     final cell = TumbleCell(
-      // Stable key per (column, row) so the cell state
-      // (current path + animation controllers) survives across
-      // tumble grid swaps and animates the path change.
       key: ValueKey('cell-${widget.columnIndex}-$row'),
       path: path,
       isFading: widget.fadingPaths.contains(path),
@@ -512,7 +479,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   }
 }
 
-/// A custom curve creating a candy-machine spring landing effect.
 class _HeftyBounceCurve extends Curve {
   const _HeftyBounceCurve();
   @override
@@ -523,9 +489,6 @@ class _HeftyBounceCurve extends Curve {
   }
 }
 
-/// Wraps a scatter symbol image and plays a scale-up pulse with
-/// golden glow, radial light burst, and sparkle effects once the
-/// drop-in animation crosses [landThreshold].
 class _ScatterPulse extends StatefulWidget {
   final Widget child;
   final Animation<double>? animation;
@@ -560,7 +523,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
   void initState() {
     super.initState();
 
-    // Scale pulse: 1.0 → 1.5 → 1.0 (very noticeable)
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
@@ -572,21 +534,18 @@ class _ScatterPulseState extends State<_ScatterPulse>
       ],
     ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
 
-    // Visual effects: glow + burst + sparkles
     _effectController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1050),
     );
     _pulseListenable = Listenable.merge([_pulseController, _effectController]);
 
-    // Golden glow: fade in fast, hold, fade out
     _glowOpacity = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 20),
       TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.8), weight: 30),
       TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 50),
     ]).animate(_effectController);
 
-    // Radial light burst: expand outward
     _burstExpand = Tween<double>(begin: 0.3, end: 1.5).animate(
       CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
     );
@@ -595,7 +554,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
       TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 85),
     ]).animate(_effectController);
 
-    // Sparkle particles progress
     _sparkleProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
     );
@@ -634,9 +592,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
 
   @override
   Widget build(BuildContext context) {
-    // Multiple scatters can land in one spin; isolating each pulse as its
-    // own layer keeps the burst+glow+sparkle stack from re-rasterizing the
-    // surrounding reel cells when only this scatter is animating.
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: _pulseListenable,
@@ -651,7 +606,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // Layer 1: Radial light burst
               if (burstAlpha > 0)
                 Positioned.fill(
                   child: Transform.scale(
@@ -675,7 +629,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
                   ),
                 ),
 
-              // Layer 2: Sparkle particles
               if (sparkle > 0 && sparkle < 1)
                 Positioned.fill(
                   child: CustomPaint(
@@ -683,9 +636,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
                   ),
                 ),
 
-              // Layer 3: Golden glow halo behind the symbol. Blur radius
-              // capped at 8 (was 20) — the BoxShadow blur is GPU-expensive
-              // and multiple scatter pulses overlap during FS triggers.
               if (glow > 0)
                 Positioned.fill(
                   child: Container(
@@ -705,7 +655,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
                   ),
                 ),
 
-              // Layer 4: The scatter image itself (with scale)
               Transform.scale(scale: scale, child: child),
             ],
           );
@@ -716,7 +665,6 @@ class _ScatterPulseState extends State<_ScatterPulse>
   }
 }
 
-/// Paints small sparkle particles radiating outward from the center.
 class _ScatterSparklePainter extends CustomPainter {
   final double progress;
   _ScatterSparklePainter({required this.progress});
@@ -725,7 +673,7 @@ class _ScatterSparklePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final maxRadius = size.width * 0.55;
-    final rng = 42; // fixed seed for consistent pattern
+    final rng = 42;
 
     for (int i = 0; i < 12; i++) {
       final angle = (i * 30.0 + rng) * (3.14159 / 180.0);
@@ -735,7 +683,6 @@ class _ScatterSparklePainter extends CustomPainter {
         center.dy + dist * math.sin(angle),
       );
 
-      // Sparkle fades out as it travels
       final alpha = ((1.0 - progress) * 0.9).clamp(0.0, 1.0);
       final sparkleSize = 2.5 * (1.0 - progress * 0.5);
 

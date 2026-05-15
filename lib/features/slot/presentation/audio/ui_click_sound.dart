@@ -21,9 +21,7 @@ class UiClickSound {
         playerMode: PlayerMode.mediaPlayer,
         audioContext: AppAudioContext.game,
       ));
-    } catch (_) {
-      // UI click audio should never block app startup.
-    }
+    } catch (_) {}
   }
 
   static Future<void> play({bool force = false}) async {
@@ -42,8 +40,6 @@ class UiClickSound {
         audioContext: AppAudioContext.game,
       ));
       await pool.start(volume: _volume);
-    } catch (_) {
-      // UI click audio should never block or break a button action.
-    }
+    } catch (_) {}
   }
 }

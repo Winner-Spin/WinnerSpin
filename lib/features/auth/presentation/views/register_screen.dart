@@ -39,7 +39,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   void _onViewModelChange() {
     _showErrorIfNeeded(context);
     _handleRegistrationSuccess(context);
-    // One-shot grow on appearance — mirrors the login screen.
     final hasError = _viewModel.errorMessage != null;
     if (hasError && _errorPulseCtrl.value == 0) {
       _errorPulseCtrl.forward(from: 0);
@@ -57,10 +56,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
-  /// Maps a viewmodel error message to its corresponding badge
-  /// image. Returns null for errors that don't have a dedicated
-  /// image — those stay silent on the new flow (the SnackBar that
-  /// used to surface them is gone).
   String? _errorImageFor(String error) {
     if (error.contains('fill in all fields')) {
       return 'lib/images/register_screen/empty_fields.png';
@@ -68,8 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     if (error.contains('do not match')) {
       return 'lib/images/register_screen/password_dont_match.png';
     }
-    if (error.contains('at least 6 characters') ||
-        error.contains('too weak')) {
+    if (error.contains('at least 6 characters') || error.contains('too weak')) {
       return 'lib/images/register_screen/min_6_characters.png';
     }
     if (error.contains('Invalid email')) {
@@ -173,11 +167,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                   ),
 
-                  // Register button stays mounted while the auth
-                  // request is in flight so the layout doesn't reflow
-                  // under the player. Taps are swallowed by the
-                  // disabled wrapper while loading and a small
-                  // spinner overlays the button.
                   Positioned(
                     bottom: screenH * 0.14,
                     left: screenW * 0.15,
@@ -232,12 +221,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                   ),
 
-                  // Inline error indicator sitting just below the
-                  // confirm password field, with enough headroom
-                  // above the register button so the badge never
-                  // sits on top of it. Replaces the old SnackBar
-                  // with one of four campaign-art badges depending
-                  // on which validation failed.
                   if (_viewModel.errorMessage != null &&
                       _errorImageFor(_viewModel.errorMessage!) != null)
                     Positioned(
@@ -266,8 +249,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // ─── NAVIGATION (View responsibility) ───────────────────────
-
   void _handleRegistrationSuccess(BuildContext context) {
     if (!mounted) return;
     if (_viewModel.registrationSuccess) {
@@ -282,8 +263,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-  // ─── ERROR HANDLING ──────────────────────────────────────────
-
   void _showErrorIfNeeded(BuildContext context) {
     if (!mounted) return;
     final error = _viewModel.errorMessage;
@@ -297,8 +276,6 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
     }
   }
-
-  // ─── HELPERS ─────────────────────────────────────────────────
 
   Widget _buildCustomTextField({
     required BuildContext context,

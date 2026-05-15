@@ -5,7 +5,7 @@ import '../../data/repositories/firebase_auth_repository.dart';
 
 class RegisterViewModel extends ChangeNotifier {
   RegisterViewModel({AuthRepository? authRepository})
-      : _authRepository = authRepository ?? FirebaseAuthRepository();
+    : _authRepository = authRepository ?? FirebaseAuthRepository();
 
   final AuthRepository _authRepository;
 
@@ -24,9 +24,6 @@ class RegisterViewModel extends ChangeNotifier {
   bool _registrationSuccess = false;
   bool get registrationSuccess => _registrationSuccess;
 
-  /// Validates inputs and calls the repository's signUp.
-  /// On success the user is signed back out so they must log in manually;
-  /// the View handles navigation off [registrationSuccess].
   Future<void> register() async {
     _errorMessage = null;
     _registrationSuccess = false;
@@ -65,7 +62,6 @@ class RegisterViewModel extends ChangeNotifier {
         password: password,
         username: username,
       );
-      // Sign back out so the user must log in manually.
       await _authRepository.signOut();
       _registrationSuccess = true;
     } on AuthException catch (e) {
@@ -79,18 +75,12 @@ class RegisterViewModel extends ChangeNotifier {
     }
   }
 
-  /// Clears the currently surfaced error message — the register
-  /// screen calls this after the in-screen error indicator has been
-  /// on screen long enough for the player to read it, so a fresh
-  /// register attempt doesn't have to re-render against a stale
-  /// error.
   void clearError() {
     if (_errorMessage == null) return;
     _errorMessage = null;
     notifyListeners();
   }
 
-  /// Resets the registrationSuccess flag after navigation is handled.
   void resetRegistrationSuccess() {
     _registrationSuccess = false;
   }
@@ -100,7 +90,6 @@ class RegisterViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Maps domain-level auth error codes to user-facing messages.
   String _friendlyError(AuthErrorCode code) {
     switch (code) {
       case AuthErrorCode.emailAlreadyInUse:

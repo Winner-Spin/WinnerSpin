@@ -9,32 +9,17 @@ import 'rtp_config.dart';
 import 'tumble_simulator.dart';
 import 'weighted_random.dart';
 
-/// Public, stateless slot engine. Orchestrates the per-spin decision flow
-/// (FS trigger, win/lose, rejection sampling) by delegating to dedicated
-/// sub-modules under `engine/`.
 class SlotEngine {
   SlotEngine._();
 
-  /// Re-exported board dimensions for callers outside the engine package.
   static const int columns = kEngineColumns;
   static const int rows = kEngineRows;
 
-  /// Re-exported buy price for backward-compat with the ViewModel.
   static const double buyFeaturePriceMultiplier = BuyConfig.priceMultiplier;
 
-  /// Buy-FS pool affordability check. Wraps [PoolGuard.canAffordBuyFs] so
-  /// callers don't have to import the engine package directly.
   static bool canAffordBuyFs(PoolState pool, double betAmount) =>
       PoolGuard.canAffordBuyFs(pool, betAmount);
 
-  /// Single-spin orchestrator.
-  ///
-  /// Flow:
-  ///   1. Build weighted symbol pool + roll multiplier cap.
-  ///   2. Decide if FS triggers (gated by Virtual Cost guard).
-  ///   3. Decide win/lose (FS rounds use boosted hit rate).
-  ///   4. Generate winning or safe grid; run cascade tumbles.
-  ///   5. Reject samples that exceed the per-mode max-win cap and retry.
   static SpinResult spin(
     PoolState pool,
     double betAmount, {
@@ -45,13 +30,17 @@ class SlotEngine {
   }) {
     final mode = pool.currentMode;
     final weights = WeightedRandom.buildAdjustedWeights(mode, isFreeSpins);
-    final spinMaxMults = GridGenerator.rollMaxMultipliers(isFreeSpins: isFreeSpins);
+    final spinMaxMults = GridGenerator.rollMaxMultipliers(
+      isFreeSpins: isFreeSpins,
+    );
 
-    // betAmount=0 happens during initial UI grid generation at app startup.
-    // Returning a zero-win result short-circuits the win loop's infinite spin.
     if (betAmount <= 0) {
       return SpinResult(
-        initialGrid: GridGenerator.generateSafe(weights, spinMaxMults, isFreeSpins: isFreeSpins),
+        initialGrid: GridGenerator.generateSafe(
+          weights,
+          spinMaxMults,
+          isFreeSpins: isFreeSpins,
+        ),
         tumbles: const [],
         totalWin: 0,
         tumbleCount: 0,
@@ -62,10 +51,14 @@ class SlotEngine {
     }
 
     final maxAllowedWin =
-        PoolGuard.getMaxWinMultiplier(mode, pool, betAmount, isFreeSpins: isFreeSpins) * betAmount;
+        PoolGuard.getMaxWinMultiplier(
+          mode,
+          pool,
+          betAmount,
+          isFreeSpins: isFreeSpins,
+        ) *
+        betAmount;
 
-    // FS trigger decision — base or retrigger rate, optionally bumped by
-    // ante on base spins. Both paths gated by the Virtual Cost guard.
     final bool isRetriggerAttempt = isFreeSpins;
     final double baseFsRate = isRetriggerAttempt
         ? (RtpConfig.fsRetriggerRate[mode] ?? 0.0)
@@ -73,39 +66,64 @@ class SlotEngine {
     final double fsRate = (anteBet && !isRetriggerAttempt)
         ? baseFsRate * AnteConfig.fsTriggerMultiplier
         : baseFsRate;
-    final bool canAffordFs = PoolGuard.canAffordFsRound(
-          pool, betAmount, mode, isRetriggerAttempt,
+    final bool canAffordFs =
+        PoolGuard.canAffordFsRound(
+          pool,
+          betAmount,
+          mode,
+          isRetriggerAttempt,
           isAnte: anteBet && !isRetriggerAttempt,
         ) &&
         maxAllowedWin >= (3.25 * betAmount);
-    // The buy CTA pays its own pool fee up front, so the rate roll and
-    // pool guard are bypassed when [forceFsTrigger] is true — the
-    // engine guarantees a scatter-bearing grid regardless of pool
-    // health and the buy's recovery-mode handling lives downstream.
     final bool triggersFs =
         forceFsTrigger || (canAffordFs && (engineRng.nextDouble() < fsRate));
 
-    // FS rounds boost hit rate so the round feels lucky.
     final double effectiveHitRate = isFreeSpins
-        ? _min(0.95, (RtpConfig.hitRate[mode] ?? 0.30) * (RtpConfig.fsHitRateBoost[mode] ?? 1.25))
+        ? _min(
+            0.95,
+            (RtpConfig.hitRate[mode] ?? 0.30) *
+                (RtpConfig.fsHitRateBoost[mode] ?? 1.25),
+          )
         : (RtpConfig.hitRate[mode] ?? 0.30);
     final shouldWin = triggersFs || engineRng.nextDouble() < effectiveHitRate;
 
     if (!shouldWin) {
-      final grid = GridGenerator.generateSafe(weights, spinMaxMults, isFreeSpins: isFreeSpins);
-      return TumbleSimulator.run(grid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
+      final grid = GridGenerator.generateSafe(
+        weights,
+        spinMaxMults,
+        isFreeSpins: isFreeSpins,
+      );
+      return TumbleSimulator.run(
+        grid,
+        weights,
+        betAmount,
+        safeRefill: true,
+        maxMults: spinMaxMults,
+        isFreeSpins: isFreeSpins,
+        anteBet: anteBet,
+        buyFs: buyFs,
+      );
     }
 
-    // Rejection sampling: try natural cascades up to 50 times; reject any
-    // that exceed the budget and keep retrying. A forced trigger (buy
-    // CTA) accepts the first scatter-bearing winning grid regardless of
-    // budget so the FS round is always granted even on a depleted pool.
     SpinResult? lastForcedFallback;
     for (int attempt = 0; attempt < 50; attempt++) {
-      final initialGrid = GridGenerator.generateWinning(weights, mode, spinMaxMults, forceScatters: triggersFs, isFreeSpins: isFreeSpins);
-      final simResult = TumbleSimulator.run(initialGrid, weights, betAmount,
-          safeRefill: false, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
+      final initialGrid = GridGenerator.generateWinning(
+        weights,
+        mode,
+        spinMaxMults,
+        forceScatters: triggersFs,
+        isFreeSpins: isFreeSpins,
+      );
+      final simResult = TumbleSimulator.run(
+        initialGrid,
+        weights,
+        betAmount,
+        safeRefill: false,
+        maxMults: spinMaxMults,
+        isFreeSpins: isFreeSpins,
+        anteBet: anteBet,
+        buyFs: buyFs,
+      );
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult;
       }
@@ -114,12 +132,25 @@ class SlotEngine {
       }
     }
 
-    // Fallback: safe-refill (single-cascade only) keeps the win bounded.
     int fallbackAttempts = 0;
     while (fallbackAttempts++ < 100) {
-      final fallbackGrid = GridGenerator.generateWinning(weights, mode, spinMaxMults, forceScatters: triggersFs, isFreeSpins: isFreeSpins);
-      final simResult = TumbleSimulator.run(fallbackGrid, weights, betAmount,
-          safeRefill: true, maxMults: spinMaxMults, isFreeSpins: isFreeSpins, anteBet: anteBet, buyFs: buyFs);
+      final fallbackGrid = GridGenerator.generateWinning(
+        weights,
+        mode,
+        spinMaxMults,
+        forceScatters: triggersFs,
+        isFreeSpins: isFreeSpins,
+      );
+      final simResult = TumbleSimulator.run(
+        fallbackGrid,
+        weights,
+        betAmount,
+        safeRefill: true,
+        maxMults: spinMaxMults,
+        isFreeSpins: isFreeSpins,
+        anteBet: anteBet,
+        buyFs: buyFs,
+      );
       if (simResult.totalWin > 0 && simResult.totalWin <= maxAllowedWin) {
         return simResult;
       }
@@ -128,17 +159,17 @@ class SlotEngine {
       }
     }
 
-    // Forced-trigger path can't be allowed to silently drop the scatter
-    // grid into a non-triggering safe fallback — if every attempt
-    // exceeded the per-mode cap, return the most recent scatter-bearing
-    // result so the buy still grants the FS round it was paid for.
+    // Buy Feature must return a scatter result once paid.
     if (forceFsTrigger && lastForcedFallback != null) {
       return lastForcedFallback;
     }
 
-    // Hard fail-safe: if even the bounded fallback can't fit, return a safe grid.
     return TumbleSimulator.run(
-      GridGenerator.generateSafe(weights, spinMaxMults, isFreeSpins: isFreeSpins),
+      GridGenerator.generateSafe(
+        weights,
+        spinMaxMults,
+        isFreeSpins: isFreeSpins,
+      ),
       weights,
       betAmount,
       safeRefill: true,
