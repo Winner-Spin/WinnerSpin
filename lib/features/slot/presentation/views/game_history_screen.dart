@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
 import '../../../../core/widgets/money_text.dart';
+import '../../domain/models/game_history_entry.dart';
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 

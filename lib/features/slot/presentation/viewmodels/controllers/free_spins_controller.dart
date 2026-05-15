@@ -14,17 +14,20 @@ class FreeSpinsController extends ChangeNotifier {
   bool get currentRoundFromBuy => _currentRoundFromBuy;
 
   void hydrate(Map<String, dynamic> userData) {
-    _remaining = userData['freeSpinsRemaining'] ?? 0;
+    final storedRemaining = userData['freeSpinsRemaining'];
+    final remaining = storedRemaining is num ? storedRemaining.toInt() : 0;
+    _remaining = remaining < 0 ? 0 : remaining;
     notifyListeners();
   }
 
   void consumeOne() {
+    if (_remaining <= 0) return;
     _remaining--;
     notifyListeners();
   }
 
   void awardInitial() {
-    _remaining += _initialAward;
+    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
     notifyListeners();
   }
 
@@ -34,7 +37,7 @@ class FreeSpinsController extends ChangeNotifier {
   }
 
   void awardBoughtRound() {
-    _remaining += _initialAward;
+    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
     _currentRoundFromBuy = true;
     notifyListeners();
   }

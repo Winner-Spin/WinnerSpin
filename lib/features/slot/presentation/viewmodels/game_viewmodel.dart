@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/audio/app_audio_context.dart';
+import '../../data/repositories/local_game_history_repository.dart';
+import '../../domain/models/game_history_entry.dart';
 import '../../domain/models/pool_state.dart';
 import '../../domain/models/spin_result.dart';
 import '../../domain/models/symbol_registry.dart';
@@ -15,6 +14,7 @@ import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../audio/ui_click_sound.dart';
 import '../../data/repositories/firestore_pool_repository.dart';
+import '../../domain/repositories/game_history_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
 import '../../domain/engine/spin_task.dart';
@@ -24,51 +24,17 @@ import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
 import 'controllers/grid_controller.dart';
 
-class GameHistoryEntry {
-  const GameHistoryEntry({
-    required this.id,
-    required this.playedAt,
-    required this.newBalance,
-    required this.bet,
-    required this.winAmount,
-  });
-
-  factory GameHistoryEntry.fromJson(Map<String, dynamic> json) {
-    final playedAt = DateTime.parse(json['playedAt'] as String);
-    return GameHistoryEntry(
-      id: json['id'] as String? ?? playedAt.microsecondsSinceEpoch.toString(),
-      playedAt: playedAt,
-      newBalance: (json['newBalance'] as num).toDouble(),
-      bet: (json['bet'] as num).toDouble(),
-      winAmount: (json['winAmount'] as num).toDouble(),
-    );
-  }
-
-  final String id;
-  final DateTime playedAt;
-  final double newBalance;
-  final double bet;
-  final double winAmount;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'playedAt': playedAt.toIso8601String(),
-      'newBalance': newBalance,
-      'bet': bet,
-      'winAmount': winAmount,
-    };
-  }
-}
-
 class GameViewModel extends ChangeNotifier {
   static const double _ambientMusicVolume = 0.48;
 
   GameViewModel({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
+    GameHistoryRepository? gameHistoryRepository,
   }) : _authRepository = authRepository ?? FirebaseAuthRepository(),
-       _poolRepository = poolRepository ?? FirestorePoolRepository() {
+       _poolRepository = poolRepository ?? FirestorePoolRepository(),
+       _gameHistoryRepository =
+           gameHistoryRepository ?? LocalGameHistoryRepository() {
     final result = SlotEngine.spin(_pool, 0);
     _gridCtrl = GridController(result.initialGrid);
     _initMusic();
@@ -89,6 +55,7 @@ class GameViewModel extends ChangeNotifier {
 
   final AuthRepository _authRepository;
   final PoolRepository _poolRepository;
+  final GameHistoryRepository _gameHistoryRepository;
   StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
   final BalanceController _balanceCtrl = BalanceController();
@@ -192,7 +159,6 @@ class GameViewModel extends ChangeNotifier {
 
   bool _currentSpinFromBuy = false;
   bool get isCurrentSpinFromBuy => _currentSpinFromBuy;
-  String? _historyUserId;
   final List<GameHistoryEntry> _gameHistory = [];
   List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
 
@@ -353,8 +319,7 @@ class GameViewModel extends ChangeNotifier {
     try {
       final uid = _authRepository.currentUserId;
       if (uid != null) {
-        _historyUserId = uid;
-        await _loadGameHistory();
+        await _loadGameHistory(uid);
 
         final results = await Future.wait([
           _authRepository.getUserData(uid),
@@ -570,6 +535,7 @@ class GameViewModel extends ChangeNotifier {
           _fsCtrl.markCurrentRoundFromBuy();
         }
       }
+      _savePlayerState();
     }
 
     if (!isInFreeSpins) {
@@ -595,6 +561,7 @@ class GameViewModel extends ChangeNotifier {
     if (!_pendingFsConsume) return;
     _pendingFsConsume = false;
     _fsCtrl.consumeOne();
+    _savePlayerState();
   }
 
   void releaseFsRoundHold() {
@@ -616,39 +583,21 @@ class GameViewModel extends ChangeNotifier {
     _loggedOut = false;
   }
 
-  Future<File?> _gameHistoryFile() async {
-    final uid = _historyUserId;
-    if (uid == null) return null;
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/game_history_$uid.json');
-  }
-
-  Future<void> _loadGameHistory() async {
+  Future<void> _loadGameHistory(String userId) async {
     try {
-      final file = await _gameHistoryFile();
-      if (file == null || !await file.exists()) return;
-
-      final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
       _gameHistory
         ..clear()
-        ..addAll(
-          decoded
-              .cast<Map<String, dynamic>>()
-              .map(GameHistoryEntry.fromJson)
-              .take(30),
-        );
+        ..addAll(await _gameHistoryRepository.load(userId));
     } catch (e) {
       debugPrint('Game history load error: $e');
     }
   }
 
   Future<void> _saveGameHistory() async {
+    final uid = _authRepository.currentUserId;
+    if (uid == null) return;
     try {
-      final file = await _gameHistoryFile();
-      if (file == null) return;
-      await file.writeAsString(
-        jsonEncode(_gameHistory.map((entry) => entry.toJson()).toList()),
-      );
+      await _gameHistoryRepository.save(uid, _gameHistory);
     } catch (e) {
       debugPrint('Game history save error: $e');
     }
