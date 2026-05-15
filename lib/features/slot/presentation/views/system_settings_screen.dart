@@ -367,6 +367,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   }
 
   void _showDepositMoney() {
+    if (widget.viewModel.isInFreeSpins) return;
     UiClickSound.play();
     showGeneralDialog<void>(
       context: context,
@@ -392,32 +393,44 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   }
 
   Widget _buildBuyGameMoneyButton() {
-    return GestureDetector(
-      onTap: _showDepositMoney,
-      child: Container(
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF00C76A),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.32),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+    return ListenableBuilder(
+      listenable: widget.viewModel,
+      builder: (context, _) {
+        final disabled = widget.viewModel.isInFreeSpins;
+        return GestureDetector(
+          onTap: disabled ? null : _showDepositMoney,
+          child: AnimatedOpacity(
+            opacity: disabled ? 0.48 : 1,
+            duration: const Duration(milliseconds: 120),
+            child: Container(
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: disabled
+                    ? _textColor.withValues(alpha: 0.34)
+                    : const Color(0xFF00C76A),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.32),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Text(
+                'BUY GAME MONEY',
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 1.1,
+                ),
+              ),
             ),
-          ],
-        ),
-        child: Text(
-          'BUY GAME MONEY',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 23,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: 1.1,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
