@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/format/money_format.dart';
@@ -30,6 +28,9 @@ import 'widgets/spring_popup_card.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/first_launch_disclaimer_dialog.dart';
+import 'widgets/free_spin_scatter_transition.dart';
+import 'widgets/free_spin_summary_popup.dart';
+import 'widgets/free_spin_win_popup.dart';
 import 'widgets/flying_tumble_sprite.dart';
 import 'widgets/footer_clock_text.dart';
 import 'widgets/multiplier_label.dart';
@@ -195,7 +196,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _precacheOpeningGridSymbols();
       _precacheMultiplierLabels();
       _precacheWinOverlayAssets();
-      unawaited(_FreeSpinScatterTransitionState.precacheCupcakeImage());
+      unawaited(FreeSpinScatterTransition.precacheCupcakeImage());
       _scheduleDeferredSymbolPrecache();
       precacheImage(
         const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
@@ -320,14 +321,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
     precacheImage(
       const ResizeImage(
-        AssetImage(_FreeSpinWinPopupState.assetPath),
+        AssetImage(FreeSpinWinPopup.assetPath),
         width: _freeSpinPopupCacheWidth,
       ),
       context,
     );
     precacheImage(
       const ResizeImage(
-        AssetImage(_FreeSpinSummaryPopupState.assetPath),
+        AssetImage(FreeSpinSummaryPopup.assetPath),
         width: _freeSpinPopupCacheWidth,
       ),
       context,
@@ -438,10 +439,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     late OverlayEntry entry;
     entry = OverlayEntry(
-      builder: (context) => _FreeSpinWinPopup(
+      builder: (context) => FreeSpinWinPopup(
         value: value,
         isRetrigger: isRetrigger,
         winAmount: winAmount,
+        cacheWidth: _freeSpinPopupCacheWidth,
         onDismiss: () {
           if (_freeSpinWinPopupEntry == entry) {
             _freeSpinWinPopupEntry = null;
@@ -554,9 +556,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     setState(() => _fsSummaryPopupVisible = true);
     late OverlayEntry entry;
     entry = OverlayEntry(
-      builder: (context) => _FreeSpinSummaryPopup(
+      builder: (context) => FreeSpinSummaryPopup(
         totalWin: _fsAccumulatedWin,
         totalFreeSpins: _fsAwardedThisRound,
+        cacheWidth: _freeSpinPopupCacheWidth,
         onDismiss: () {
           if (_freeSpinWinPopupEntry == entry) {
             _freeSpinWinPopupEntry = null;
@@ -1387,7 +1390,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
               if (_showFreeSpinTransition)
-                const Positioned.fill(child: _FreeSpinScatterTransition()),
+                const Positioned.fill(child: FreeSpinScatterTransition()),
             ],
           ),
         );
@@ -1871,531 +1874,3 @@ class _ScatterCell {
   const _ScatterCell({required this.column, required this.row});
 }
 
-class _FreeSpinWinPopup extends StatefulWidget {
-  final int value;
-  final bool isRetrigger;
-  final double winAmount;
-  final VoidCallback onDismiss;
-
-  const _FreeSpinWinPopup({
-    required this.value,
-    required this.isRetrigger,
-    required this.winAmount,
-    required this.onDismiss,
-  });
-
-  @override
-  State<_FreeSpinWinPopup> createState() => _FreeSpinWinPopupState();
-}
-
-class _FreeSpinWinPopupState extends State<_FreeSpinWinPopup>
-    with SingleTickerProviderStateMixin {
-  static const assetPath =
-      'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
-
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-  late final Animation<double> _fade;
-  bool _isDismissing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 520),
-      reverseDuration: const Duration(milliseconds: 220),
-    )..forward();
-    _scale = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-      reverseCurve: Curves.easeInBack,
-    );
-    _fade = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _dismiss() async {
-    if (_isDismissing) return;
-    _isDismissing = true;
-    await _controller.reverse();
-    if (mounted) widget.onDismiss();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width * 0.88;
-    final valueOffset = Offset(0, width * 0.035);
-    final valueFontSize = width * 0.16;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _dismiss,
-      child: FadeTransition(
-        opacity: _fade,
-        child: Container(
-          color: Colors.black.withValues(alpha: 0.36),
-          alignment: Alignment.center,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.86, end: 1.0).animate(_scale),
-            child: SizedBox(
-              width: width,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.asset(
-                    assetPath,
-                    width: width,
-                    filterQuality: FilterQuality.medium,
-                    cacheWidth: _freeSpinPopupCacheWidth,
-                  ),
-                  Transform.translate(
-                    offset: valueOffset,
-                    child: Text(
-                      '${widget.value}',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        fontSize: valueFontSize,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        color: const Color(0xFFFFB72E),
-                        shadows: [
-                          Shadow(
-                            color: const Color(
-                              0xFF9C5A00,
-                            ).withValues(alpha: 0.95),
-                            offset: const Offset(0, 4),
-                            blurRadius: 8,
-                          ),
-                          Shadow(
-                            color: const Color(
-                              0xFFFFF0A8,
-                            ).withValues(alpha: 0.85),
-                            offset: const Offset(0, -2),
-                            blurRadius: 3,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FreeSpinSummaryPopup extends StatefulWidget {
-  final double totalWin;
-  final int totalFreeSpins;
-  final VoidCallback onDismiss;
-
-  const _FreeSpinSummaryPopup({
-    required this.totalWin,
-    required this.totalFreeSpins,
-    required this.onDismiss,
-  });
-
-  @override
-  State<_FreeSpinSummaryPopup> createState() => _FreeSpinSummaryPopupState();
-}
-
-class _FreeSpinSummaryPopupState extends State<_FreeSpinSummaryPopup>
-    with SingleTickerProviderStateMixin {
-  static const assetPath =
-      'lib/images/slot_main_screen/WIN_ARTICLES/xFreeSpinWin.png';
-
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-  late final Animation<double> _fade;
-  bool _isDismissing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 520),
-      reverseDuration: const Duration(milliseconds: 220),
-    )..forward();
-    _scale = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-      reverseCurve: Curves.easeInBack,
-    );
-    _fade = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _dismiss() async {
-    if (_isDismissing) return;
-    _isDismissing = true;
-    await _controller.reverse();
-    if (mounted) widget.onDismiss();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width * 0.88;
-    final amountFontSize = width * 0.115;
-    final spinFontSize = width * 0.060;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _dismiss,
-      child: FadeTransition(
-        opacity: _fade,
-        child: Container(
-          color: Colors.black.withValues(alpha: 0.36),
-          alignment: Alignment.center,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.86, end: 1.0).animate(_scale),
-            child: SizedBox(
-              width: width,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.asset(
-                    assetPath,
-                    width: width,
-                    filterQuality: FilterQuality.medium,
-                    cacheWidth: _freeSpinPopupCacheWidth,
-                  ),
-                  Transform.translate(
-                    offset: Offset(0, width * 0.025),
-                    child: SizedBox(
-                      width: width * 0.46,
-                      height: width * 0.12,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: MoneyText(
-                          text: formatMoney(widget.totalWin),
-                          spacing: width * 0.007,
-                          symbolOffset: Offset(0, width * 0.005),
-                          lineYOffset: width * 0.009,
-                          lineLengthScale: 0.96,
-                          lineTopExtend: width * 0.004,
-                          symbolTextYOffset: width * 0.006,
-                          style: GoogleFonts.outfit(
-                            fontSize: amountFontSize,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                            color: const Color(0xFFFFD13B),
-                            shadows: [
-                              Shadow(
-                                color: const Color(
-                                  0xFF9C5A00,
-                                ).withValues(alpha: 0.95),
-                                offset: const Offset(0, 4),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Transform.translate(
-                    offset: Offset(width * -0.14, width * 0.17),
-                    child: SizedBox(
-                      width: width * 0.11,
-                      height: width * 0.07,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '${widget.totalFreeSpins}',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            fontSize: spinFontSize,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                            color: const Color(0xFFFFD13B),
-                            letterSpacing: 1.2,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.85),
-                                offset: const Offset(0, 3),
-                                blurRadius: 5,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FreeSpinScatterTransition extends StatefulWidget {
-  const _FreeSpinScatterTransition();
-
-  @override
-  State<_FreeSpinScatterTransition> createState() =>
-      _FreeSpinScatterTransitionState();
-}
-
-class _FreeSpinScatterTransitionState extends State<_FreeSpinScatterTransition>
-    with SingleTickerProviderStateMixin {
-  static const _cupcakeAssetPath =
-      'lib/images/slot_main_screen/Items/cupCake.png';
-  static const int _cupcakeCount = 420;
-  static const double _cupcakeCellSize = 0.19;
-  static ui.Image? _cachedCupcakeImage;
-  static Future<ui.Image>? _cupcakeImageFuture;
-
-  late final AnimationController _controller;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
-  late final Animation<double> _rotation;
-  Size? _burstLayoutSize;
-  late List<_CupcakeBurstParticle> _cupcakeParticles = const [];
-  ui.Image? _cupcakeImage;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..forward();
-    _fade = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 18),
-      TweenSequenceItem(tween: ConstantTween(1.0), weight: 55),
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 27),
-    ]).animate(_controller);
-    _scale = Tween<double>(
-      begin: 0.25,
-      end: 1.45,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-    _rotation = Tween<double>(
-      begin: -0.16,
-      end: 0.08,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    unawaited(_resolveCupcakeImage());
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  static Future<ui.Image> precacheCupcakeImage() {
-    final cached = _cachedCupcakeImage;
-    if (cached != null) return Future.value(cached);
-    return _cupcakeImageFuture ??= _loadCupcakeImage().then((image) {
-      _cachedCupcakeImage = image;
-      return image;
-    });
-  }
-
-  static Future<ui.Image> _loadCupcakeImage() async {
-    final data = await rootBundle.load(_cupcakeAssetPath);
-    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-    final frame = await codec.getNextFrame();
-    codec.dispose();
-    return frame.image;
-  }
-
-  Future<void> _resolveCupcakeImage() async {
-    final image = await precacheCupcakeImage();
-    if (!mounted) return;
-    setState(() => _cupcakeImage = image);
-  }
-
-  void _ensureCupcakeBurstLayout(Size size) {
-    if (_burstLayoutSize == size) return;
-    double noise(int seed) {
-      final raw = math.sin(seed * 12.9898) * 43758.5453;
-      return raw - raw.floorToDouble();
-    }
-
-    final particles = <_CupcakeBurstParticle>[];
-
-    for (int index = 0; index < _cupcakeCount; index++) {
-      final t = index / _cupcakeCount;
-      final angleBase = index * 2.399963229728653;
-      final angle = angleBase + (noise(index * 7 + 3) - 0.5) * 1.15;
-      final radius = math.sqrt(t) * (0.95 + noise(index * 11 + 5) * 0.58);
-      final aspect = size.height / size.width;
-      final x =
-          math.cos(angle) * radius * 0.88 +
-          (noise(index * 13 + 7) - 0.5) * 0.26;
-      final y =
-          math.sin(angle) * radius * 0.88 / aspect +
-          (noise(index * 17 + 9) - 0.5) * 0.26;
-      final sizeVar = _cupcakeCellSize + noise(index * 19 + 11) * 0.13;
-      final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
-      final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
-        0.0,
-        0.28,
-      );
-      final width = size.width * sizeVar;
-
-      particles.add(
-        _CupcakeBurstParticle(
-          left: size.width * (0.5 + x) - (width / 2),
-          top: size.height * (0.46 + y) - (width / 2),
-          driftX: (noise(index * 31 + 17) - 0.5) * 95,
-          driftY: -85 - noise(index * 37 + 19) * 95,
-          rotation: rotation,
-          delay: delay,
-          width: width,
-        ),
-      );
-    }
-
-    _burstLayoutSize = size;
-    _cupcakeParticles = particles;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size =
-              constraints.hasBoundedWidth && constraints.hasBoundedHeight
-              ? constraints.biggest
-              : MediaQuery.sizeOf(context);
-          _ensureCupcakeBurstLayout(size);
-          return AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return Opacity(
-                opacity: _fade.value,
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.38),
-                  child: CustomPaint(
-                    size: size,
-                    painter: _CupcakeBurstPainter(
-                      particles: _cupcakeParticles,
-                      image: _cupcakeImage,
-                      progress: _controller.value,
-                      scale: _scale.value.clamp(0.9, 1.22),
-                      rotation: _rotation.value,
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _CupcakeBurstParticle {
-  final double left;
-  final double top;
-  final double driftX;
-  final double driftY;
-  final double rotation;
-  final double delay;
-  final double width;
-
-  const _CupcakeBurstParticle({
-    required this.left,
-    required this.top,
-    required this.driftX,
-    required this.driftY,
-    required this.rotation,
-    required this.delay,
-    required this.width,
-  });
-}
-
-class _CupcakeBurstPainter extends CustomPainter {
-  final List<_CupcakeBurstParticle> particles;
-  final ui.Image? image;
-  final double progress;
-  final double scale;
-  final double rotation;
-
-  const _CupcakeBurstPainter({
-    required this.particles,
-    required this.image,
-    required this.progress,
-    required this.scale,
-    required this.rotation,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cupcake = image;
-    if (cupcake == null) return;
-
-    final source = Rect.fromLTWH(
-      0,
-      0,
-      cupcake.width.toDouble(),
-      cupcake.height.toDouble(),
-    );
-    final paint = Paint()
-      ..filterQuality = FilterQuality.medium
-      ..isAntiAlias = true;
-
-    for (final particle in particles) {
-      final localProgress = ((progress - particle.delay) / 0.52).clamp(
-        0.0,
-        1.0,
-      );
-      final pop = Curves.easeOutBack.transform(localProgress);
-      final drift = Curves.easeOutCubic.transform(localProgress);
-      final drawScale = (0.34 + pop * 0.84) * scale;
-      final center = Offset(
-        particle.left + particle.width / 2 + particle.driftX * (1 - drift),
-        particle.top + particle.width / 2 + particle.driftY * (1 - drift),
-      );
-      final target = Rect.fromCenter(
-        center: Offset.zero,
-        width: particle.width,
-        height: particle.width,
-      );
-
-      canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(particle.rotation + rotation);
-      canvas.scale(drawScale);
-      canvas.drawImageRect(cupcake, source, target, paint);
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CupcakeBurstPainter oldDelegate) {
-    return oldDelegate.particles != particles ||
-        oldDelegate.image != image ||
-        oldDelegate.progress != progress ||
-        oldDelegate.scale != scale ||
-        oldDelegate.rotation != rotation;
-  }
-}
