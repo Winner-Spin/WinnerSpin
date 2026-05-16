@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,6 +11,11 @@ import '../../domain/models/cluster_win.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../audio/ui_click_sound.dart';
+import '../controllers/big_win_overlay_controller.dart';
+import '../controllers/free_spin_overlay_controller.dart';
+import '../models/pending_free_spin_award.dart';
+import '../models/scatter_cell.dart';
+import '../services/game_asset_precache_service.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/buy_feature_button.dart';
 import 'widgets/double_chance_button.dart';
@@ -19,21 +23,21 @@ import 'widgets/slot_reel.dart';
 import 'widgets/respin_button.dart';
 import 'widgets/minus_button.dart';
 import 'widgets/plus_button.dart';
-import 'widgets/pulsing_multiplier_sum.dart';
 import 'widgets/auto_spin_button.dart';
 import 'widgets/info_button.dart';
 import 'widgets/settings_button.dart';
 import 'widgets/speed_button.dart';
 import 'widgets/spring_popup_card.dart';
+import 'widgets/spring_popup_transition.dart';
+import 'widgets/status_band.dart';
 import 'widgets/big_win_overlay.dart';
 import 'widgets/floating_win_overlay.dart';
 import 'widgets/first_launch_disclaimer_dialog.dart';
+import 'widgets/free_spin_info_line.dart';
 import 'widgets/free_spin_scatter_transition.dart';
-import 'widgets/free_spin_summary_popup.dart';
-import 'widgets/free_spin_win_popup.dart';
 import 'widgets/flying_tumble_sprite.dart';
-import 'widgets/footer_clock_text.dart';
-import 'widgets/multiplier_label.dart';
+import 'widgets/game_bottom_panel.dart';
+import 'widgets/tumble_win_line.dart';
 import 'widgets/win_amount_counter.dart';
 import 'widgets/win_presentation.dart';
 import 'widgets/win_presentation_controller.dart';
@@ -42,8 +46,6 @@ import 'auto_play_settings_screen.dart';
 import 'buy_freespins_confirm_screen.dart';
 import 'game_rules_screen.dart';
 import 'system_settings_screen.dart';
-
-const int _freeSpinPopupCacheWidth = 1024;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -58,6 +60,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       LocalFirstLaunchDisclaimerRepository();
 
   final WinPresentationController _winCtrl = WinPresentationController();
+  final BigWinOverlayController _bigWinOverlayController =
+      BigWinOverlayController();
+  final FreeSpinOverlayController _freeSpinOverlayController =
+      FreeSpinOverlayController();
+  final GameAssetPrecacheService _assetPrecacheService =
+      GameAssetPrecacheService();
 
   final GlobalKey _tumbleWinAnchorKey = GlobalKey();
 
@@ -87,9 +95,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _showFreeSpinTransition = false;
   Object? _lastFreeSpinAwardPopupResult;
   Timer? _freeSpinTransitionTimer;
-  OverlayEntry? _freeSpinWinPopupEntry;
   int _fsAwardedThisRound = 0;
-  _PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
+  PendingFreeSpinAward? _pendingFreeSpinAwardPopup;
   bool _freeSpinAwardSequenceActive = false;
   bool _fsSummaryPopupVisible = false;
   bool _deferInitialFreeSpinVisualMode = false;
@@ -102,8 +109,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   bool _bigWinShownThisSpin = false;
   bool _isBigWinShowing = false;
-  OverlayEntry? _bigWinEntry;
-  Timer? _deferredPrecacheTimer;
 
   bool get _isFreeSpinVisualMode =>
       _viewModel.isInFreeSpins && !_deferInitialFreeSpinVisualMode;
@@ -115,7 +120,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final winPresentationActive =
         phase != WinPresentationPhase.idle &&
         phase != WinPresentationPhase.done;
-    return winPresentationActive || _bigWinEntry != null || _celebrationLocked;
+    return winPresentationActive ||
+        _bigWinOverlayController.hasActiveOverlay ||
+        _celebrationLocked;
   }
 
   late final TextStyle _statusBaseStyle;
@@ -193,14 +200,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _precacheOpeningGridSymbols();
-      _precacheMultiplierLabels();
-      _precacheWinOverlayAssets();
-      unawaited(FreeSpinScatterTransition.precacheCupcakeImage());
-      _scheduleDeferredSymbolPrecache();
-      precacheImage(
-        const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
-        context,
+      _assetPrecacheService.precacheInitialAssets(
+        context: context,
+        openingGrid: _viewModel.grid,
+        isMounted: () => mounted,
       );
       unawaited(_maybeShowFirstLaunchDisclaimer());
     });
@@ -259,82 +262,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _precacheOpeningGridSymbols() {
-    final openingPaths = <String>{
-      for (final column in _viewModel.grid) ...column,
-    };
-    for (final path in openingPaths) {
-      _precacheSymbol(path);
-    }
-  }
-
-  void _scheduleDeferredSymbolPrecache() {
-    final openingPaths = <String>{
-      for (final column in _viewModel.grid) ...column,
-    };
-    final remainingPaths = SymbolRegistry.all
-        .map((symbol) => symbol.assetPath)
-        .where((path) => !openingPaths.contains(path))
-        .toList(growable: false);
-
-    _deferredPrecacheTimer?.cancel();
-    _deferredPrecacheTimer = Timer(const Duration(milliseconds: 300), () {
-      unawaited(_precacheSymbolsInBatches(remainingPaths));
-    });
-  }
-
-  Future<void> _precacheSymbolsInBatches(List<String> paths) async {
-    const batchSize = 3;
-    for (var index = 0; index < paths.length; index += batchSize) {
-      if (!mounted) return;
-      final end = math.min(index + batchSize, paths.length);
-      for (final path in paths.sublist(index, end)) {
-        _precacheSymbol(path);
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 24));
-    }
-  }
-
-  void _precacheSymbol(String path) {
-    precacheImage(ResizeImage(AssetImage(path), width: 256), context);
-  }
-
-  void _precacheMultiplierLabels() {
-    for (final path in MultiplierLabel.assetPaths) {
-      precacheImage(ResizeImage(AssetImage(path), width: 384), context);
-    }
-  }
-
-  void _precacheWinOverlayAssets() {
-    for (final path in WinTier.assetPaths) {
-      precacheImage(
-        ResizeImage(AssetImage(path), width: BigWinOverlay.headlineCacheWidth),
-        context,
-      );
-    }
-    precacheImage(
-      const ResizeImage(
-        AssetImage(BigWinOverlay.amountBannerAssetPath),
-        width: BigWinOverlay.amountBannerCacheWidth,
-      ),
-      context,
-    );
-    precacheImage(
-      const ResizeImage(
-        AssetImage(FreeSpinWinPopup.assetPath),
-        width: _freeSpinPopupCacheWidth,
-      ),
-      context,
-    );
-    precacheImage(
-      const ResizeImage(
-        AssetImage(FreeSpinSummaryPopup.assetPath),
-        width: _freeSpinPopupCacheWidth,
-      ),
-      context,
-    );
-  }
-
   Future<void> _maybeShowFirstLaunchDisclaimer() async {
     try {
       if (await _firstLaunchDisclaimerRepository.hasSeenDisclaimer()) return;
@@ -353,7 +280,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           },
         ),
         transitionBuilder: (context, anim, _, child) {
-          return _buildSpringPopupTransition(anim, child);
+          return buildSpringPopupTransition(anim, child);
         },
       );
     } catch (_) {}
@@ -412,7 +339,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _deferInitialFreeSpinVisualMode = true;
       }
     });
-    _pendingFreeSpinAwardPopup = _PendingFreeSpinAward(
+    _pendingFreeSpinAwardPopup = PendingFreeSpinAward(
       value: popupValue,
       isRetrigger: isRetrigger,
       winAmount: winAmount,
@@ -431,41 +358,30 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     required bool isRetrigger,
     required double winAmount,
   }) {
-    _freeSpinWinPopupEntry?.remove();
-    _freeSpinWinPopupEntry = null;
-
     final overlay = _stageOverlayKey.currentState;
     if (overlay == null) return;
 
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (context) => FreeSpinWinPopup(
-        value: value,
-        isRetrigger: isRetrigger,
-        winAmount: winAmount,
-        cacheWidth: _freeSpinPopupCacheWidth,
-        onDismiss: () {
-          if (_freeSpinWinPopupEntry == entry) {
-            _freeSpinWinPopupEntry = null;
-          }
-          entry.remove();
-          _freeSpinAwardSequenceActive = false;
-          _continueAutoSpinIfPresentationIdle();
-        },
-      ),
+    _freeSpinOverlayController.showWinPopup(
+      overlay: overlay,
+      value: value,
+      isRetrigger: isRetrigger,
+      winAmount: winAmount,
+      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
+      onDismiss: () {
+        _freeSpinAwardSequenceActive = false;
+        _continueAutoSpinIfPresentationIdle();
+      },
     );
-    _freeSpinWinPopupEntry = entry;
-    overlay.insert(entry);
   }
 
   void _showPendingFreeSpinAwardPopup() {
     final pending = _pendingFreeSpinAwardPopup;
-    if (pending == null || _freeSpinWinPopupEntry != null) return;
+    if (pending == null || _freeSpinOverlayController.hasActiveOverlay) return;
     _pendingFreeSpinAwardPopup = null;
     _showFreeSpinAwardSequence(pending);
   }
 
-  void _showFreeSpinAwardSequence(_PendingFreeSpinAward pending) {
+  void _showFreeSpinAwardSequence(PendingFreeSpinAward pending) {
     _freeSpinAwardSequenceActive = true;
     if (pending.isRetrigger) {
       _showScatterPulse(
@@ -485,7 +401,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _startInitialFreeSpinVisualTransition(_PendingFreeSpinAward pending) {
+  void _startInitialFreeSpinVisualTransition(PendingFreeSpinAward pending) {
     if (!mounted) return;
     setState(() => _showFreeSpinTransition = true);
     Future.delayed(const Duration(milliseconds: 900), () {
@@ -522,18 +438,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<_ScatterCell> _currentScatterCells() {
+  List<ScatterCell> _currentScatterCells() {
     final scatterPath = SymbolRegistry.all
         .firstWhere((s) => s.isScatter)
         .assetPath;
-    final cells = <_ScatterCell>[];
+    final cells = <ScatterCell>[];
     final grid = _viewModel.grid;
 
     for (var col = 0; col < grid.length; col++) {
       final column = grid[col];
       for (var row = 0; row < column.length; row++) {
         if (column[row] == scatterPath) {
-          cells.add(_ScatterCell(column: col, row: row));
+          cells.add(ScatterCell(column: col, row: row));
         }
       }
     }
@@ -549,31 +465,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return;
     }
 
-    _freeSpinWinPopupEntry?.remove();
-    _freeSpinWinPopupEntry = null;
+    _freeSpinOverlayController.clear();
     _pendingFreeSpinAwardPopup = null;
 
     setState(() => _fsSummaryPopupVisible = true);
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (context) => FreeSpinSummaryPopup(
-        totalWin: _fsAccumulatedWin,
-        totalFreeSpins: _fsAwardedThisRound,
-        cacheWidth: _freeSpinPopupCacheWidth,
-        onDismiss: () {
-          if (_freeSpinWinPopupEntry == entry) {
-            _freeSpinWinPopupEntry = null;
-          }
-          entry.remove();
-          if (!mounted) return;
-          setState(() => _fsSummaryPopupVisible = false);
-          _playFreeSpinExitTransitionThenRelease();
-          _continueAutoSpinIfPresentationIdle();
-        },
-      ),
+    _freeSpinOverlayController.showSummaryPopup(
+      overlay: overlay,
+      totalWin: _fsAccumulatedWin,
+      totalFreeSpins: _fsAwardedThisRound,
+      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
+      onDismiss: () {
+        if (!mounted) return;
+        setState(() => _fsSummaryPopupVisible = false);
+        _playFreeSpinExitTransitionThenRelease();
+        _continueAutoSpinIfPresentationIdle();
+      },
     );
-    _freeSpinWinPopupEntry = entry;
-    overlay.insert(entry);
   }
 
   void _playFreeSpinExitTransitionThenRelease() {
@@ -600,18 +507,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       pageBuilder: (context, _, child) =>
           AutoPlaySettingsScreen(viewModel: _viewModel),
       transitionBuilder: (context, anim, _, child) {
-        return _buildSpringPopupTransition(anim, child);
+        return buildSpringPopupTransition(anim, child);
       },
     );
-  }
-
-  Widget _buildSpringPopupTransition(Animation<double> anim, Widget child) {
-    final fade = CurvedAnimation(
-      parent: anim,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    return FadeTransition(opacity: fade, child: child);
   }
 
   void _trackNormalBigWin() {
@@ -653,7 +551,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           price: _viewModel.buyFeaturePrice,
         ),
         transitionsBuilder: (_, anim, _, child) =>
-            _buildSpringPopupTransition(anim, child),
+            buildSpringPopupTransition(anim, child),
         transitionDuration: const Duration(milliseconds: 280),
         reverseTransitionDuration: const Duration(milliseconds: 220),
       ),
@@ -664,7 +562,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _maybeShowBigWin(double amount) {
     if (!mounted) return;
-    if (_bigWinShownThisSpin || _bigWinEntry != null) return;
+    if (_bigWinShownThisSpin || _bigWinOverlayController.hasActiveOverlay) {
+      return;
+    }
     if (_viewModel.isBusy) return;
     final bet = _viewModel.betAmount;
     if (bet <= 0) return;
@@ -679,26 +579,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _isBigWinShowing = true;
     });
 
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) => BigWinOverlay(
-        amount: amount,
-        tier: tier,
-        instantAmount: _viewModel.speedMultiplier >= 3,
-        soundEnabled: _viewModel.soundEffects,
-        vibrationEnabled: _viewModel.vibration,
-        onComplete: () {
-          if (_bigWinEntry == entry) {
-            setState(() => _bigWinEntry = null);
-            _releaseCelebrationLock();
-          }
-          entry.remove();
-          if (mounted) setState(() => _isBigWinShowing = false);
-        },
-      ),
+    _bigWinOverlayController.show(
+      overlay: overlay,
+      amount: amount,
+      tier: tier,
+      instantAmount: _viewModel.speedMultiplier >= 3,
+      soundEnabled: _viewModel.soundEffects,
+      vibrationEnabled: _viewModel.vibration,
+      onComplete: () {
+        if (!mounted) return;
+        setState(() => _isBigWinShowing = false);
+        _releaseCelebrationLock();
+      },
     );
-    overlay.insert(entry);
-    setState(() => _bigWinEntry = entry);
   }
 
   void _trackSpinTransitions() {
@@ -834,14 +727,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    _bigWinEntry?.remove();
-    _bigWinEntry = null;
-    _freeSpinWinPopupEntry?.remove();
-    _freeSpinWinPopupEntry = null;
+    _bigWinOverlayController.dispose();
+    _freeSpinOverlayController.dispose();
     _isBigWinShowing = false;
     _freeSpinTransitionTimer?.cancel();
     _scatterPulseTimer?.cancel();
-    _deferredPrecacheTimer?.cancel();
+    _assetPrecacheService.dispose();
     _lingeringClusterTimer?.cancel();
     _celebrationLockWatchdog?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -963,7 +854,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_celebrationLocked) {
       setState(() => _celebrationLocked = false);
     }
-    if (_bigWinEntry != null) {
+    if (_bigWinOverlayController.hasActiveOverlay) {
       return;
     }
     _viewModel.commitPendingFsConsume();
@@ -982,7 +873,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _freeSpinAwardSequenceActive ||
         _pendingFreeSpinAwardPopup != null ||
         _scatterPulseTimer?.isActive == true ||
-        _freeSpinWinPopupEntry != null ||
+        _freeSpinOverlayController.hasActiveOverlay ||
         _showFreeSpinTransition ||
         _fsSummaryPopupVisible) {
       return;
@@ -1104,7 +995,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   const kazancTop = infoTop + bandHeight + wideGap;
                   const fsTotalHeight = kazancTop + bandHeight;
                   final totalHeight = isFs ? fsTotalHeight : bandHeight;
-                  final kazancBand = _buildStatusBand(
+                  final kazancBand = StatusBand(
                     child: ListenableBuilder(
                       listenable: _balanceStatusListenable,
                       builder: (context, _) => _buildStatusText(
@@ -1128,7 +1019,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             left: 0,
                             right: 0,
                             height: bandHeight,
-                            child: _buildStatusBand(
+                            child: StatusBand(
                               child: _buildTumbleWinSlot(
                                 screenH: screenH,
                                 screenW: screenW,
@@ -1142,7 +1033,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             left: 0,
                             right: 0,
                             height: bandHeight,
-                            child: _buildStatusBand(
+                            child: StatusBand(
                               child: ListenableBuilder(
                                 listenable: _fsInfoListenable,
                                 builder: (context, _) => _buildFsInfoLine(),
@@ -1303,7 +1194,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     ),
                                 transitionsBuilder:
                                     (context, anim, animation, child) {
-                                      return _buildSpringPopupTransition(
+                                      return buildSpringPopupTransition(
                                         anim,
                                         child,
                                       );
@@ -1338,7 +1229,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             pageBuilder: (context, _, child) =>
                                 SystemSettingsScreen(viewModel: _viewModel),
                             transitionBuilder: (context, anim, _, child) {
-                              return _buildSpringPopupTransition(anim, child);
+                              return buildSpringPopupTransition(anim, child);
                             },
                           );
                         },
@@ -1386,7 +1277,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _buildBottomPanel(),
+                  child: GameBottomPanel(
+                    balanceListenable: _viewModel.balanceCtrl,
+                    balance: () => _viewModel.balance,
+                    betAmount: () => _viewModel.betAmount,
+                    labelStyle: _bottomLabelStyle,
+                    valueStyle: _bottomValueStyle,
+                    clockStyle: _bottomClockStyle,
+                  ),
                 ),
               ),
               if (_showFreeSpinTransition)
@@ -1540,34 +1438,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
   }
 
-  Widget _buildStatusBand({required Widget child}) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.58),
-                    Colors.black.withValues(alpha: 0.58),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.22, 0.78, 1.0],
-                ),
-              ),
-            ),
-          ),
-        ),
-        child,
-      ],
-    );
-  }
-
   Widget _buildTumbleWinSlot({
     required double screenH,
     required double screenW,
@@ -1589,7 +1459,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         Center(
           child: ListenableBuilder(
             listenable: _tumbleWinListenable,
-            builder: (context, _) => _buildTumbleWinLine(),
+            builder: (context, _) => TumbleWinLine(
+              isFlyingTumble: _isFlyingTumble,
+              isBusy: _viewModel.isBusy,
+              liveTumbleWin: _viewModel.liveTumbleWin,
+              lastWin: _viewModel.lastWin,
+              result: _viewModel.lastSpinResult,
+              controller: _winCtrl,
+              anchorKey: _tumbleWinAnchorKey,
+              labelStyle: _statusKazancStyle,
+              valueStyle: _statusBaseStyle,
+              vibrationEnabled: _viewModel.vibration,
+            ),
           ),
         ),
         if (showOrchestrator)
@@ -1615,153 +1496,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTumbleWinLine() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text('TUMBLE WIN', style: _statusKazancStyle),
-        const SizedBox(width: 6),
-        _buildTumbleWinValue(),
-      ],
-    );
-  }
-
-  Widget _buildTumbleWinValue() {
-    if (_isFlyingTumble) {
-      return Container(
-        key: _tumbleWinAnchorKey,
-        child: MoneyText(
-          text: formatMoney(0),
-          style: _statusBaseStyle,
-          symbolOffset: const Offset(0, 1.5),
-          lineYOffset: 0.75,
-          lineLengthScale: 0.94,
-        ),
-      );
-    }
-
-    if (_viewModel.isBusy) {
-      return Container(
-        key: _tumbleWinAnchorKey,
-        child: WinAmountCounter(
-          to: _viewModel.liveTumbleWin,
-          style: _statusBaseStyle,
-          duration: const Duration(milliseconds: 350),
-          vibrationEnabled: _viewModel.vibration,
-        ),
-      );
-    }
-
-    final result = _viewModel.lastSpinResult;
-    if (result == null) {
-      return Container(
-        key: _tumbleWinAnchorKey,
-        child: MoneyText(
-          text: formatMoney(_viewModel.lastWin),
-          style: _statusBaseStyle,
-          symbolOffset: const Offset(0, 1.5),
-          lineYOffset: 0.75,
-          lineLengthScale: 0.94,
-        ),
-      );
-    }
-
-    final hasSequence =
-        result.baseWin > 0 && result.finalMultipliers.isNotEmpty;
-    if (!hasSequence) {
-      return Container(
-        key: _tumbleWinAnchorKey,
-        child: MoneyText(
-          text: formatMoney(result.totalWin),
-          style: _statusBaseStyle,
-          symbolOffset: const Offset(0, 1.5),
-          lineYOffset: 0.75,
-          lineLengthScale: 0.94,
-        ),
-      );
-    }
-
-    switch (_winCtrl.phase) {
-      case WinPresentationPhase.idle:
-      case WinPresentationPhase.baseCounting:
-        return Container(
-          key: _tumbleWinAnchorKey,
-          child: MoneyText(
-            text: formatMoney(result.baseWin),
-            style: _statusBaseStyle,
-            symbolOffset: const Offset(0, 1.5),
-            lineYOffset: 0.75,
-            lineLengthScale: 0.94,
-            lineTopExtend: 0.9,
-          ),
-        );
-
-      case WinPresentationPhase.multiplierCollecting:
-        final sum = _winCtrl.runningSum;
-        final showMultiplySign = _winCtrl.multiplierFlightStarted;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            MoneyText(
-              text: formatMoney(result.baseWin),
-              style: _statusBaseStyle,
-              symbolOffset: const Offset(0, 1.5),
-              lineYOffset: 0.75,
-              lineLengthScale: 0.94,
-            ),
-            if (showMultiplySign) ...[
-              const SizedBox(width: 8),
-              Text('×', style: _statusBaseStyle),
-              const SizedBox(width: 6),
-              Container(
-                key: _tumbleWinAnchorKey,
-                child: sum > 0
-                    ? PulsingMultiplierSum(
-                        value: sum,
-                        style: _statusKazancStyle,
-                      )
-                    : Text(
-                        '0',
-                        style: _statusKazancStyle.copyWith(
-                          color: const Color(0x00000000),
-                        ),
-                      ),
-              ),
-            ],
-          ],
-        );
-
-      case WinPresentationPhase.finalCounting:
-        return Container(
-          key: _tumbleWinAnchorKey,
-          child: WinAmountCounter(
-            from: _winCtrl.baseWin,
-            to: result.totalWin,
-            style: _statusBaseStyle,
-            duration: WinPresentationController.finalCountUpDuration,
-            vibrationEnabled: _viewModel.vibration,
-          ),
-        );
-
-      case WinPresentationPhase.done:
-        return Container(
-          key: _tumbleWinAnchorKey,
-          child: MoneyText(
-            text: formatMoney(result.totalWin),
-            style: _statusBaseStyle,
-            symbolOffset: const Offset(0, 1.5),
-            lineYOffset: 0.75,
-            lineLengthScale: 0.94,
-            lineTopExtend: 0.9,
-          ),
-        );
-    }
-  }
-
   Widget _buildFsInfoLine() {
     final infoStyle = _statusBaseStyle.copyWith(fontSize: 16);
     final activeExplosions = _viewModel.activeExplosions;
@@ -1769,108 +1503,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ? activeExplosions.reduce((a, b) => a.amount >= b.amount ? a : b)
         : _lingeringCluster;
 
-    if (clusterToShow != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text('${clusterToShow.positions.length}X', style: infoStyle),
-          const SizedBox(width: 6),
-          Image.asset(
-            clusterToShow.assetPath,
-            width: 20,
-            height: 20,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 6),
-          Text('PAYS', style: infoStyle),
-          const SizedBox(width: 3),
-          MoneyText(
-            text: formatMoney(clusterToShow.amount),
-            style: infoStyle,
-            symbolOffset: const Offset(0, 1.5),
-            lineYOffset: 0.75,
-            lineLengthScale: 0.94,
-            lineTopExtend: 0.9,
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text('FREE SPINS LEFT', style: infoStyle),
-        const SizedBox(width: 6),
-        Text('${_viewModel.freeSpinsRemaining}', style: infoStyle),
-      ],
+    return FreeSpinInfoLine(
+      cluster: clusterToShow,
+      freeSpinsRemaining: _viewModel.freeSpinsRemaining,
+      style: infoStyle,
     );
   }
 
-  Widget _buildBottomPanel() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ListenableBuilder(
-          listenable: _viewModel.balanceCtrl,
-          builder: (context, _) => _buildBottomMoneyRow(),
-        ),
-        const SizedBox(height: 1),
-        FooterClockText(style: _bottomClockStyle),
-      ],
-    );
-  }
-
-  Widget _buildBottomMoneyRow() {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('CREDIT', style: _bottomLabelStyle),
-          const SizedBox(width: 4),
-          MoneyText(
-            text: formatMoney(_viewModel.balance),
-            style: _bottomValueStyle,
-            symbolOffset: const Offset(0, 1.1),
-            lineYOffset: 1.05,
-            symbolTextYOffset: 0.45,
-          ),
-          const SizedBox(width: 16),
-          Text('BET', style: _bottomLabelStyle),
-          const SizedBox(width: 4),
-          MoneyText(
-            text: formatMoney(_viewModel.betAmount),
-            style: _bottomValueStyle,
-            symbolOffset: const Offset(0, 1.1),
-            lineYOffset: 1.05,
-            symbolTextYOffset: 0.45,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class _PendingFreeSpinAward {
-  final int value;
-  final bool isRetrigger;
-  final double winAmount;
-
-  const _PendingFreeSpinAward({
-    required this.value,
-    required this.isRetrigger,
-    required this.winAmount,
-  });
-}
-
-class _ScatterCell {
-  final int column;
-  final int row;
-
-  const _ScatterCell({required this.column, required this.row});
-}
 
