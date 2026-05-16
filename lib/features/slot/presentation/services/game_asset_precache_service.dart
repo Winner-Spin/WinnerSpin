@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../domain/models/symbol_registry.dart';
+import '../models/game_presentation_timings.dart';
+import '../models/win_tier.dart';
 import '../views/widgets/big_win_overlay.dart';
 import '../views/widgets/free_spin_scatter_transition.dart';
 import '../views/widgets/free_spin_summary_popup.dart';
@@ -39,9 +41,7 @@ class GameAssetPrecacheService {
     BuildContext context,
     List<List<String>> openingGrid,
   ) {
-    final openingPaths = <String>{
-      for (final column in openingGrid) ...column,
-    };
+    final openingPaths = <String>{for (final column in openingGrid) ...column};
     for (final path in openingPaths) {
       _precacheSymbol(context, path);
     }
@@ -52,24 +52,25 @@ class GameAssetPrecacheService {
     required List<List<String>> openingGrid,
     required bool Function() isMounted,
   }) {
-    final openingPaths = <String>{
-      for (final column in openingGrid) ...column,
-    };
+    final openingPaths = <String>{for (final column in openingGrid) ...column};
     final remainingPaths = SymbolRegistry.all
         .map((symbol) => symbol.assetPath)
         .where((path) => !openingPaths.contains(path))
         .toList(growable: false);
 
     _deferredSymbolTimer?.cancel();
-    _deferredSymbolTimer = Timer(const Duration(milliseconds: 300), () {
-      unawaited(
-        _precacheSymbolsInBatches(
-          context: context,
-          paths: remainingPaths,
-          isMounted: isMounted,
-        ),
-      );
-    });
+    _deferredSymbolTimer = Timer(
+      GamePresentationTimings.deferredSymbolPrecacheDelay,
+      () {
+        unawaited(
+          _precacheSymbolsInBatches(
+            context: context,
+            paths: remainingPaths,
+            isMounted: isMounted,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _precacheSymbolsInBatches({
@@ -84,7 +85,9 @@ class GameAssetPrecacheService {
       for (final path in paths.sublist(index, end)) {
         _precacheSymbol(context, path);
       }
-      await Future<void>.delayed(const Duration(milliseconds: 24));
+      await Future<void>.delayed(
+        GamePresentationTimings.symbolPrecacheBatchDelay,
+      );
     }
   }
 

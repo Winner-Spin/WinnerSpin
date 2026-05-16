@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/format/money_format.dart';
 import '../../../../../core/widgets/money_text.dart';
+import '../../models/game_presentation_timings.dart';
 
 class FreeSpinSummaryPopup extends StatefulWidget {
   static const assetPath =
@@ -37,8 +38,8 @@ class _FreeSpinSummaryPopupState extends State<FreeSpinSummaryPopup>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
-      reverseDuration: const Duration(milliseconds: 220),
+      duration: GamePresentationTimings.freeSpinPopupShowDuration,
+      reverseDuration: GamePresentationTimings.freeSpinPopupDismissDuration,
     )..forward();
     _scale = CurvedAnimation(
       parent: _controller,

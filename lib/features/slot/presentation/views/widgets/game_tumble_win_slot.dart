@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/spin_result.dart';
+import '../../models/spin_result_presentation_rules.dart';
 import 'tumble_win_line.dart';
 import 'win_presentation.dart';
 import 'win_presentation_controller.dart';
@@ -54,9 +55,7 @@ class GameTumbleWinSlot extends StatelessWidget {
       builder: (context, _) {
         final spinResult = result();
         final hasMultiplierSequence =
-            spinResult != null &&
-            spinResult.baseWin > 0 &&
-            spinResult.finalMultipliers.isNotEmpty;
+            SpinResultPresentationRules.hasMultiplierSequence(spinResult);
         final showOrchestrator =
             hasMultiplierSequence &&
             !isBusy() &&

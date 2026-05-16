@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/cluster_win.dart';
+import '../../models/cluster_presentation_rules.dart';
 import 'free_spin_info_line.dart';
 
 class GameFreeSpinInfoSlot extends StatelessWidget {
@@ -25,9 +26,9 @@ class GameFreeSpinInfoSlot extends StatelessWidget {
       listenable: listenable,
       builder: (context, _) {
         final explosions = activeExplosions();
-        final clusterToShow = explosions.isNotEmpty
-            ? explosions.reduce((a, b) => a.amount >= b.amount ? a : b)
-            : lingeringCluster();
+        final clusterToShow =
+            ClusterPresentationRules.highestAmount(explosions) ??
+            lingeringCluster();
 
         return FreeSpinInfoLine(
           cluster: clusterToShow,

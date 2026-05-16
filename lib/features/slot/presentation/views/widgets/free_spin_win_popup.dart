@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../models/game_presentation_timings.dart';
+
 class FreeSpinWinPopup extends StatefulWidget {
   static const assetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/FreeSpinWin.png';
@@ -36,8 +38,8 @@ class _FreeSpinWinPopupState extends State<FreeSpinWinPopup>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
-      reverseDuration: const Duration(milliseconds: 220),
+      duration: GamePresentationTimings.freeSpinPopupShowDuration,
+      reverseDuration: GamePresentationTimings.freeSpinPopupDismissDuration,
     )..forward();
     _scale = CurvedAnimation(
       parent: _controller,

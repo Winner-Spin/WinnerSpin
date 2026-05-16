@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/win_tier.dart';
 import '../views/widgets/big_win_overlay.dart';
 
 class BigWinOverlayController {

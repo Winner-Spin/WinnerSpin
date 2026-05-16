@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../../core/format/money_format.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../../domain/models/spin_result.dart';
+import '../../models/game_presentation_timings.dart';
+import '../../models/spin_result_presentation_rules.dart';
 import 'win_amount_counter.dart';
 import 'win_presentation.dart';
 import 'win_presentation_controller.dart';
@@ -68,7 +70,7 @@ class GameStatusText extends StatelessWidget {
     if (isFreeSpinVisualMode) {
       return _winCounterRow(
         to: freeSpinAccumulatedWin,
-        duration: const Duration(milliseconds: 700),
+        duration: GamePresentationTimings.statusFreeSpinWinCount,
         anchorKey: kazancAnchorKey,
       );
     }
@@ -76,17 +78,18 @@ class GameStatusText extends StatelessWidget {
     if (isTumbling && liveTumbleWin > 0) {
       return _winCounterRow(
         to: liveTumbleWin,
-        duration: const Duration(milliseconds: 900),
+        duration: GamePresentationTimings.statusTumbleWinCount,
       );
     }
 
     if (lastWin > 0 && !isBusy) {
       final spinResult = result;
       final hasMultiplierSequence =
-          spinResult != null &&
-          spinResult.baseWin > 0 &&
-          spinResult.finalMultipliers.isNotEmpty &&
-          !(lastSpinWasFreeSpin && !isFreeSpinVisualMode);
+          SpinResultPresentationRules.shouldShowMainWinSequence(
+            result: spinResult,
+            lastSpinWasFreeSpin: lastSpinWasFreeSpin,
+            isFreeSpinVisualMode: isFreeSpinVisualMode,
+          );
 
       if (hasMultiplierSequence) {
         return WinPresentation(

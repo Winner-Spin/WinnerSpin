@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../../core/format/money_format.dart';
 import '../../../../../core/widgets/money_text.dart';
 import '../../../domain/models/spin_result.dart';
+import '../../models/game_presentation_timings.dart';
+import '../../models/spin_result_presentation_rules.dart';
 import 'pulsing_multiplier_sum.dart';
 import 'win_amount_counter.dart';
 import 'win_presentation_controller.dart';
@@ -58,7 +60,7 @@ class TumbleWinLine extends StatelessWidget {
         child: WinAmountCounter(
           to: liveTumbleWin,
           style: valueStyle,
-          duration: const Duration(milliseconds: 350),
+          duration: GamePresentationTimings.tumbleLineLiveCount,
           vibrationEnabled: vibrationEnabled,
         ),
       );
@@ -69,8 +71,9 @@ class TumbleWinLine extends StatelessWidget {
       return _moneyValue(lastWin);
     }
 
-    final hasSequence =
-        spinResult.baseWin > 0 && spinResult.finalMultipliers.isNotEmpty;
+    final hasSequence = SpinResultPresentationRules.hasMultiplierSequence(
+      spinResult,
+    );
     if (!hasSequence) {
       return _moneyValue(spinResult.totalWin);
     }
