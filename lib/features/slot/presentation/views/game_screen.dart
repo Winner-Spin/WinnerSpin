@@ -1,51 +1,38 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-import '../../../../core/format/money_format.dart';
-import '../../../../core/widgets/money_text.dart';
 
 import '../../data/repositories/local_first_launch_disclaimer_repository.dart';
 import '../../domain/models/cluster_win.dart';
-import '../../domain/models/symbol_registry.dart';
 import '../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../audio/ui_click_sound.dart';
 import '../controllers/big_win_overlay_controller.dart';
 import '../controllers/free_spin_overlay_controller.dart';
+import '../models/game_screen_listenables.dart';
+import '../models/game_stage_metrics.dart';
+import '../models/game_screen_text_styles.dart';
 import '../models/pending_free_spin_award.dart';
 import '../models/scatter_cell.dart';
+import '../navigation/game_screen_navigation.dart';
 import '../services/game_asset_precache_service.dart';
+import '../services/scatter_cell_finder.dart';
 import '../viewmodels/game_viewmodel.dart';
-import 'widgets/buy_feature_button.dart';
-import 'widgets/double_chance_button.dart';
 import 'widgets/slot_reel.dart';
-import 'widgets/respin_button.dart';
-import 'widgets/minus_button.dart';
-import 'widgets/plus_button.dart';
-import 'widgets/auto_spin_button.dart';
-import 'widgets/info_button.dart';
-import 'widgets/settings_button.dart';
-import 'widgets/speed_button.dart';
-import 'widgets/spring_popup_card.dart';
-import 'widgets/spring_popup_transition.dart';
-import 'widgets/status_band.dart';
+import 'widgets/game_utility_buttons.dart';
+import 'widgets/game_feature_controls.dart';
 import 'widgets/big_win_overlay.dart';
-import 'widgets/floating_win_overlay.dart';
-import 'widgets/first_launch_disclaimer_dialog.dart';
-import 'widgets/free_spin_info_line.dart';
 import 'widgets/free_spin_scatter_transition.dart';
 import 'widgets/flying_tumble_sprite.dart';
-import 'widgets/game_bottom_panel.dart';
-import 'widgets/tumble_win_line.dart';
-import 'widgets/win_amount_counter.dart';
-import 'widgets/win_presentation.dart';
+import 'widgets/game_background.dart';
+import 'widgets/game_bottom_info_slot.dart';
+import 'widgets/game_free_spin_info_slot.dart';
+import 'widgets/game_spin_controls_slot.dart';
+import 'widgets/game_status_bands.dart';
+import 'widgets/game_status_text.dart';
+import 'widgets/game_tumble_win_slot.dart';
 import 'widgets/win_presentation_controller.dart';
-import '../../../auth/presentation/views/login_screen.dart';
-import 'auto_play_settings_screen.dart';
-import 'buy_freespins_confirm_screen.dart';
-import 'game_rules_screen.dart';
-import 'system_settings_screen.dart';
+import 'widgets/slot_grid_view.dart';
+import 'widgets/slot_playfield.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -125,21 +112,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _celebrationLocked;
   }
 
-  late final TextStyle _statusBaseStyle;
-  late final TextStyle _statusKazancStyle;
-  late final TextStyle _statusInsufficientStyle;
-  late final TextStyle _bottomLabelStyle;
-  late final TextStyle _bottomValueStyle;
-  late final TextStyle _bottomClockStyle;
-
-  late final Listenable _freeSpinVisualListenable;
-  late final Listenable _gridVisualListenable;
-  late final Listenable _balanceStatusListenable;
-  late final Listenable _fsInfoListenable;
-  late final Listenable _buyFeatureListenable;
-  late final Listenable _anteToggleListenable;
-  late final Listenable _spinControlsListenable;
-  late final Listenable _tumbleWinListenable;
+  late final GameScreenTextStyles _styles;
+  late final GameScreenListenables _listenables;
 
   @override
   void initState() {
@@ -148,44 +122,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       GameViewModel.columns,
       (_) => SlotReelController(),
     );
-    _freeSpinVisualListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.fsCtrl,
-    ]);
-    _gridVisualListenable = Listenable.merge([_viewModel, _viewModel.gridCtrl]);
-    _balanceStatusListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.balanceCtrl,
-    ]);
-    _fsInfoListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.fsCtrl,
-      _viewModel.gridCtrl,
-    ]);
-    _buyFeatureListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.balanceCtrl,
-      _viewModel.anteCtrl,
-      _viewModel.fsCtrl,
-    ]);
-    _anteToggleListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.anteCtrl,
-      _viewModel.balanceCtrl,
-      _viewModel.fsCtrl,
-    ]);
-    _spinControlsListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.balanceCtrl,
-      _viewModel.fsCtrl,
-      _winCtrl,
-    ]);
-    _tumbleWinListenable = Listenable.merge([
-      _viewModel,
-      _viewModel.balanceCtrl,
-      _viewModel.gridCtrl,
-      _winCtrl,
-    ]);
+    _styles = GameScreenTextStyles.create();
+    _listenables = GameScreenListenables(
+      viewModel: _viewModel,
+      winController: _winCtrl,
+    );
     WidgetsBinding.instance.addObserver(this);
     UiClickSound.enabled = _viewModel.soundEffects;
     unawaited(UiClickSound.preload());
@@ -205,90 +146,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         openingGrid: _viewModel.grid,
         isMounted: () => mounted,
       );
-      unawaited(_maybeShowFirstLaunchDisclaimer());
-    });
-
-    final softShadow = [
-      Shadow(
-        color: Colors.black.withValues(alpha: 0.60),
-        offset: const Offset(0, 1),
-        blurRadius: 1.2,
-      ),
-    ];
-
-    _statusBaseStyle = GoogleFonts.anton(
-      color: Colors.white.withValues(alpha: 0.97),
-      fontSize: 20,
-      letterSpacing: 0.8,
-      height: 1.0,
-      decoration: TextDecoration.none,
-      shadows: [
-        Shadow(
-          color: Colors.black.withValues(alpha: 0.70),
-          offset: const Offset(0, 1),
-          blurRadius: 1.6,
+      unawaited(
+        GameScreenNavigation.maybeShowFirstLaunchDisclaimer(
+          context: context,
+          repository: _firstLaunchDisclaimerRepository,
         ),
-      ],
-    );
-    _statusKazancStyle = _statusBaseStyle.copyWith(
-      color: const Color(0xFFFFD13B),
-    );
-    _statusInsufficientStyle = _statusBaseStyle.copyWith(
-      color: const Color(0xFFFF6A6A),
-    );
-
-    _bottomLabelStyle = GoogleFonts.barlowCondensed(
-      color: const Color(0xFFFFD13B),
-      fontSize: 18,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.4,
-      height: 1.0,
-      shadows: softShadow,
-    );
-    _bottomValueStyle = GoogleFonts.barlowCondensed(
-      color: Colors.white.withValues(alpha: 0.98),
-      fontSize: 18,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.1,
-      height: 1.0,
-      shadows: softShadow,
-    );
-    _bottomClockStyle = GoogleFonts.barlowCondensed(
-      color: Colors.white.withValues(alpha: 0.62),
-      fontSize: 9.2,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.3,
-      height: 1.0,
-    );
-  }
-
-  Future<void> _maybeShowFirstLaunchDisclaimer() async {
-    try {
-      if (await _firstLaunchDisclaimerRepository.hasSeenDisclaimer()) return;
-      if (!mounted) return;
-      await showGeneralDialog<void>(
-        context: context,
-        barrierColor: Colors.transparent,
-        barrierDismissible: false,
-        barrierLabel: 'Disclaimer',
-        transitionDuration: const Duration(milliseconds: 280),
-        pageBuilder: (context, _, child) => FirstLaunchDisclaimerDialog(
-          onOkay: () async {
-            UiClickSound.play();
-            await _firstLaunchDisclaimerRepository.markDisclaimerSeen();
-            if (context.mounted) Navigator.of(context).pop();
-          },
-        ),
-        transitionBuilder: (context, anim, _, child) {
-          return buildSpringPopupTransition(anim, child);
-        },
       );
-    } catch (_) {}
+    });
   }
 
   void _onViewModelChange() {
     UiClickSound.enabled = _viewModel.soundEffects;
-    _handleLogout(context);
+    GameScreenNavigation.handleLogout(
+      context: context,
+      viewModel: _viewModel,
+      isMounted: mounted,
+    );
     _trackSpinTransitions();
     _trackLingeringCluster();
     _trackFsAccumulator();
@@ -439,22 +312,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   List<ScatterCell> _currentScatterCells() {
-    final scatterPath = SymbolRegistry.all
-        .firstWhere((s) => s.isScatter)
-        .assetPath;
-    final cells = <ScatterCell>[];
-    final grid = _viewModel.grid;
-
-    for (var col = 0; col < grid.length; col++) {
-      final column = grid[col];
-      for (var row = 0; row < column.length; row++) {
-        if (column[row] == scatterPath) {
-          cells.add(ScatterCell(column: col, row: row));
-        }
-      }
-    }
-
-    return cells;
+    return ScatterCellFinder.findInGrid(_viewModel.grid);
   }
 
   void _showFreeSpinSummaryPopup() {
@@ -497,18 +355,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _showAutoPlaySettings(BuildContext context) {
-    showGeneralDialog(
+  void _showAutoPlaySettings() {
+    GameScreenNavigation.showAutoPlaySettings(
       context: context,
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      barrierLabel: 'Auto Play Settings',
-      transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, _, child) =>
-          AutoPlaySettingsScreen(viewModel: _viewModel),
-      transitionBuilder: (context, anim, _, child) {
-        return buildSpringPopupTransition(anim, child);
-      },
+      viewModel: _viewModel,
+    );
+  }
+
+  void _showGameRules() {
+    GameScreenNavigation.showGameRules(
+      context: context,
+      betAmount: _viewModel.betAmount,
+    );
+  }
+
+  void _showSystemSettings() {
+    GameScreenNavigation.showSystemSettings(
+      context: context,
+      viewModel: _viewModel,
     );
   }
 
@@ -541,22 +405,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         !_viewModel.canBuyFreeSpinsForUi) {
       return;
     }
-    final confirmed = await Navigator.of(context).push<bool>(
-      PageRouteBuilder(
-        opaque: false,
-        barrierDismissible: true,
-        barrierColor: Colors.transparent,
-        pageBuilder: (_, _, _) => BuyFreeSpinsConfirmScreen(
-          spinCount: 10,
-          price: _viewModel.buyFeaturePrice,
-        ),
-        transitionsBuilder: (_, anim, _, child) =>
-            buildSpringPopupTransition(anim, child),
-        transitionDuration: const Duration(milliseconds: 280),
-        reverseTransitionDuration: const Duration(milliseconds: 220),
-      ),
+    final confirmed = await GameScreenNavigation.promptBuyFreeSpinsConfirm(
+      context: context,
+      spinCount: 10,
+      price: _viewModel.buyFeaturePrice,
     );
-    if (!mounted || confirmed != true) return;
+    if (!mounted || !confirmed) return;
     await _viewModel.buyFreeSpins();
   }
 
@@ -810,7 +664,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           amount: amount,
           start: startCenter,
           end: endCenter,
-          style: _statusBaseStyle,
+          style: _styles.statusBase,
           duration: const Duration(milliseconds: 700),
           onComplete: () {
             entry.remove();
@@ -881,17 +735,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _viewModel.continueAutoSpinIfReady();
   }
 
-  void _handleLogout(BuildContext context) {
-    if (!mounted) return;
-    if (_viewModel.loggedOut) {
-      _viewModel.resetLoggedOut();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -909,383 +752,108 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Widget _buildStage() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double screenH = constraints.maxHeight;
-        final double screenW = constraints.maxWidth;
-
-        const double bgAspect = 1408 / 3040;
-        const double bgInnerLeftRatio = 88 / 1408;
-        const double bgInnerRightRatio = 1319 / 1408;
-
-        final double screenAspect = screenW / screenH;
-        final double bgDisplayW;
-        final double bgLeftOnScreen;
-        if (screenAspect >= bgAspect) {
-          bgDisplayW = screenW;
-          bgLeftOnScreen = 0;
-        } else {
-          bgDisplayW = screenH * bgAspect;
-          bgLeftOnScreen = (screenW - bgDisplayW) / 2;
-        }
-        final double gridLeftPx =
-            bgLeftOnScreen + bgDisplayW * bgInnerLeftRatio;
-        final double gridRightPx =
-            screenW - (bgLeftOnScreen + bgDisplayW * bgInnerRightRatio);
+        final metrics = GameStageMetrics.fromConstraints(constraints);
 
         return AbsorbPointer(
           absorbing: _isBigWinShowing,
           child: Stack(
             children: [
               Positioned.fill(
-                child: ListenableBuilder(
-                  listenable: _freeSpinVisualListenable,
-                  builder: (context, _) {
-                    final bgPath = _isFreeSpinVisualMode
-                        ? 'lib/images/slot_main_screen/freespin arka plan.png'
-                        : 'lib/images/slot_main_screen/nihai arka plan.png';
-                    return RepaintBoundary(
-                      child: Image.asset(
-                        bgPath,
-                        fit: BoxFit.cover,
-                        alignment: const Alignment(0, -0.4),
-                        filterQuality: FilterQuality.low,
-                      ),
-                    );
-                  },
+                child: GameBackground(
+                  listenable: _listenables.freeSpinVisual,
+                  isFreeSpinVisualMode: () => _isFreeSpinVisualMode,
                 ),
               ),
-              Positioned(
-                top: screenH * 0.195,
-                left: gridLeftPx,
-                right: gridRightPx,
-                height: screenH * 0.32,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned.fill(
-                      child: ListenableBuilder(
-                        listenable: _gridVisualListenable,
-                        builder: (context, _) => _buildSlotGrid(),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: ListenableBuilder(
-                        listenable: _viewModel.gridCtrl,
-                        builder: (context, _) {
-                          return RepaintBoundary(
-                            child: FloatingWinOverlay(
-                              activeExplosions: _viewModel.activeExplosions,
-                              gridWidth: screenW * 0.87,
-                              gridHeight: screenH * 0.32,
-                              speedMultiplier: _viewModel.speedMultiplier,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+              SlotPlayfield(
+                screenH: metrics.screenH,
+                screenW: metrics.screenW,
+                gridLeft: metrics.gridLeft,
+                gridRight: metrics.gridRight,
+                gridListenable: _listenables.gridVisual,
+                floatingWinListenable: _viewModel.gridCtrl,
+                activeExplosions: () => _viewModel.activeExplosions,
+                speedMultiplier: () => _viewModel.speedMultiplier,
+                buildSlotGrid: _buildSlotGrid,
+              ),
+              GameStatusBands(
+                screenH: metrics.screenH,
+                freeSpinVisualListenable: _listenables.freeSpinVisual,
+                balanceStatusListenable: _listenables.balanceStatus,
+                isFreeSpinVisualMode: () => _isFreeSpinVisualMode,
+                buildStatusText: () => _buildStatusText(
+                  screenH: metrics.screenH,
+                  gridLeft: metrics.gridLeft,
+                  gridRight: metrics.gridRight,
+                  screenW: metrics.screenW,
+                ),
+                buildTumbleWinSlot: () => _buildTumbleWinSlot(
+                  screenH: metrics.screenH,
+                  screenW: metrics.screenW,
+                  gridLeft: metrics.gridLeft,
+                  gridRight: metrics.gridRight,
+                ),
+                freeSpinInfoLine: GameFreeSpinInfoSlot(
+                  listenable: _listenables.fsInfo,
+                  activeExplosions: () => _viewModel.activeExplosions,
+                  lingeringCluster: () => _lingeringCluster,
+                  freeSpinsRemaining: () => _viewModel.freeSpinsRemaining,
+                  style: _styles.statusBase.copyWith(fontSize: 16),
                 ),
               ),
-              ListenableBuilder(
-                listenable: _freeSpinVisualListenable,
-                builder: (context, _) {
-                  final isFs = _isFreeSpinVisualMode;
-                  const bandHeight = 31.0;
-                  const wideGap = 31.0;
-                  const infoTop = bandHeight;
-                  const kazancTop = infoTop + bandHeight + wideGap;
-                  const fsTotalHeight = kazancTop + bandHeight;
-                  final totalHeight = isFs ? fsTotalHeight : bandHeight;
-                  final kazancBand = StatusBand(
-                    child: ListenableBuilder(
-                      listenable: _balanceStatusListenable,
-                      builder: (context, _) => _buildStatusText(
-                        screenH: screenH,
-                        gridLeft: gridLeftPx,
-                        gridRight: gridRightPx,
-                        screenW: screenW,
-                      ),
-                    ),
-                  );
-                  return Positioned(
-                    top: screenH * 0.5185,
-                    left: 0,
-                    right: 0,
-                    height: totalHeight,
-                    child: Stack(
-                      children: [
-                        if (isFs) ...[
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: bandHeight,
-                            child: StatusBand(
-                              child: _buildTumbleWinSlot(
-                                screenH: screenH,
-                                screenW: screenW,
-                                gridLeft: gridLeftPx,
-                                gridRight: gridRightPx,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: infoTop,
-                            left: 0,
-                            right: 0,
-                            height: bandHeight,
-                            child: StatusBand(
-                              child: ListenableBuilder(
-                                listenable: _fsInfoListenable,
-                                builder: (context, _) => _buildFsInfoLine(),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: kazancTop,
-                            left: 0,
-                            right: 0,
-                            height: bandHeight,
-                            child: kazancBand,
-                          ),
-                        ] else
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: bandHeight,
-                            child: kazancBand,
-                          ),
-                      ],
-                    ),
-                  );
-                },
+              GameFeatureControls(
+                screenH: metrics.screenH,
+                screenW: metrics.screenW,
+                buyFeatureListenable: _listenables.buyFeature,
+                anteToggleListenable: _listenables.anteToggle,
+                isFreeSpinVisualMode: () => _isFreeSpinVisualMode,
+                isBigWinShowing: () => _isBigWinShowing,
+                isBusy: () => _viewModel.isBusy,
+                isCelebrationActive: () => _isCelebrationActive,
+                anteBetActive: () => _viewModel.anteBetActive,
+                canBuyFreeSpinsForUi: () => _viewModel.canBuyFreeSpinsForUi,
+                isAutoSpinning: () => _viewModel.isAutoSpinning,
+                isInFreeSpins: () => _viewModel.isInFreeSpins,
+                vibrationEnabled: () => _viewModel.vibration,
+                buyFeaturePrice: () => _viewModel.buyFeaturePrice,
+                anteCost: () => _viewModel.anteCost,
+                onBuyFeatureTap: _promptBuyFreeSpinsConfirm,
+                onAnteTap: _viewModel.toggleAnteBet,
               ),
-              Positioned(
-                top: screenH * 0.55,
-                left: screenW * 0.08,
-                child: ListenableBuilder(
-                  listenable: _buyFeatureListenable,
-                  builder: (context, _) {
-                    if (_isFreeSpinVisualMode) {
-                      return const SizedBox.shrink();
-                    }
-                    final betButtonPassive =
-                        _isBigWinShowing ||
-                        _viewModel.isBusy ||
-                        _isCelebrationActive;
-                    return RepaintBoundary(
-                      child: BuyFeatureButton(
-                        price: _viewModel.buyFeaturePrice,
-                        disabled:
-                            _viewModel.anteBetActive ||
-                            betButtonPassive ||
-                            !_viewModel.canBuyFreeSpinsForUi,
-                        vibrationEnabled: _viewModel.vibration,
-                        onTap: () {
-                          _promptBuyFreeSpinsConfirm();
-                        },
-                        width: screenW * 0.39,
-                        height: screenW * 0.22,
-                      ),
-                    );
-                  },
-                ),
+              GameSpinControlsSlot(
+                screenH: metrics.screenH,
+                listenable: _listenables.spinControls,
+                autoSpinActive: () => _viewModel.isAutoSpinning,
+                bigWinShowing: () => _isBigWinShowing,
+                spinning: () => _viewModel.isBusy || _isCelebrationActive,
+                canDecreaseBet: () => _viewModel.canDecreaseBet,
+                canIncreaseBet: () => _viewModel.canIncreaseBet,
+                isInFreeSpins: () => _viewModel.isInFreeSpins,
+                autoSpinsRemaining: () => _viewModel.autoSpinsRemaining,
+                onDecreaseBet: _viewModel.decreaseBet,
+                onIncreaseBet: _viewModel.increaseBet,
+                onSpin: _viewModel.spin,
+                onStopAutoSpin: _viewModel.stopAutoSpin,
               ),
-              Positioned(
-                top: screenH * 0.55,
-                right: screenW * 0.08,
-                child: ListenableBuilder(
-                  listenable: _anteToggleListenable,
-                  builder: (context, _) {
-                    if (_isFreeSpinVisualMode) {
-                      return const SizedBox.shrink();
-                    }
-                    return RepaintBoundary(
-                      child: DoubleChanceButton(
-                        betAmount: _viewModel.anteCost,
-                        isOn: _viewModel.anteBetActive,
-                        disabled:
-                            _isBigWinShowing ||
-                            _viewModel.isBusy ||
-                            _viewModel.isAutoSpinning ||
-                            _viewModel.isInFreeSpins,
-                        vibrationEnabled: _viewModel.vibration,
-                        onTap: _viewModel.toggleAnteBet,
-                        width: screenW * 0.39,
-                        height: screenW * 0.22,
-                      ),
-                    );
-                  },
-                ),
+              GameUtilityButtons(
+                screenH: metrics.screenH,
+                screenW: metrics.screenW,
+                listenable: _viewModel,
+                bigWinShowing: () => _isBigWinShowing,
+                autoSpinning: () => _viewModel.isAutoSpinning,
+                betAmount: () => _viewModel.betAmount,
+                speedMultiplier: () => _viewModel.speedMultiplier,
+                onInfoTap: _showGameRules,
+                onSettingsTap: _showSystemSettings,
+                onAutoSpinTap: _showAutoPlaySettings,
+                onSpeedTap: _viewModel.toggleSpeed,
               ),
-              Positioned(
-                top: screenH * 0.72,
-                left: 0,
-                right: 0,
-                child: ListenableBuilder(
-                  listenable: _spinControlsListenable,
-                  builder: (context, _) {
-                    final autoActive = _viewModel.isAutoSpinning;
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (!autoActive) ...[
-                          RepaintBoundary(
-                            child: MinusButton(
-                              size: 42,
-                              onTap: _viewModel.decreaseBet,
-                              disabled:
-                                  _isBigWinShowing ||
-                                  !_viewModel.canDecreaseBet ||
-                                  _viewModel.isInFreeSpins,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                        ],
-                        RepaintBoundary(
-                          child: RespinButton(
-                            size: 84,
-                            onTap: autoActive
-                                ? _viewModel.stopAutoSpin
-                                : _viewModel.spin,
-                            spinning: _viewModel.isBusy || _isCelebrationActive,
-                            disabled: _isBigWinShowing,
-                            autoSpinsRemaining: autoActive
-                                ? _viewModel.autoSpinsRemaining
-                                : null,
-                          ),
-                        ),
-                        if (!autoActive) ...[
-                          const SizedBox(width: 16),
-                          RepaintBoundary(
-                            child: PlusButton(
-                              size: 42,
-                              onTap: _viewModel.increaseBet,
-                              disabled:
-                                  _isBigWinShowing ||
-                                  !_viewModel.canIncreaseBet ||
-                                  _viewModel.isInFreeSpins,
-                            ),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: 0,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => InfoButton(
-                    betAmount: _viewModel.betAmount,
-                    onTap: _isBigWinShowing
-                        ? null
-                        : () {
-                            Navigator.of(context).push(
-                              PageRouteBuilder(
-                                opaque: false,
-                                barrierDismissible: true,
-                                pageBuilder: (context, animation, child) =>
-                                    GameRulesScreen(
-                                      betAmount: _viewModel.betAmount,
-                                    ),
-                                transitionsBuilder:
-                                    (context, anim, animation, child) {
-                                      return buildSpringPopupTransition(
-                                        anim,
-                                        child,
-                                      );
-                                    },
-                                transitionDuration: const Duration(
-                                  milliseconds: 280,
-                                ),
-                                reverseTransitionDuration: const Duration(
-                                  milliseconds: 220,
-                                ),
-                              ),
-                            );
-                          },
-                  ),
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                right: 0,
-                child: SettingsButton(
-                  onTap: _isBigWinShowing
-                      ? null
-                      : () {
-                          showGeneralDialog(
-                            context: context,
-                            barrierColor: Colors.transparent,
-                            barrierDismissible: true,
-                            barrierLabel: 'Settings',
-                            transitionDuration: const Duration(
-                              milliseconds: 280,
-                            ),
-                            pageBuilder: (context, _, child) =>
-                                SystemSettingsScreen(viewModel: _viewModel),
-                            transitionBuilder: (context, anim, _, child) {
-                              return buildSpringPopupTransition(anim, child);
-                            },
-                          );
-                        },
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: screenW * 0.30,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => AutoSpinButton(
-                    onTap: _isBigWinShowing || _viewModel.isAutoSpinning
-                        ? null
-                        : () => _showAutoPlaySettings(context),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: screenH * 0.90,
-                left: screenW * 0.5 + 42,
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, _) => SpeedButton(
-                    level: _viewModel.speedMultiplier,
-                    onTap: _isBigWinShowing ? null : _viewModel.toggleSpeed,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 12,
-                left: 0,
-                right: 0,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.22, 0.78, 1.0],
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: GameBottomPanel(
-                    balanceListenable: _viewModel.balanceCtrl,
-                    balance: () => _viewModel.balance,
-                    betAmount: () => _viewModel.betAmount,
-                    labelStyle: _bottomLabelStyle,
-                    valueStyle: _bottomValueStyle,
-                    clockStyle: _bottomClockStyle,
-                  ),
-                ),
+              GameBottomInfoSlot(
+                balanceListenable: _viewModel.balanceCtrl,
+                balance: () => _viewModel.balance,
+                betAmount: () => _viewModel.betAmount,
+                labelStyle: _styles.bottomLabel,
+                valueStyle: _styles.bottomValue,
+                clockStyle: _styles.bottomClock,
               ),
               if (_showFreeSpinTransition)
                 const Positioned.fill(child: FreeSpinScatterTransition()),
@@ -1297,35 +865,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildSlotGrid() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        children: List.generate(GameViewModel.columns, (col) {
-          return Expanded(
-            child: RepaintBoundary(
-              child: SlotReel(
-                columnIndex: col,
-                controller: _reelControllers[col],
-                previousItems: _viewModel.previousGrid[col],
-                targetItems: _viewModel.grid[col],
-                spinning: _viewModel.isSpinning,
-                fadingPaths: _viewModel.fadingPaths,
-                clearedPositions: _viewModel.clearedPositions,
-                speedMultiplier: _viewModel.speedMultiplier,
-                soundEffectsEnabled: _viewModel.soundEffects,
-                pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
-                scatterPulseTrigger: _scatterPulseTrigger,
-                onComplete: col == GameViewModel.columns - 1
-                    ? () => _viewModel.onSpinComplete()
-                    : null,
-                onDropInStart: col == 0
-                    ? () => _viewModel.clearMultiplierResidues()
-                    : null,
-              ),
-            ),
-          );
-        }),
-      ),
+    return SlotGridView(
+      columns: GameViewModel.columns,
+      reelControllers: _reelControllers,
+      previousGrid: _viewModel.previousGrid,
+      grid: _viewModel.grid,
+      isSpinning: _viewModel.isSpinning,
+      fadingPaths: _viewModel.fadingPaths,
+      clearedPositions: _viewModel.clearedPositions,
+      speedMultiplier: _viewModel.speedMultiplier,
+      soundEffectsEnabled: _viewModel.soundEffects,
+      pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
+      scatterPulseTrigger: _scatterPulseTrigger,
+      onSpinComplete: _viewModel.onSpinComplete,
+      onFirstDropInStart: _viewModel.clearMultiplierResidues,
     );
   }
 
@@ -1335,107 +888,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     required double gridLeft,
     required double gridRight,
   }) {
-    final lastWin = _viewModel.lastWin;
-    final liveWin = _viewModel.liveTumbleWin;
-    final isBusy = _viewModel.isBusy;
-    final isTumbling = _viewModel.isTumbling;
-    final isFs = _isFreeSpinVisualMode;
-
-    if (_viewModel.showInsufficientFundsHint) {
-      return Text('PLEASE DEPOSIT MONEY!', style: _statusInsufficientStyle);
-    }
-
-    if (isFs) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('WIN', style: _statusKazancStyle),
-          const SizedBox(width: 6),
-          Container(
-            key: _kazancAnchorKey,
-            child: WinAmountCounter(
-              to: _fsAccumulatedWin,
-              style: _statusBaseStyle,
-              duration: const Duration(milliseconds: 700),
-              vibrationEnabled: _viewModel.vibration,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (isTumbling && liveWin > 0) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('WIN', style: _statusKazancStyle),
-          const SizedBox(width: 6),
-          WinAmountCounter(
-            to: liveWin,
-            style: _statusBaseStyle,
-            duration: const Duration(milliseconds: 900),
-            vibrationEnabled: _viewModel.vibration,
-          ),
-        ],
-      );
-    }
-
-    if (lastWin > 0 && !isBusy) {
-      final result = _viewModel.lastSpinResult;
-      final hasMultiplierSequence =
-          result != null &&
-          result.baseWin > 0 &&
-          result.finalMultipliers.isNotEmpty &&
-          !(_viewModel.lastSpinWasFreeSpin && !_isFreeSpinVisualMode);
-
-      if (hasMultiplierSequence) {
-        return WinPresentation(
-          key: ValueKey<double>(lastWin),
-          controller: _winCtrl,
-          spinResult: result,
-          gridLeft: gridLeft,
-          gridTop: screenH * 0.195,
-          gridWidth: screenW - gridLeft - gridRight,
-          gridHeight: screenH * 0.32,
-          baseStyle: _statusBaseStyle,
-          accentStyle: _statusKazancStyle,
-          soundEnabled: _viewModel.soundEffects,
-          vibrationEnabled: _viewModel.vibration,
-          speedMultiplier: _viewModel.speedMultiplier,
-          onMultiplierLifted: (col, row) {
-            _viewModel.gridCtrl.clearMultiplierPosition(col, row);
-          },
-        );
-      }
-
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text('WIN', style: _statusKazancStyle),
-          const SizedBox(width: 6),
-          MoneyText(
-            text: formatMoney(lastWin),
-            style: _statusBaseStyle,
-            symbolOffset: const Offset(0, 1.5),
-            lineYOffset: 0.75,
-            lineLengthScale: 0.94,
-            lineTopExtend: 0.9,
-          ),
-        ],
-      );
-    }
-
-    if (isBusy || _viewModel.isAutoSpinning) {
-      return Text('GOOD LUCK!', style: _statusBaseStyle);
-    }
-
-    return Text('PLACE YOUR BETS!', style: _statusBaseStyle);
+    return GameStatusText(
+      showInsufficientFundsHint: _viewModel.showInsufficientFundsHint,
+      isFreeSpinVisualMode: _isFreeSpinVisualMode,
+      isTumbling: _viewModel.isTumbling,
+      isBusy: _viewModel.isBusy,
+      isAutoSpinning: _viewModel.isAutoSpinning,
+      lastSpinWasFreeSpin: _viewModel.lastSpinWasFreeSpin,
+      freeSpinAccumulatedWin: _fsAccumulatedWin,
+      liveTumbleWin: _viewModel.liveTumbleWin,
+      lastWin: _viewModel.lastWin,
+      result: _viewModel.lastSpinResult,
+      winController: _winCtrl,
+      screenH: screenH,
+      screenW: screenW,
+      gridLeft: gridLeft,
+      gridRight: gridRight,
+      baseStyle: _styles.statusBase,
+      accentStyle: _styles.statusAccent,
+      insufficientStyle: _styles.statusInsufficient,
+      soundEnabled: _viewModel.soundEffects,
+      vibrationEnabled: _viewModel.vibration,
+      speedMultiplier: _viewModel.speedMultiplier,
+      kazancAnchorKey: _kazancAnchorKey,
+      onMultiplierLifted: _viewModel.gridCtrl.clearMultiplierPosition,
+    );
   }
 
   Widget _buildTumbleWinSlot({
@@ -1444,69 +921,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     required double gridLeft,
     required double gridRight,
   }) {
-    final result = _viewModel.lastSpinResult;
-    final hasMultiplierSequence =
-        result != null &&
-        result.baseWin > 0 &&
-        result.finalMultipliers.isNotEmpty;
-    final showOrchestrator =
-        hasMultiplierSequence &&
-        !_viewModel.isBusy &&
-        _winCtrl.phase != WinPresentationPhase.done;
-
-    return Stack(
-      children: [
-        Center(
-          child: ListenableBuilder(
-            listenable: _tumbleWinListenable,
-            builder: (context, _) => TumbleWinLine(
-              isFlyingTumble: _isFlyingTumble,
-              isBusy: _viewModel.isBusy,
-              liveTumbleWin: _viewModel.liveTumbleWin,
-              lastWin: _viewModel.lastWin,
-              result: _viewModel.lastSpinResult,
-              controller: _winCtrl,
-              anchorKey: _tumbleWinAnchorKey,
-              labelStyle: _statusKazancStyle,
-              valueStyle: _statusBaseStyle,
-              vibrationEnabled: _viewModel.vibration,
-            ),
-          ),
-        ),
-        if (showOrchestrator)
-          WinPresentation(
-            key: ValueKey<Object?>(result),
-            controller: _winCtrl,
-            formulaOnly: true,
-            flightTargetKey: _tumbleWinAnchorKey,
-            spinResult: result,
-            gridLeft: gridLeft,
-            gridTop: screenH * 0.195,
-            gridWidth: screenW - gridLeft - gridRight,
-            gridHeight: screenH * 0.32,
-            baseStyle: _statusBaseStyle,
-            accentStyle: _statusKazancStyle,
-            soundEnabled: _viewModel.soundEffects,
-            speedMultiplier: _viewModel.speedMultiplier,
-            onMultiplierLifted: (col, row) {
-              _viewModel.gridCtrl.clearMultiplierPosition(col, row);
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _buildFsInfoLine() {
-    final infoStyle = _statusBaseStyle.copyWith(fontSize: 16);
-    final activeExplosions = _viewModel.activeExplosions;
-    final ClusterWin? clusterToShow = activeExplosions.isNotEmpty
-        ? activeExplosions.reduce((a, b) => a.amount >= b.amount ? a : b)
-        : _lingeringCluster;
-
-    return FreeSpinInfoLine(
-      cluster: clusterToShow,
-      freeSpinsRemaining: _viewModel.freeSpinsRemaining,
-      style: infoStyle,
+    return GameTumbleWinSlot(
+      listenable: _listenables.tumbleWin,
+      isFlyingTumble: () => _isFlyingTumble,
+      isBusy: () => _viewModel.isBusy,
+      liveTumbleWin: () => _viewModel.liveTumbleWin,
+      lastWin: () => _viewModel.lastWin,
+      result: () => _viewModel.lastSpinResult,
+      controller: _winCtrl,
+      anchorKey: _tumbleWinAnchorKey,
+      labelStyle: _styles.statusAccent,
+      valueStyle: _styles.statusBase,
+      vibrationEnabled: () => _viewModel.vibration,
+      soundEnabled: () => _viewModel.soundEffects,
+      speedMultiplier: () => _viewModel.speedMultiplier,
+      screenH: screenH,
+      screenW: screenW,
+      gridLeft: gridLeft,
+      gridRight: gridRight,
+      onMultiplierLifted: _viewModel.gridCtrl.clearMultiplierPosition,
     );
   }
 

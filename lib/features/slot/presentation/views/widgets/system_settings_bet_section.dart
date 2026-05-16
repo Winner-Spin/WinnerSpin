@@ -99,9 +99,17 @@ class SystemSettingsBetSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ListenableBuilder(
-          listenable: viewModel.balanceCtrl,
+          listenable: Listenable.merge([
+            viewModel,
+            viewModel.balanceCtrl,
+            viewModel.fsCtrl,
+          ]),
           builder: (context, _) {
             final bet = viewModel.betAmount;
+            final decreaseDisabled =
+                viewModel.isInFreeSpins || !viewModel.canDecreaseBet;
+            final increaseDisabled =
+                viewModel.isInFreeSpins || !viewModel.canIncreaseBet;
             return Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -109,6 +117,7 @@ class SystemSettingsBetSection extends StatelessWidget {
                   icon: Icons.remove,
                   color: Colors.white,
                   iconColor: Colors.black,
+                  disabled: decreaseDisabled,
                   onTap: viewModel.decreaseBet,
                 ),
                 const SizedBox(width: 16),
@@ -141,6 +150,7 @@ class SystemSettingsBetSection extends StatelessWidget {
                   icon: Icons.add,
                   color: Colors.white,
                   iconColor: Colors.black,
+                  disabled: increaseDisabled,
                   onTap: viewModel.increaseBet,
                 ),
               ],
@@ -156,24 +166,33 @@ class SystemSettingsBetSection extends StatelessWidget {
     required Color color,
     required Color iconColor,
     required VoidCallback onTap,
+    required bool disabled,
   }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      onTap: disabled ? null : onTap,
+      child: AnimatedOpacity(
+        opacity: disabled ? 0.58 : 1,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: disabled ? const Color(0xFFD5CCD3) : color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: disabled ? 0.18 : 0.5),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: disabled ? const Color(0xFF8A7C86) : iconColor,
+            size: 28,
+          ),
         ),
-        child: Icon(icon, color: iconColor, size: 28),
       ),
     );
   }
