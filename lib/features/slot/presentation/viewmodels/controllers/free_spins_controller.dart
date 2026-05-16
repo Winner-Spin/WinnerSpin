@@ -6,10 +6,14 @@ class FreeSpinsController extends ChangeNotifier {
 
   int _remaining = 0;
   bool _currentRoundFromBuy = false;
+  bool _roundHoldActive = false;
+  bool _pendingConsume = false;
 
   int get remaining => _remaining;
 
   bool get isActive => _remaining > 0;
+
+  bool get isInRound => isActive || _roundHoldActive;
 
   bool get currentRoundFromBuy => _currentRoundFromBuy;
 
@@ -24,6 +28,24 @@ class FreeSpinsController extends ChangeNotifier {
     if (_remaining <= 0) return;
     _remaining--;
     notifyListeners();
+  }
+
+  void beginSpinRound() {
+    _pendingConsume = true;
+    _roundHoldActive = true;
+  }
+
+  bool commitPendingConsume() {
+    if (!_pendingConsume) return false;
+    _pendingConsume = false;
+    consumeOne();
+    return true;
+  }
+
+  bool releaseRoundHold() {
+    if (!_roundHoldActive) return false;
+    _roundHoldActive = false;
+    return true;
   }
 
   void awardInitial() {
