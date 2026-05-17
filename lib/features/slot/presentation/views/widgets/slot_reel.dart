@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
+import 'hefty_bounce_curve.dart';
 import 'multiplier_bomb_animation.dart';
 import 'multiplier_bomb_symbol.dart';
+import 'scatter_pulse.dart';
 import 'tumble_cell.dart';
 
 class SlotReelController {
@@ -79,7 +81,7 @@ class SlotReel extends StatefulWidget {
 enum ReelState { static, droppingOut, empty, droppingIn }
 
 class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
-  static const Curve _heftyBounceCurve = _HeftyBounceCurve();
+  static const Curve _heftyBounceCurve = HeftyBounceCurve();
 
   static const Duration _scatterPulseSettleDuration = Duration(
     milliseconds: 1050,
@@ -235,7 +237,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     final Widget symbolChild;
     if (!isDropOut && isScatter && widget.pulseScattersOnLanding) {
-      symbolChild = _ScatterPulse(
+      symbolChild = ScatterPulse(
         child: Image.asset(
           assetPath,
           fit: BoxFit.contain,
@@ -462,7 +464,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       return cell;
     }
 
-    return _ScatterPulse(
+    return ScatterPulse(
       key: ValueKey(
         'manual-scatter-pulse-${widget.columnIndex}-$row-${widget.scatterPulseTrigger}',
       ),
@@ -477,226 +479,4 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     _controller?.dispose();
     super.dispose();
   }
-}
-
-class _HeftyBounceCurve extends Curve {
-  const _HeftyBounceCurve();
-  @override
-  double transformInternal(double t) {
-    final double t1 = t - 1.0;
-    const double s = 1.35;
-    return (t1 * t1 * ((s + 1.0) * t1 + s) + 1.0);
-  }
-}
-
-class _ScatterPulse extends StatefulWidget {
-  final Widget child;
-  final Animation<double>? animation;
-  final double landThreshold;
-  final bool autoStart;
-
-  const _ScatterPulse({
-    super.key,
-    required this.child,
-    this.animation,
-    this.landThreshold = 1.0,
-    this.autoStart = false,
-  });
-
-  @override
-  State<_ScatterPulse> createState() => _ScatterPulseState();
-}
-
-class _ScatterPulseState extends State<_ScatterPulse>
-    with TickerProviderStateMixin {
-  late final AnimationController _pulseController;
-  late final AnimationController _effectController;
-  late final Animation<double> _pulseScale;
-  late final Animation<double> _glowOpacity;
-  late final Animation<double> _burstExpand;
-  late final Animation<double> _burstOpacity;
-  late final Animation<double> _sparkleProgress;
-  late final Listenable _pulseListenable;
-  bool _hasTriggered = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 850),
-    );
-    _pulseScale = TweenSequence<double>(
-      [
-        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.5), weight: 35),
-        TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.0), weight: 65),
-      ],
-    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
-
-    _effectController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1050),
-    );
-    _pulseListenable = Listenable.merge([_pulseController, _effectController]);
-
-    _glowOpacity = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 20),
-      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.8), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 50),
-    ]).animate(_effectController);
-
-    _burstExpand = Tween<double>(begin: 0.3, end: 1.5).animate(
-      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
-    );
-    _burstOpacity = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.8), weight: 15),
-      TweenSequenceItem(tween: Tween(begin: 0.8, end: 0.0), weight: 85),
-    ]).animate(_effectController);
-
-    _sparkleProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _effectController, curve: Curves.easeOut),
-    );
-
-    if (widget.autoStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _hasTriggered) return;
-        _hasTriggered = true;
-        _pulseController.forward();
-        _effectController.forward();
-      });
-    } else {
-      widget.animation?.addListener(_checkLanding);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _checkLanding());
-    }
-  }
-
-  void _checkLanding() {
-    if (!mounted) return;
-    final animation = widget.animation;
-    if (animation == null) return;
-    if (!_hasTriggered && animation.value >= widget.landThreshold) {
-      _hasTriggered = true;
-      _pulseController.forward();
-      _effectController.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.animation?.removeListener(_checkLanding);
-    _pulseController.dispose();
-    _effectController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _pulseListenable,
-        builder: (context, child) {
-          final scale = _pulseScale.value;
-          final glow = _glowOpacity.value;
-          final burst = _burstExpand.value;
-          final burstAlpha = _burstOpacity.value;
-          final sparkle = _sparkleProgress.value;
-
-          return Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              if (burstAlpha > 0)
-                Positioned.fill(
-                  child: Transform.scale(
-                    scale: burst,
-                    child: Opacity(
-                      opacity: burstAlpha,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFFFFD700).withValues(alpha: 0.7),
-                              const Color(0xFFFFD700).withValues(alpha: 0.2),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.5, 1.0],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              if (sparkle > 0 && sparkle < 1)
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _ScatterSparklePainter(progress: sparkle),
-                  ),
-                ),
-
-              if (glow > 0)
-                Positioned.fill(
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xFFFFD700,
-                          ).withValues(alpha: glow * 0.6),
-                          blurRadius: 8,
-                          spreadRadius: 6,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              Transform.scale(scale: scale, child: child),
-            ],
-          );
-        },
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-class _ScatterSparklePainter extends CustomPainter {
-  final double progress;
-  _ScatterSparklePainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width * 0.55;
-    final rng = 42;
-
-    for (int i = 0; i < 12; i++) {
-      final angle = (i * 30.0 + rng) * (3.14159 / 180.0);
-      final dist = maxRadius * progress * (0.6 + (i % 3) * 0.2);
-      final pos = Offset(
-        center.dx + dist * math.cos(angle),
-        center.dy + dist * math.sin(angle),
-      );
-
-      final alpha = ((1.0 - progress) * 0.9).clamp(0.0, 1.0);
-      final sparkleSize = 2.5 * (1.0 - progress * 0.5);
-
-      final paint = Paint()
-        ..color = Color.lerp(
-          const Color(0xFFFFD700),
-          const Color(0xFFFFFFFF),
-          (i % 2 == 0) ? 0.0 : 0.5,
-        )!.withValues(alpha: alpha);
-
-      canvas.drawCircle(pos, sparkleSize, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ScatterSparklePainter old) => old.progress != progress;
 }
