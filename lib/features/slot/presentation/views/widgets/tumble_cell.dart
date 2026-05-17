@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../../core/audio/app_audio_context.dart';
+import '../../audio/item_explosion_pop_sound.dart';
 import '../../../domain/enums/symbol_tier.dart';
 import '../../../domain/models/symbol_registry.dart';
-import 'multiplier_bomb_symbol.dart';
+import 'tumble_frozen_multiplier_bomb.dart';
+import 'tumble_glow_palette.dart';
+import 'tumble_particle_burst.dart';
 
 class TumbleCell extends StatefulWidget {
   final String path;
@@ -38,8 +39,8 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
   late final Animation<double> _dropAnimation;
   late final Listenable _cellAnimationListenable;
 
-  late List<_Particle> _particles;
-  late _GlowPalette _palette;
+  late List<TumbleParticle> _particles;
+  late TumbleGlowPalette _palette;
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     ]);
 
     _particles = _generateParticles();
-    _palette = _GlowPalette.forPath(widget.path);
+    _palette = TumbleGlowPalette.forPath(widget.path);
 
     _dropController.value = 1.0;
 
@@ -93,7 +94,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     if (widget.path != oldWidget.path) {
       _fadeController.value = 0.0;
       _dropController.forward(from: 0.0);
-      _palette = _GlowPalette.forPath(widget.path);
+      _palette = TumbleGlowPalette.forPath(widget.path);
       return;
     }
 
@@ -118,14 +119,14 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  List<_Particle> _generateParticles() {
+  List<TumbleParticle> _generateParticles() {
     final rng = math.Random();
-    return List.generate(90, (_) => _Particle.random(rng));
+    return List.generate(90, (_) => TumbleParticle.random(rng));
   }
 
   void _playPopSound() {
     if (!widget.soundEnabled) return;
-    unawaited(_ItemExplosionPopSound.play());
+    unawaited(ItemExplosionPopSound.play());
   }
 
   double _preBurstScale(double t) {
@@ -174,7 +175,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
                 if (particleProgress > 0 && !isMultiplier)
                   IgnorePointer(
                     child: CustomPaint(
-                      painter: _ParticleBurstPainter(
+                      painter: TumbleParticleBurstPainter(
                         progress: particleProgress,
                         particles: _particles,
                         palette: _palette,
@@ -193,7 +194,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(2),
           child: Center(
             child: isMultiplier
-                ? _FrozenBomb(
+                ? TumbleFrozenMultiplierBomb(
                     opacity: _imageOpacity,
                     itemH: widget.itemH,
                     multiplierValue: symbol?.multiplierValue ?? 5,
@@ -211,325 +212,4 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
       ),
     );
   }
-}
-
-class _ItemExplosionPopSound {
-  static const _assetPath = 'audio/Items/Item_Explosion_Pop.wav';
-  static const _popSpacing = Duration(milliseconds: 42);
-  static const _maxQueuedPops = 6;
-  static const _volume = 0.38;
-
-  static Future<AudioPool>? _poolFuture;
-  static int _queuedPops = 0;
-  static bool _isDraining = false;
-
-  static Future<void> play() {
-    _queuedPops = math.min(_queuedPops + 1, _maxQueuedPops);
-    if (!_isDraining) {
-      _isDraining = true;
-      unawaited(_drainQueue());
-    }
-    return Future.value();
-  }
-
-  static Future<void> _drainQueue() async {
-    while (_queuedPops > 0) {
-      _queuedPops--;
-      await _playOne();
-      if (_queuedPops > 0) {
-        await Future.delayed(_popSpacing);
-      }
-    }
-    _isDraining = false;
-    if (_queuedPops > 0) {
-      _isDraining = true;
-      unawaited(_drainQueue());
-    }
-  }
-
-  static Future<void> _playOne() async {
-    try {
-      final pool = await (_poolFuture ??= AudioPool.create(
-        source: AssetSource(_assetPath),
-        minPlayers: 3,
-        maxPlayers: 8,
-        playerMode: PlayerMode.lowLatency,
-        audioContext: AppAudioContext.game,
-      ));
-      await pool.start(volume: _volume);
-    } catch (_) {
-      // Ignore audio failures during animation.
-    }
-  }
-}
-
-class _FrozenBomb extends StatelessWidget {
-  final Animation<double> opacity;
-  final double itemH;
-  final int multiplierValue;
-  const _FrozenBomb({
-    required this.opacity,
-    required this.itemH,
-    required this.multiplierValue,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: opacity,
-      builder: (context, child) =>
-          Opacity(opacity: opacity.value, child: child),
-      child: MultiplierBombSymbol(
-        itemH: itemH,
-        multiplierValue: multiplierValue,
-        labelAlignmentY: 0.22,
-      ),
-    );
-  }
-}
-
-class _GlowPalette {
-  final List<Color> sweep;
-  final Color sparkle;
-  final Color particle;
-
-  const _GlowPalette({
-    required this.sweep,
-    required this.sparkle,
-    required this.particle,
-  });
-
-  static const _yellow = _GlowPalette(
-    sweep: [
-      Color(0xFFFFB300),
-      Color(0xFFFFE082),
-      Color(0xFFFFFFFF),
-      Color(0xFFFFE082),
-      Color(0xFFFFB300),
-    ],
-    sparkle: Color(0xFFFFF8E1),
-    particle: Color(0xFFFFD54F),
-  );
-
-  static const _purple = _GlowPalette(
-    sweep: [
-      Color(0xFF6A1B9A),
-      Color(0xFFCE93D8),
-      Color(0xFFFFFFFF),
-      Color(0xFFCE93D8),
-      Color(0xFF6A1B9A),
-    ],
-    sparkle: Color(0xFFE1BEE7),
-    particle: Color(0xFFBA68C8),
-  );
-
-  static const _green = _GlowPalette(
-    sweep: [
-      Color(0xFF2E7D32),
-      Color(0xFFA5D6A7),
-      Color(0xFFFFFFFF),
-      Color(0xFFA5D6A7),
-      Color(0xFF2E7D32),
-    ],
-    sparkle: Color(0xFFC8E6C9),
-    particle: Color(0xFF66BB6A),
-  );
-
-  static const _orange = _GlowPalette(
-    sweep: [
-      Color(0xFFEF6C00),
-      Color(0xFFFFB74D),
-      Color(0xFFFFFFFF),
-      Color(0xFFFFB74D),
-      Color(0xFFEF6C00),
-    ],
-    sparkle: Color(0xFFFFE0B2),
-    particle: Color(0xFFFFA726),
-  );
-
-  static const _red = _GlowPalette(
-    sweep: [
-      Color(0xFFB71C1C),
-      Color(0xFFEF9A9A),
-      Color(0xFFFFFFFF),
-      Color(0xFFEF9A9A),
-      Color(0xFFB71C1C),
-    ],
-    sparkle: Color(0xFFFFCDD2),
-    particle: Color(0xFFEF5350),
-  );
-
-  static const _pink = _GlowPalette(
-    sweep: [
-      Color(0xFFAD1457),
-      Color(0xFFF48FB1),
-      Color(0xFFFFFFFF),
-      Color(0xFFF48FB1),
-      Color(0xFFAD1457),
-    ],
-    sparkle: Color(0xFFFCE4EC),
-    particle: Color(0xFFF06292),
-  );
-
-  static const _cyan = _GlowPalette(
-    sweep: [
-      Color(0xFF006064),
-      Color(0xFF80DEEA),
-      Color(0xFFFFFFFF),
-      Color(0xFF80DEEA),
-      Color(0xFF006064),
-    ],
-    sparkle: Color(0xFFB2EBF2),
-    particle: Color(0xFF4DD0E1),
-  );
-
-  static const _gold = _GlowPalette(
-    sweep: [
-      Color(0xFFFF6F00),
-      Color(0xFFFFCA28),
-      Color(0xFFFFFFFF),
-      Color(0xFFFFCA28),
-      Color(0xFFFF6F00),
-    ],
-    sparkle: Color(0xFFFFE082),
-    particle: Color(0xFFFFB300),
-  );
-
-  static _GlowPalette forPath(String path) {
-    final id = SymbolRegistry.byPath(path)?.id;
-    switch (id) {
-      case 'muz':
-        return _yellow;
-      case 'uzum':
-        return _purple;
-      case 'karpuz':
-      case 'yesil_ayi':
-        return _green;
-      case 'seftali':
-        return _orange;
-      case 'elma':
-      case 'cilek':
-      case 'kalp':
-        return _red;
-      case 'pembe_ayi':
-        return _pink;
-      case 'cupcake':
-        return _cyan;
-      case 'multi_2x':
-      case 'multi_3x':
-      case 'multi_5x':
-      case 'multi_10x':
-      case 'multi_25x':
-      case 'multi_50x':
-      case 'multi_100x':
-        return _gold;
-      default:
-        return _yellow;
-    }
-  }
-}
-
-class _Particle {
-  final double originX;
-  final double originY;
-  final double angle;
-  final double speed;
-  final double size;
-  final double startProgress;
-  final double spin;
-  final int colorIndex;
-
-  const _Particle({
-    required this.originX,
-    required this.originY,
-    required this.angle,
-    required this.speed,
-    required this.size,
-    required this.startProgress,
-    required this.spin,
-    required this.colorIndex,
-  });
-
-  factory _Particle.random(math.Random rng) {
-    final originAngle = rng.nextDouble() * 2 * math.pi;
-    final originRadius = math.sqrt(rng.nextDouble());
-    final originX = math.cos(originAngle) * originRadius;
-    final originY = math.sin(originAngle) * originRadius;
-    final outwardAngle = math.atan2(originY, originX);
-
-    return _Particle(
-      originX: originX,
-      originY: originY,
-      angle: outwardAngle + (rng.nextDouble() - 0.5) * 1.25,
-      speed: 0.20 + rng.nextDouble() * 0.34,
-      size: 1.1 + rng.nextDouble() * 2.2,
-      startProgress: rng.nextDouble() * 0.18,
-      spin: (rng.nextDouble() * 2 - 1) * math.pi * 1.7,
-      colorIndex: rng.nextInt(5),
-    );
-  }
-}
-
-class _ParticleBurstPainter extends CustomPainter {
-  final double progress;
-  final List<_Particle> particles;
-  final _GlowPalette palette;
-
-  _ParticleBurstPainter({
-    required this.progress,
-    required this.particles,
-    required this.palette,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxDistance = math.max(size.width, size.height);
-    final originRadius = math.min(size.width, size.height) * 0.24;
-
-    for (final p in particles) {
-      final localT = ((progress - p.startProgress) / (1.0 - p.startProgress))
-          .clamp(0.0, 1.0);
-      if (localT <= 0) continue;
-
-      final eased = Curves.easeOutCubic.transform(localT);
-      final origin = Offset(
-        center.dx + p.originX * originRadius,
-        center.dy + p.originY * originRadius,
-      );
-      final distance = eased * p.speed * maxDistance * 0.58;
-      final pos = Offset(
-        origin.dx + math.cos(p.angle) * distance,
-        origin.dy +
-            math.sin(p.angle) * distance +
-            eased * eased * size.height * 0.18,
-      );
-      final alpha = (1.0 - localT).clamp(0.0, 1.0);
-      final radius = p.size * (1.0 - localT * 0.35);
-      final color = _particleColor(p.colorIndex).withValues(alpha: alpha);
-
-      final dustPaint = Paint()..color = color.withValues(alpha: alpha * 0.9);
-      canvas.drawCircle(pos, radius * 0.55, dustPaint);
-
-      if (p.colorIndex == 1 || p.colorIndex == 3) {
-        final fleckPaint = Paint()
-          ..color = color.withValues(alpha: alpha * 0.55);
-        final offset = Offset(
-          math.cos(p.angle + p.spin) * radius * 0.65,
-          math.sin(p.angle + p.spin) * radius * 0.65,
-        );
-        canvas.drawCircle(pos + offset, radius * 0.28, fleckPaint);
-      }
-    }
-  }
-
-  Color _particleColor(int index) {
-    if (index == 0) return palette.particle;
-    if (index == 1) return palette.sparkle;
-    return palette.sweep[index % palette.sweep.length];
-  }
-
-  @override
-  bool shouldRepaint(_ParticleBurstPainter old) =>
-      old.progress != progress || old.palette != palette;
 }
