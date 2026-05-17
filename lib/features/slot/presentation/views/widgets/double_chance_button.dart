@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/format/money_format.dart';
-import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
+import 'embossed_button_text.dart';
+import 'on_off_capsule.dart';
 
 class DoubleChanceButton extends StatefulWidget {
   final double betAmount;
@@ -263,21 +263,25 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                                   children: [
                                     Padding(
                                       padding: EdgeInsets.only(top: h * 0.03),
-                                      child: _EmbossedText(
+                                      child: EmbossedButtonText(
                                         text: 'BET',
                                         fontSize: h * 0.16,
                                         strokeWidth: 2.6,
                                         letterSpacing: 0.5,
                                         fillColor: Colors.white,
+                                        strokeColor: const Color(0xFF053C14),
+                                        shadowColor: const Color(0xFF053C14),
                                       ),
                                     ),
                                     SizedBox(width: h * 0.04),
-                                    _EmbossedMoneyText(
+                                    EmbossedButtonMoneyText(
                                       text: formatMoney(widget.betAmount),
                                       fontSize: h * 0.20,
                                       strokeWidth: 2.6,
                                       letterSpacing: 0.5,
                                       fillColor: const Color(0xFFFFC93C),
+                                      strokeColor: const Color(0xFF053C14),
+                                      shadowColor: const Color(0xFF053C14),
                                     ),
                                   ],
                                 ),
@@ -288,25 +292,26 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              _EmbossedText(
+                              EmbossedButtonText(
                                 text: 'DOUBLE CHANCE',
                                 fontSize: h * 0.13,
                                 strokeWidth: 2.3,
                                 letterSpacing: 0.6,
                                 fillColor: Colors.white,
+                                strokeColor: const Color(0xFF053C14),
+                                shadowColor: const Color(0xFF053C14),
                               ),
-                              _EmbossedText(
+                              EmbossedButtonText(
                                 text: 'TO WIN FEATURE',
                                 fontSize: h * 0.13,
                                 strokeWidth: 2.3,
                                 letterSpacing: 0.6,
                                 fillColor: Colors.white,
+                                strokeColor: const Color(0xFF053C14),
+                                shadowColor: const Color(0xFF053C14),
                               ),
                               SizedBox(height: h * 0.04),
-                              _OnOffCapsule(
-                                isOn: widget.isOn,
-                                height: h * 0.31,
-                              ),
+                              OnOffCapsule(isOn: widget.isOn, height: h * 0.31),
                             ],
                           ),
                         ],
@@ -321,295 +326,4 @@ class _DoubleChanceButtonState extends State<DoubleChanceButton>
       ),
     );
   }
-}
-
-class _OnOffCapsule extends StatelessWidget {
-  final bool isOn;
-  final double height;
-
-  const _OnOffCapsule({required this.isOn, required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    final w = height * 2.7;
-    final knobH = height * 0.92;
-    final knobW = height * 1.05;
-    final pad = height * 0.02;
-    const animDuration = Duration(milliseconds: 220);
-    const animCurve = Curves.easeInOut;
-
-    return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(height / 2),
-        child: Container(
-          width: w,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(height / 2),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.32),
-                Colors.black.withValues(alpha: 0.22),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.30),
-              width: 1.2,
-            ),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedPositioned(
-                duration: animDuration,
-                curve: animCurve,
-                left: isOn ? 0 : knobW,
-                right: isOn ? knobW : 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: AnimatedSwitcher(
-                    duration: animDuration,
-                    child: Text(
-                      isOn ? 'ON' : 'OFF',
-                      key: ValueKey<bool>(isOn),
-                      style: GoogleFonts.outfit(
-                        fontSize: height * 0.50,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                        color: isOn
-                            ? const Color(0xFFE8FFD7)
-                            : const Color(0xFFFFF8E6),
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            offset: const Offset(0, 1),
-                            blurRadius: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              AnimatedAlign(
-                duration: animDuration,
-                curve: animCurve,
-                alignment: isOn ? Alignment.centerRight : Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: pad),
-                  child: Container(
-                    width: knobW,
-                    height: knobH,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(knobH / 2),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF89E875),
-                          Color(0xFF3DB836),
-                          Color(0xFF166D24),
-                        ],
-                        stops: [0.0, 0.55, 1.0],
-                      ),
-                      border: Border.all(
-                        color: const Color(0xFF0E5320),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Center(
-                      child: SizedBox(
-                        width: knobH * 0.55,
-                        height: knobH * 0.55,
-                        child: CustomPaint(
-                          painter: _SolidArrowPainter(
-                            color: Colors.white,
-                            reversed: isOn,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmbossedText extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final double strokeWidth;
-  final double letterSpacing;
-  final Color fillColor;
-
-  const _EmbossedText({
-    required this.text,
-    required this.fontSize,
-    required this.strokeWidth,
-    required this.letterSpacing,
-    required this.fillColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeJoin = StrokeJoin.round
-              ..color = const Color(0xFF053C14),
-          ),
-        ),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            color: fillColor,
-            shadows: const [
-              Shadow(
-                color: Color(0xFF053C14),
-                offset: Offset(0, 2),
-                blurRadius: 2,
-              ),
-              Shadow(
-                color: Color(0x55FFC089),
-                offset: Offset(0, -1),
-                blurRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmbossedMoneyText extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final double strokeWidth;
-  final double letterSpacing;
-  final Color fillColor;
-
-  const _EmbossedMoneyText({
-    required this.text,
-    required this.fontSize,
-    required this.strokeWidth,
-    required this.letterSpacing,
-    required this.fillColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        MoneyText(
-          text: text,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeJoin = StrokeJoin.round
-              ..color = const Color(0xFF053C14),
-          ),
-        ),
-        MoneyText(
-          text: text,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            color: fillColor,
-            shadows: const [
-              Shadow(
-                color: Color(0xFF053C14),
-                offset: Offset(0, 2),
-                blurRadius: 2,
-              ),
-              Shadow(
-                color: Color(0x55FFC089),
-                offset: Offset(0, -1),
-                blurRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SolidArrowPainter extends CustomPainter {
-  final Color color;
-  final bool reversed;
-
-  const _SolidArrowPainter({required this.color, this.reversed = false});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cy = h / 2;
-
-    final shaftEnd = w * 0.55;
-    final shaftHalf = h * 0.18;
-    final headHalf = h * 0.45;
-
-    final path = Path()
-      ..moveTo(0, cy - shaftHalf)
-      ..lineTo(shaftEnd, cy - shaftHalf)
-      ..lineTo(shaftEnd, cy - headHalf)
-      ..lineTo(w, cy)
-      ..lineTo(shaftEnd, cy + headHalf)
-      ..lineTo(shaftEnd, cy + shaftHalf)
-      ..lineTo(0, cy + shaftHalf)
-      ..close();
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    if (reversed) {
-      canvas.save();
-      canvas.translate(w, 0);
-      canvas.scale(-1, 1);
-      canvas.drawPath(path, paint);
-      canvas.restore();
-    } else {
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SolidArrowPainter old) =>
-      old.color != color || old.reversed != reversed;
 }

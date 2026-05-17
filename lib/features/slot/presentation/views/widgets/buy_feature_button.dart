@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../core/widgets/money_text.dart';
 import '../../audio/ui_click_sound.dart';
+import 'embossed_button_text.dart';
 
 final RegExp _priceSeparatorPattern = RegExp(r'(\d)(?=(\d{3})+$)');
 
@@ -322,23 +321,27 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
                                   children: [
                                     FittedBox(
                                       fit: BoxFit.scaleDown,
-                                      child: _EmbossedText(
+                                      child: EmbossedButtonText(
                                         text: widget.title,
                                         fontSize: h * 0.20,
                                         strokeWidth: 2.8,
                                         letterSpacing: 0.8,
                                         fillColor: Colors.white,
+                                        strokeColor: const Color(0xFF8B2258),
+                                        shadowColor: const Color(0xFF6E1A4B),
                                       ),
                                     ),
                                     SizedBox(height: h * 0.03),
                                     FittedBox(
                                       fit: BoxFit.scaleDown,
-                                      child: _EmbossedMoneyText(
+                                      child: EmbossedButtonMoneyText(
                                         text: widget._formattedPrice,
                                         fontSize: h * 0.30,
                                         strokeWidth: 4.2,
                                         letterSpacing: 0.8,
                                         fillColor: Colors.white,
+                                        strokeColor: const Color(0xFF8B2258),
+                                        shadowColor: const Color(0xFF6E1A4B),
                                       ),
                                     ),
                                   ],
@@ -356,130 +359,6 @@ class _BuyFeatureButtonState extends State<BuyFeatureButton>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _EmbossedText extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final double strokeWidth;
-  final double letterSpacing;
-  final Color fillColor;
-
-  const _EmbossedText({
-    required this.text,
-    required this.fontSize,
-    required this.strokeWidth,
-    required this.letterSpacing,
-    required this.fillColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeJoin = StrokeJoin.round
-              ..color = const Color(0xFF8B2258),
-          ),
-        ),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            color: fillColor,
-            shadows: const [
-              Shadow(
-                color: Color(0xFF6E1A4B),
-                offset: Offset(0, 2),
-                blurRadius: 2,
-              ),
-              Shadow(
-                color: Color(0x55FFC089),
-                offset: Offset(0, -1),
-                blurRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmbossedMoneyText extends StatelessWidget {
-  final String text;
-  final double fontSize;
-  final double strokeWidth;
-  final double letterSpacing;
-  final Color fillColor;
-
-  const _EmbossedMoneyText({
-    required this.text,
-    required this.fontSize,
-    required this.strokeWidth,
-    required this.letterSpacing,
-    required this.fillColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        MoneyText(
-          text: text,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeJoin = StrokeJoin.round
-              ..color = const Color(0xFF8B2258),
-          ),
-        ),
-        MoneyText(
-          text: text,
-          style: GoogleFonts.outfit(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w900,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            color: fillColor,
-            shadows: const [
-              Shadow(
-                color: Color(0xFF6E1A4B),
-                offset: Offset(0, 2),
-                blurRadius: 2,
-              ),
-              Shadow(
-                color: Color(0x55FFC089),
-                offset: Offset(0, -1),
-                blurRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
