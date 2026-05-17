@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'floating_collect_text.dart';
+import '../effects/floating_collect_text.dart';
 
 class MultiplierCollectAnimation {
   MultiplierCollectAnimation._();

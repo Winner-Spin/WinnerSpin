@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../domain/models/cluster_win.dart';
-import '../presentation/floating_win_overlay.dart';
+import '../presentation/effects/floating_win_overlay.dart';
 
 class SlotPlayfield extends StatelessWidget {
   const SlotPlayfield({

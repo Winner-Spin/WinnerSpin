@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/format/money_format.dart';
-import '../../../../../../../core/widgets/money_text.dart';
-import '../../../../../domain/models/spin_result.dart';
-import '../../../../models/game_presentation_timings.dart';
-import '../../../../models/spin_result_presentation_rules.dart';
-import 'pulsing_multiplier_sum.dart';
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
+import '../../../../../../domain/models/spin_result.dart';
+import '../../../../../models/game_presentation_timings.dart';
+import '../../../../../models/spin_result_presentation_rules.dart';
+import '../effects/pulsing_multiplier_sum.dart';
 import 'win_amount_counter.dart';
-import 'win_presentation_controller.dart';
+import '../../../../../ui_controllers/win_presentation_controller.dart';
 
 class TumbleWinLine extends StatelessWidget {
   final bool isFlyingTumble;

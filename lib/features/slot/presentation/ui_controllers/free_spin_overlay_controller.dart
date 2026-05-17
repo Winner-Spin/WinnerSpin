@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../views/game/widgets/presentation/free_spin_summary_popup.dart';
-import '../views/game/widgets/presentation/free_spin_win_popup.dart';
+import '../views/game/widgets/presentation/free_spins/free_spin_summary_popup.dart';
+import '../views/game/widgets/presentation/free_spins/free_spin_win_popup.dart';
 
 class FreeSpinOverlayController {
   OverlayEntry? _activeEntry;

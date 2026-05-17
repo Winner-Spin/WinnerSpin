@@ -4,8 +4,8 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/audio/app_audio_context.dart';
-import '../../../../models/win_tier.dart';
+import '../../../../../../../../core/audio/app_audio_context.dart';
+import '../../../../../models/win_tier.dart';
 import 'big_win_amount_banner.dart';
 import 'big_win_coin_rain.dart';
 import 'big_win_headline.dart';

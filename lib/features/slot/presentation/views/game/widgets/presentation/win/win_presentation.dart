@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../../../domain/models/spin_result.dart';
-import '../playfield/multiplier_bomb_animation.dart';
+import '../../../../../../domain/models/spin_result.dart';
+import '../../playfield/multiplier_bomb_animation.dart';
 import 'multiplier_collect_animation.dart';
-import 'win_presentation_controller.dart';
+import '../../../../../ui_controllers/win_presentation_controller.dart';
 import 'win_sequence_bar.dart';
 
 class WinPresentation extends StatefulWidget {

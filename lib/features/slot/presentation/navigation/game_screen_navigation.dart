@@ -8,7 +8,7 @@ import '../views/auto_play/auto_play_settings_screen.dart';
 import '../views/buy_freespins/buy_freespins_confirm_screen.dart';
 import '../views/rules/game_rules_screen.dart';
 import '../views/settings/system_settings_screen.dart';
-import '../views/game/widgets/presentation/first_launch_disclaimer_dialog.dart';
+import '../views/game/widgets/presentation/dialogs/first_launch_disclaimer_dialog.dart';
 import '../views/shared/widgets/spring_popup_transition.dart';
 
 class GameScreenNavigation {

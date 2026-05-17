@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/format/money_format.dart';
-import '../../../../../../../core/widgets/money_text.dart';
-import '../../../../../domain/models/cluster_win.dart';
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
+import '../../../../../../domain/models/cluster_win.dart';
 
 class FreeSpinInfoLine extends StatelessWidget {
   final ClusterWin? cluster;

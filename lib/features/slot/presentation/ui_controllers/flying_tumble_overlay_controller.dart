@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../views/game/widgets/presentation/flying_tumble_sprite.dart';
+import '../views/game/widgets/presentation/effects/flying_tumble_sprite.dart';
 
 class FlyingTumbleOverlayController {
   OverlayEntry? _activeEntry;

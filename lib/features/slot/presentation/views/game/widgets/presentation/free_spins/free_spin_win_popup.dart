@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../models/game_presentation_timings.dart';
+import '../../../../../models/game_presentation_timings.dart';
 
 class FreeSpinWinPopup extends StatefulWidget {
   static const assetPath =

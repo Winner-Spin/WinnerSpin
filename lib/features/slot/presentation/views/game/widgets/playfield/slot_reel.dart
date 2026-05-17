@@ -8,23 +8,8 @@ import 'hefty_bounce_curve.dart';
 import 'multiplier_bomb_animation.dart';
 import 'multiplier_bomb_symbol.dart';
 import 'scatter_pulse.dart';
+import 'slot_reel_controller.dart';
 import 'tumble_cell.dart';
-
-class SlotReelController {
-  _SlotReelState? _state;
-
-  void quickStop() => _state?._quickStop();
-
-  void _attach(_SlotReelState state) {
-    _state = state;
-  }
-
-  void _detach(_SlotReelState state) {
-    if (_state == state) {
-      _state = null;
-    }
-  }
-}
 
 class SlotReel extends StatefulWidget {
   final int columnIndex;
@@ -101,15 +86,15 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    widget.controller?._attach(this);
+    widget.controller?.attach(this, _quickStop);
   }
 
   @override
   void didUpdateWidget(SlotReel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?._detach(this);
-      widget.controller?._attach(this);
+      oldWidget.controller?.detach(this);
+      widget.controller?.attach(this, _quickStop);
     }
     if (widget.spinning && !oldWidget.spinning) {
       _quickStopped = false;
@@ -475,7 +460,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    widget.controller?._detach(this);
+    widget.controller?.detach(this);
     _controller?.dispose();
     super.dispose();
   }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../../../core/format/money_format.dart';
-import '../../../../../../../core/widgets/money_text.dart';
-import '../../../../models/game_presentation_timings.dart';
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
+import '../../../../../models/game_presentation_timings.dart';
 
 class FreeSpinSummaryPopup extends StatefulWidget {
   static const assetPath =

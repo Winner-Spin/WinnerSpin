@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/widgets/money_text.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
 
 const double bigWinCoinRainCycleProgress = 0.78;
 

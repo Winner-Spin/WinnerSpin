@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../models/win_tier.dart';
+import '../../../../../models/win_tier.dart';
 
 class BigWinHeadline extends StatelessWidget {
   const BigWinHeadline({

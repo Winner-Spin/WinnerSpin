@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/format/money_format.dart';
-import '../../../../../../../core/widgets/money_text.dart';
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
 
 class FlyingTumbleSprite extends StatefulWidget {
   final double amount;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../domain/models/cluster_win.dart';
 import '../../../../models/cluster_presentation_rules.dart';
-import '../presentation/free_spin_info_line.dart';
+import '../presentation/free_spins/free_spin_info_line.dart';
 
 class GameFreeSpinInfoSlot extends StatelessWidget {
   const GameFreeSpinInfoSlot({

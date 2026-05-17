@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../../../core/format/money_format.dart';
-import '../../../../../../../core/widgets/money_text.dart';
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
 import 'win_amount_counter.dart';
-import 'win_presentation_controller.dart';
+import '../../../../../ui_controllers/win_presentation_controller.dart';
 
 class WinSequenceBar extends StatelessWidget {
   final WinPresentationController controller;

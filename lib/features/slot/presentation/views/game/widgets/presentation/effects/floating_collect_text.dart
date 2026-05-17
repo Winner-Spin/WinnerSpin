@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../playfield/multiplier_label.dart';
+import '../../playfield/multiplier_label.dart';
 
 class FloatingCollectText extends StatefulWidget {
   final Offset start;

@@ -6,6 +6,7 @@ import '../../viewmodels/game_viewmodel.dart';
 import '../deposit/deposit_money_screen.dart';
 import '../history/game_history_screen.dart';
 import '../shared/widgets/spring_popup_card.dart';
+import '../shared/widgets/spring_popup_transition.dart';
 import 'widgets/system_settings_bet_section.dart';
 import 'widgets/system_settings_footer.dart';
 import 'widgets/system_settings_header.dart';
@@ -263,17 +264,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       pageBuilder: (context, _, child) =>
           DepositMoneyScreen(viewModel: widget.viewModel),
       transitionBuilder: (context, anim, _, child) {
-        return _buildSpringPopupTransition(anim, child);
+        return buildSpringPopupTransition(anim, child);
       },
     );
-  }
-
-  Widget _buildSpringPopupTransition(Animation<double> anim, Widget child) {
-    final fade = CurvedAnimation(
-      parent: anim,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    return FadeTransition(opacity: fade, child: child);
   }
 }

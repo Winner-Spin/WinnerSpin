@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'slot_reel.dart';
+import 'slot_reel_controller.dart';
 
 class SlotGridView extends StatelessWidget {
   final int columns;

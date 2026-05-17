@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../shared/widgets/spring_popup_card.dart';
+import '../../../../shared/widgets/spring_popup_card.dart';
 
 class FirstLaunchDisclaimerDialog extends StatelessWidget {
   final VoidCallback onOkay;
