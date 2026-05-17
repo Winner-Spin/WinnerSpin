@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/data/repositories/firebase_auth_repository.dart';
 import '../features/auth/presentation/views/login_screen.dart';
-import '../features/slot/presentation/views/game_screen.dart';
+import '../features/slot/presentation/views/game/game_screen.dart';
 
 /// Root application widget.
 class WinnerSpinApp extends StatelessWidget {

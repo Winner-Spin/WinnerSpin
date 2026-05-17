@@ -1,0 +1,112 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../../../../../../../core/format/money_format.dart';
+import '../../../../../../../../core/widgets/money_text.dart';
+
+class WinAmountCounter extends StatefulWidget {
+  final double from;
+  final double to;
+  final TextStyle style;
+  final Duration duration;
+  final Curve curve;
+  final bool vibrationEnabled;
+
+  final bool forceComplete;
+
+  const WinAmountCounter({
+    super.key,
+    this.from = 0,
+    required this.to,
+    required this.style,
+    this.duration = const Duration(milliseconds: 1100),
+    this.curve = Curves.easeOut,
+    this.vibrationEnabled = false,
+    this.forceComplete = false,
+  });
+
+  @override
+  State<WinAmountCounter> createState() => _WinAmountCounterState();
+}
+
+class _WinAmountCounterState extends State<WinAmountCounter>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late Animation<double> _anim;
+  double _displayed = 0;
+  double _lastHapticValue = 0;
+  int _lastHapticAtMs = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.duration);
+    _anim = Tween<double>(
+      begin: widget.from,
+      end: widget.to,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
+    _ctrl.addListener(_onTick);
+    if (widget.forceComplete) {
+      _displayed = widget.to;
+    } else {
+      _displayed = widget.from;
+      if (widget.to != widget.from) _ctrl.forward();
+    }
+  }
+
+  void _onTick() {
+    final next = _anim.value;
+    _maybeHapticTick(next);
+    setState(() {
+      _displayed = next;
+    });
+  }
+
+  void _maybeHapticTick(double next) {
+    if (!widget.vibrationEnabled || next <= _lastHapticValue) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastHapticAtMs < 120) return;
+    _lastHapticAtMs = nowMs;
+    _lastHapticValue = next;
+    HapticFeedback.selectionClick();
+  }
+
+  @override
+  void didUpdateWidget(covariant WinAmountCounter old) {
+    super.didUpdateWidget(old);
+    if (old.to != widget.to) {
+      _lastHapticValue = _displayed;
+      _lastHapticAtMs = 0;
+      _anim = Tween<double>(
+        begin: _displayed,
+        end: widget.to,
+      ).animate(CurvedAnimation(parent: _ctrl, curve: widget.curve));
+      _ctrl
+        ..duration = widget.duration
+        ..forward(from: 0);
+    }
+    if (widget.forceComplete && !old.forceComplete) {
+      _ctrl.stop();
+      setState(() => _displayed = widget.to);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.removeListener(_onTick);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MoneyText(
+      text: formatMoney(_displayed),
+      style: widget.style,
+      symbolOffset: const Offset(0, 1.5),
+      lineYOffset: 0.75,
+      lineLengthScale: 0.94,
+      lineTopExtend: 0.9,
+    );
+  }
+}

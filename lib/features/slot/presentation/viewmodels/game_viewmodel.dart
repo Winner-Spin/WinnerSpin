@@ -1,99 +1,93 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
 
-import '../../../../core/audio/app_audio_context.dart';
-import '../../domain/models/pool_state.dart';
+import '../../data/repositories/local_game_history_repository.dart';
+import '../../domain/models/game_history_entry.dart';
 import '../../domain/models/spin_result.dart';
-import '../../domain/models/symbol_registry.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
-import '../../../auth/data/repositories/firebase_auth_repository.dart';
-import '../audio/ui_click_sound.dart';
-import '../../data/repositories/firestore_pool_repository.dart';
+import '../audio/game_music_service.dart';
+import '../../domain/repositories/game_history_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
-import '../../domain/engine/spin_task.dart';
 import '../../domain/models/cluster_win.dart';
 import 'controllers/ante_controller.dart';
+import 'controllers/auto_spin_controller.dart';
 import 'controllers/balance_controller.dart';
 import 'controllers/free_spins_controller.dart';
+import 'controllers/game_feedback_controller.dart';
+import 'controllers/game_history_controller.dart';
 import 'controllers/grid_controller.dart';
-
-class GameHistoryEntry {
-  const GameHistoryEntry({
-    required this.id,
-    required this.playedAt,
-    required this.newBalance,
-    required this.bet,
-    required this.winAmount,
-  });
-
-  factory GameHistoryEntry.fromJson(Map<String, dynamic> json) {
-    final playedAt = DateTime.parse(json['playedAt'] as String);
-    return GameHistoryEntry(
-      id: json['id'] as String? ?? playedAt.microsecondsSinceEpoch.toString(),
-      playedAt: playedAt,
-      newBalance: (json['newBalance'] as num).toDouble(),
-      bet: (json['bet'] as num).toDouble(),
-      winAmount: (json['winAmount'] as num).toDouble(),
-    );
-  }
-
-  final String id;
-  final DateTime playedAt;
-  final double newBalance;
-  final double bet;
-  final double winAmount;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'playedAt': playedAt.toIso8601String(),
-      'newBalance': newBalance,
-      'bet': bet,
-      'winAmount': winAmount,
-    };
-  }
-}
+import 'controllers/insufficient_funds_hint_controller.dart';
+import 'controllers/player_session_controller.dart';
+import 'controllers/slot_auto_spin_flow_controller.dart';
+import 'controllers/slot_player_controls_controller.dart';
+import 'controllers/slot_persistence_controller.dart';
+import 'controllers/slot_pool_controller.dart';
+import 'controllers/slot_session_hydration_controller.dart';
+import 'controllers/slot_session_lifecycle_controller.dart';
+import 'controllers/slot_spin_completion_controller.dart';
+import 'controllers/slot_spin_flow_controller.dart';
+import 'controllers/slot_spin_start_controller.dart';
+import 'controllers/spin_availability_controller.dart';
+import 'controllers/spin_execution_controller.dart';
+import 'controllers/spin_lifecycle_controller.dart';
+import 'controllers/spin_result_settlement_controller.dart';
+import 'controllers/spin_round_controller.dart';
+import 'controllers/tumble_sequence_controller.dart';
 
 class GameViewModel extends ChangeNotifier {
-  static const double _ambientMusicVolume = 0.48;
-
   GameViewModel({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
-  }) : _authRepository = authRepository ?? FirebaseAuthRepository(),
-       _poolRepository = poolRepository ?? FirestorePoolRepository() {
-    final result = SlotEngine.spin(_pool, 0);
+    GameHistoryRepository? gameHistoryRepository,
+    GameMusicService? musicService,
+    SpinExecutionController? spinExecutionController,
+  }) : _historyCtrl = GameHistoryController(
+         gameHistoryRepository ?? LocalGameHistoryRepository(),
+       ),
+       _feedbackCtrl = GameFeedbackController(musicService: musicService),
+       _spinExecutionCtrl =
+           spinExecutionController ?? SpinExecutionController() {
+    _persistenceCtrl = SlotPersistenceController.withDefaults(
+      authRepository: authRepository,
+      poolRepository: poolRepository,
+    );
+    final result = SlotEngine.spin(_poolCtrl.pool, 0);
     _gridCtrl = GridController(result.initialGrid);
-    _initMusic();
+    unawaited(_feedbackCtrl.initializeMusic());
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isMusicInitialized = false;
-
-  Future<void> _initMusic() async {
-    _isMusicInitialized = true;
-    await _audioPlayer.setAudioContext(AppAudioContext.game);
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.setVolume(_ambientMusicVolume);
-    if (_ambientMusic) {
-      await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
-    }
-  }
-
-  final AuthRepository _authRepository;
-  final PoolRepository _poolRepository;
-  StreamSubscription<Map<String, dynamic>?>? _userSubscription;
+  final GameFeedbackController _feedbackCtrl;
+  final GameHistoryController _historyCtrl;
+  final SpinExecutionController _spinExecutionCtrl;
+  late final SlotPersistenceController _persistenceCtrl;
 
   final BalanceController _balanceCtrl = BalanceController();
   final AnteController _anteCtrl = AnteController();
   final FreeSpinsController _fsCtrl = FreeSpinsController();
+  final AutoSpinController _autoSpinCtrl = AutoSpinController();
+  final PlayerSessionController _sessionCtrl = PlayerSessionController();
+  final TumbleSequenceController _tumbleCtrl = TumbleSequenceController();
+  final SpinResultSettlementController _settlementCtrl =
+      SpinResultSettlementController();
+  final SpinAvailabilityController _availabilityCtrl =
+      SpinAvailabilityController();
+  final SpinRoundController _roundCtrl = SpinRoundController();
+  final SlotPoolController _poolCtrl = SlotPoolController();
+  final SlotSessionHydrationController _hydrationCtrl =
+      SlotSessionHydrationController();
+  final SlotPlayerControlsController _playerControlsCtrl =
+      SlotPlayerControlsController();
+  final SlotAutoSpinFlowController _autoSpinFlowCtrl =
+      SlotAutoSpinFlowController();
+  final SlotSessionLifecycleController _sessionLifecycleCtrl =
+      SlotSessionLifecycleController();
+  final SlotSpinFlowController _spinFlowCtrl = SlotSpinFlowController();
+  final SpinLifecycleController _spinLifecycleCtrl = SpinLifecycleController();
+  final SlotSpinStartController _spinStartCtrl = SlotSpinStartController();
+  final SlotSpinCompletionController _spinCompletionCtrl =
+      SlotSpinCompletionController();
   late final GridController _gridCtrl;
 
   BalanceController get balanceCtrl => _balanceCtrl;
@@ -101,17 +95,13 @@ class GameViewModel extends ChangeNotifier {
   FreeSpinsController get fsCtrl => _fsCtrl;
   GridController get gridCtrl => _gridCtrl;
 
-  String _username = 'Loading...';
-  String get username => _username;
+  String get username => _sessionCtrl.username;
 
-  String _email = 'Loading...';
-  String get email => _email;
+  String get email => _sessionCtrl.email;
 
-  bool _isLoading = true;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _sessionCtrl.isLoading;
 
-  bool _loggedOut = false;
-  bool get loggedOut => _loggedOut;
+  bool get loggedOut => _sessionCtrl.loggedOut;
 
   static const int columns = SlotEngine.columns;
   static const int rows = SlotEngine.rows;
@@ -123,32 +113,25 @@ class GameViewModel extends ChangeNotifier {
   Set<int> get winningPositions => _gridCtrl.winningPositions;
   Set<int> get clearedPositions => _gridCtrl.clearedPositions;
 
-  bool _isTumbling = false;
-  bool get isTumbling => _isTumbling;
+  bool get isTumbling => _tumbleCtrl.isTumbling;
 
-  bool _isSpinning = false;
-  bool get isSpinning => _isSpinning;
+  bool get isSpinning => _roundCtrl.isSpinning;
 
-  bool _isAutoSpinning = false;
-  bool get isAutoSpinning => _isAutoSpinning;
+  bool get isAutoSpinning => _autoSpinCtrl.active;
 
-  bool _lastSpinWasFreeSpin = false;
-  bool get lastSpinWasFreeSpin => _lastSpinWasFreeSpin;
+  bool get lastSpinWasFreeSpin => _roundCtrl.lastSpinWasFreeSpin;
 
-  int _autoSpinsRemaining = 0;
-  int get autoSpinsRemaining => _autoSpinsRemaining;
+  int get autoSpinsRemaining => _autoSpinCtrl.remaining;
 
-  bool get isBusy => _isSpinning || _isTumbling;
+  bool get isBusy => _roundCtrl.isSpinning || _tumbleCtrl.isTumbling;
 
-  int _speedMultiplier = 1;
-  int get speedMultiplier => _speedMultiplier;
+  int get speedMultiplier => _autoSpinCtrl.speedMultiplier;
 
-  bool _showInsufficientFundsHint = false;
-  bool get showInsufficientFundsHint => _showInsufficientFundsHint;
-  Timer? _insufficientHintTimer;
+  final InsufficientFundsHintController _insufficientHintCtrl =
+      InsufficientFundsHintController();
+  bool get showInsufficientFundsHint => _insufficientHintCtrl.visible;
 
-  double _liveTumbleWin = 0;
-  double get liveTumbleWin => _liveTumbleWin;
+  double get liveTumbleWin => _tumbleCtrl.liveWin;
 
   double get balance => _balanceCtrl.balance;
   double get userBalance => _balanceCtrl.userBalance;
@@ -164,555 +147,307 @@ class GameViewModel extends ChangeNotifier {
 
   int get freeSpinsRemaining => _fsCtrl.remaining;
 
-  bool _fsRoundHoldActive = false;
+  bool get isInFreeSpins => _fsCtrl.isInRound;
 
-  bool get isInFreeSpins => _fsCtrl.isActive || _fsRoundHoldActive;
+  bool get canBuyFreeSpins => _availabilityCtrl.canBuyFreeSpins(
+    isBusy: isBusy,
+    isAutoSpinning: _autoSpinCtrl.active,
+    isInFreeSpins: isInFreeSpins,
+    canAffordBuyFeature: _balanceCtrl.canAffordDisplayed(buyFeaturePrice),
+  );
 
-  bool get canBuyFreeSpins =>
-      !isBusy &&
-      !_isAutoSpinning &&
-      !isInFreeSpins &&
-      _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
+  bool get canBuyFreeSpinsForUi => _availabilityCtrl.canBuyFreeSpins(
+    isBusy: isBusy,
+    isAutoSpinning: _autoSpinCtrl.active,
+    isInFreeSpins: isInFreeSpins,
+    canAffordBuyFeature: _balanceCtrl.canAffordDisplayed(buyFeaturePrice),
+  );
 
-  bool get canBuyFreeSpinsForUi =>
-      !isBusy &&
-      !_isAutoSpinning &&
-      !isInFreeSpins &&
-      _balanceCtrl.canAffordDisplayed(buyFeaturePrice);
+  bool get canSpinForUi => _availabilityCtrl.canSpinForUi(
+    isInFreeSpins: isInFreeSpins,
+    canAffordDisplayedBet: _balanceCtrl.canAffordDisplayed(effectiveBetCost),
+  );
 
-  bool get canSpinForUi =>
-      isInFreeSpins || _balanceCtrl.canAffordDisplayed(effectiveBetCost);
+  bool get canSpin => _availabilityCtrl.canSpin(
+    isInFreeSpins: isInFreeSpins,
+    canAffordBet: _balanceCtrl.canAfford(effectiveBetCost),
+  );
 
-  bool get canSpin => isInFreeSpins || _balanceCtrl.canAfford(effectiveBetCost);
+  bool get isCurrentSpinFromBuy => _roundCtrl.currentSpinFromBuy;
+  List<GameHistoryEntry> get gameHistory => _historyCtrl.entries;
 
-  PoolState _pool = PoolState();
-  SpinResult? _pendingResult;
-  double _pendingHistoryBet = 0;
-  bool _pendingFsConsume = false;
+  SpinResult? get lastSpinResult => _roundCtrl.lastSpinResult;
+  bool get shouldPulseLandingScatters =>
+      _availabilityCtrl.shouldPulseLandingScatters(
+        isInFreeSpins: isInFreeSpins,
+        pendingResult: _roundCtrl.pendingResult,
+      );
 
-  bool _currentSpinFromBuy = false;
-  bool get isCurrentSpinFromBuy => _currentSpinFromBuy;
-  String? _historyUserId;
-  final List<GameHistoryEntry> _gameHistory = [];
-  List<GameHistoryEntry> get gameHistory => List.unmodifiable(_gameHistory);
-
-  SpinResult? _lastSpinResult;
-  SpinResult? get lastSpinResult => _lastSpinResult;
-  bool get shouldPulseLandingScatters {
-    if (isInFreeSpins) return false;
-
-    final pending = _pendingResult;
-    if (pending == null || pending.freeSpinsTriggered) return false;
-
-    final grid = pending.initialGrid;
-    final scatterPath = SymbolRegistry.all
-        .firstWhere((s) => s.isScatter)
-        .assetPath;
-    final scatterCount = grid
-        .expand((column) => column)
-        .where((path) => path == scatterPath)
-        .length;
-
-    return scatterCount >= 4;
-  }
-
-  static const Duration _tumbleFadeDuration = Duration(milliseconds: 1750);
-  static const Duration _tumbleSettleDuration = Duration(milliseconds: 450);
-
-  bool _vibration = true;
-  bool get vibration => _vibration;
+  bool get vibration => _feedbackCtrl.vibration;
   void setVibration(bool value) {
-    if (_vibration == value) return;
-    _vibration = value;
+    if (!_feedbackCtrl.setVibration(value)) return;
     notifyListeners();
   }
 
-  bool _ambientMusic = true;
-  bool get ambientMusic => _ambientMusic;
+  bool get ambientMusic => _feedbackCtrl.ambientMusic;
   void setAmbientMusic(bool value) {
-    if (_ambientMusic == value) return;
-    _ambientMusic = value;
-    if (_ambientMusic) {
-      if (!_isMusicInitialized) {
-        _initMusic();
-      } else {
-        _audioPlayer.setVolume(_ambientMusicVolume);
-        _audioPlayer.resume();
-      }
-    } else {
-      _audioPlayer.pause();
-    }
+    if (!_feedbackCtrl.setAmbientMusic(value)) return;
     notifyListeners();
   }
 
-  bool _soundEffects = true;
-  bool get soundEffects => _soundEffects;
+  bool get soundEffects => _feedbackCtrl.soundEffects;
   void setSoundEffects(bool value) {
-    _soundEffects = value;
-    UiClickSound.enabled = value;
-    if (value) unawaited(UiClickSound.preload());
+    _feedbackCtrl.setSoundEffects(value);
     notifyListeners();
-  }
-
-  void _flashInsufficientFundsHint() {
-    _showInsufficientFundsHint = true;
-    notifyListeners();
-    _insufficientHintTimer?.cancel();
-    _insufficientHintTimer = Timer(const Duration(seconds: 2), () {
-      _showInsufficientFundsHint = false;
-      notifyListeners();
-    });
   }
 
   void startAutoSpin(int spinCount, {int speedMultiplier = 1}) {
-    if (_isAutoSpinning || isBusy || spinCount <= 0) return;
-    if (!isInFreeSpins && !_balanceCtrl.canAfford(effectiveBetCost)) {
-      _flashInsufficientFundsHint();
-      return;
-    }
-
-    _autoSpinsRemaining = spinCount;
-    _speedMultiplier = speedMultiplier.clamp(1, 3).toInt();
-    _isAutoSpinning = true;
-    spin();
+    _autoSpinFlowCtrl.start(
+      autoSpinController: _autoSpinCtrl,
+      balanceController: _balanceCtrl,
+      insufficientHintController: _insufficientHintCtrl,
+      isBusy: isBusy,
+      isInFreeSpins: isInFreeSpins,
+      effectiveBetCost: effectiveBetCost,
+      spinCount: spinCount,
+      speedMultiplier: speedMultiplier,
+      spin: spin,
+      notifyListeners: notifyListeners,
+    );
   }
 
   void stopAutoSpin() {
-    if (!_isAutoSpinning && _autoSpinsRemaining == 0) return;
-    _isAutoSpinning = false;
-    _autoSpinsRemaining = 0;
+    if (!_autoSpinFlowCtrl.stop(autoSpinController: _autoSpinCtrl)) return;
     notifyListeners();
   }
 
   void toggleAutoSpin() {
-    if (_isAutoSpinning) {
-      stopAutoSpin();
-    } else {
-      startAutoSpin(100, speedMultiplier: _speedMultiplier);
-    }
+    _autoSpinFlowCtrl.toggle(
+      autoSpinController: _autoSpinCtrl,
+      start: startAutoSpin,
+      stop: stopAutoSpin,
+    );
   }
 
   void continueAutoSpinIfReady({
     Duration delay = const Duration(milliseconds: 600),
   }) {
-    if (!_isAutoSpinning || isBusy) return;
-    Future.delayed(delay, () {
-      if (_isAutoSpinning && !isBusy) {
-        spin();
-      }
-    });
-  }
-
-  void _consumeAutoSpinAtStart() {
-    if (!_isAutoSpinning) return;
-    _autoSpinsRemaining = (_autoSpinsRemaining - 1).clamp(0, 9999).toInt();
+    _autoSpinFlowCtrl.continueIfReady(
+      autoSpinController: _autoSpinCtrl,
+      isBusy: () => isBusy,
+      spin: spin,
+      delay: delay,
+    );
   }
 
   void toggleSpeed() {
-    if (isBusy && !_isAutoSpinning) return;
-    _speedMultiplier = (_speedMultiplier % 3) + 1;
+    if (!_playerControlsCtrl.toggleSpeed(
+      availabilityController: _availabilityCtrl,
+      autoSpinController: _autoSpinCtrl,
+      isBusy: isBusy,
+    ))
+      return;
     notifyListeners();
   }
 
   void toggleAnteBet() {
-    if (isBusy || isInFreeSpins || _isAutoSpinning) return;
-    _anteCtrl.toggle();
-    _balanceCtrl.anteActiveShadow = _anteCtrl.active;
+    if (!_playerControlsCtrl.toggleAnte(
+      availabilityController: _availabilityCtrl,
+      anteController: _anteCtrl,
+      autoSpinController: _autoSpinCtrl,
+      balanceController: _balanceCtrl,
+      isBusy: isBusy,
+      isInFreeSpins: isInFreeSpins,
+    ))
+      return;
   }
 
   void increaseBet() {
-    if (_isAutoSpinning || isInFreeSpins) return;
-    _balanceCtrl.increaseBet();
+    _playerControlsCtrl.increaseBet(
+      availabilityController: _availabilityCtrl,
+      autoSpinController: _autoSpinCtrl,
+      balanceController: _balanceCtrl,
+      isInFreeSpins: isInFreeSpins,
+    );
   }
 
   void decreaseBet() {
-    if (_isAutoSpinning || isInFreeSpins) return;
-    _balanceCtrl.decreaseBet();
+    _playerControlsCtrl.decreaseBet(
+      availabilityController: _availabilityCtrl,
+      autoSpinController: _autoSpinCtrl,
+      balanceController: _balanceCtrl,
+      isInFreeSpins: isInFreeSpins,
+    );
   }
 
   Future<void> purchaseGameMoney(double amount) async {
-    if (amount <= 0) return;
-    _balanceCtrl.depositGameMoney(amount);
-    _showInsufficientFundsHint = false;
+    if (!_playerControlsCtrl.depositGameMoney(
+      amount: amount,
+      balanceController: _balanceCtrl,
+      insufficientHintController: _insufficientHintCtrl,
+    ))
+      return;
     notifyListeners();
 
-    final uid = _authRepository.currentUserId;
-    if (uid == null) return;
-    try {
-      await _authRepository.savePlayerState(
-        uid,
-        userBalance: userBalance,
-        freeSpinsRemaining: freeSpinsRemaining,
-      );
-    } catch (e) {
-      debugPrint('Deposit money save error: $e');
-    }
+    await _sessionLifecycleCtrl.savePlayerState(
+      persistenceController: _persistenceCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+      debugLabel: 'Deposit money save',
+    );
   }
 
   Future<void> fetchUserData() async {
-    try {
-      final uid = _authRepository.currentUserId;
-      if (uid != null) {
-        _historyUserId = uid;
-        await _loadGameHistory();
-
-        final results = await Future.wait([
-          _authRepository.getUserData(uid),
-          _poolRepository.load(uid),
-        ]);
-
-        final userData = results[0] as Map<String, dynamic>?;
-        _pool = results[1] as PoolState;
-        _listenToUserBalance(uid);
-
-        if (userData != null) {
-          _username = userData['username'] ?? 'Player';
-          _email = userData['email'] ?? 'No Email';
-          _balanceCtrl.hydrate(userData);
-          _fsCtrl.hydrate(userData);
-
-          if (!userData.containsKey('userBalance')) {
-            _savePlayerState();
-          }
-        } else {
-          _username = 'Unknown';
-          _email = 'Unknown';
-        }
-      }
-    } catch (e) {
-      debugPrint('Data fetch error: $e');
-      _username = 'Error';
-      _email = 'Error';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  void _listenToUserBalance(String uid) {
-    _userSubscription?.cancel();
-    _userSubscription = _authRepository.watchUserData(uid).listen((data) {
-      if (data == null || !data.containsKey('userBalance')) return;
-      _balanceCtrl.applyRemoteUserBalance(
-        (data['userBalance'] ?? 10000.0).toDouble(),
-      );
-    });
+    await _hydrationCtrl.hydrate(
+      persistenceController: _persistenceCtrl,
+      historyController: _historyCtrl,
+      poolController: _poolCtrl,
+      sessionController: _sessionCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+      savePlayerState: () => _sessionLifecycleCtrl.savePlayerStateSilently(
+        persistenceController: _persistenceCtrl,
+        balanceController: _balanceCtrl,
+        freeSpinsController: _fsCtrl,
+      ),
+    );
+    notifyListeners();
   }
 
   Future<void> spin() async {
-    if (isBusy) return;
-
-    _currentSpinFromBuy = false;
-
-    final bool isFreeSpin = isInFreeSpins;
-    _lastSpinWasFreeSpin = isFreeSpin;
-
-    if (!isFreeSpin) {
-      final cost = _balanceCtrl.effectiveBetCost;
-      if (!_balanceCtrl.canAfford(cost)) {
-        if (_isAutoSpinning) {
-          _isAutoSpinning = false;
-          _autoSpinsRemaining = 0;
-        }
-        _flashInsufficientFundsHint();
-        return;
-      }
-      _pendingHistoryBet = cost;
-      _balanceCtrl.charge(cost);
-      _pool.recordBet(cost);
-    } else {
-      _pendingHistoryBet = 0;
-      _pendingFsConsume = true;
-      _fsRoundHoldActive = true;
-    }
-
-    _consumeAutoSpinAtStart();
-    _isSpinning = true;
-    _balanceCtrl.resetLastWin();
-    _liveTumbleWin = 0;
-    _gridCtrl.capturePreviousGrid();
-    _gridCtrl.resetForNewSpin();
-    if (_vibration) HapticFeedback.lightImpact();
-    notifyListeners();
-
-    final bool anteFlag = isFreeSpin
-        ? _anteCtrl.currentRoundFromAnte
-        : _anteCtrl.active;
-    final bool buyFlag = isFreeSpin && _fsCtrl.currentRoundFromBuy;
-
-    // Run engine off UI isolate.
-    final taskOutput = await compute(
-      runSlotSpinTask,
-      SpinTaskInput(
-        pool: _pool,
-        betAmount: betAmount,
-        isFreeSpins: isFreeSpin,
-        anteBet: anteFlag,
-        buyFs: buyFlag,
-      ),
+    await _spinFlowCtrl.spin(
+      startController: _spinStartCtrl,
+      lifecycleController: _spinLifecycleCtrl,
+      executionController: _spinExecutionCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+      autoSpinController: _autoSpinCtrl,
+      insufficientHintController: _insufficientHintCtrl,
+      poolController: _poolCtrl,
+      roundController: _roundCtrl,
+      anteController: _anteCtrl,
+      tumbleController: _tumbleCtrl,
+      gridController: _gridCtrl,
+      isBusy: isBusy,
+      isInFreeSpins: isInFreeSpins,
+      betAmount: betAmount,
+      vibrationEnabled: vibration,
+      commitPendingFreeSpinConsume: commitPendingFsConsume,
+      notifyListeners: notifyListeners,
     );
-
-    _pool = taskOutput.pool;
-    _pendingResult = taskOutput.result;
-
-    if (isFreeSpin) {
-      commitPendingFsConsume();
-    }
-    _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
   Future<void> buyFreeSpins() async {
-    if (_isAutoSpinning) {
-      _isAutoSpinning = false;
-      _autoSpinsRemaining = 0;
-    }
-    if (_anteCtrl.active) return;
-    if (isBusy || isInFreeSpins) return;
-    if (!_balanceCtrl.canAffordDisplayed(buyFeaturePrice)) {
-      _flashInsufficientFundsHint();
-      return;
-    }
-
-    _lastSpinWasFreeSpin = false;
-    final price = buyFeaturePrice;
-    _balanceCtrl.charge(price);
-    _pool.recordBet(price);
-    _currentSpinFromBuy = true;
-    _pendingHistoryBet = 0;
-
-    _isSpinning = true;
-    _balanceCtrl.resetLastWin();
-    _liveTumbleWin = 0;
-    _gridCtrl.capturePreviousGrid();
-    _gridCtrl.resetForNewSpin();
-    if (_vibration) HapticFeedback.lightImpact();
-    notifyListeners();
-
-    final taskOutput = await compute(
-      runSlotSpinTask,
-      SpinTaskInput(
-        pool: _pool,
-        betAmount: betAmount,
-        isFreeSpins: false,
-        anteBet: false,
-        buyFs: false,
-        forceFsTrigger: true,
-      ),
+    await _spinFlowCtrl.buyFreeSpins(
+      startController: _spinStartCtrl,
+      lifecycleController: _spinLifecycleCtrl,
+      executionController: _spinExecutionCtrl,
+      balanceController: _balanceCtrl,
+      autoSpinController: _autoSpinCtrl,
+      insufficientHintController: _insufficientHintCtrl,
+      poolController: _poolCtrl,
+      roundController: _roundCtrl,
+      anteController: _anteCtrl,
+      tumbleController: _tumbleCtrl,
+      gridController: _gridCtrl,
+      isBusy: isBusy,
+      isInFreeSpins: isInFreeSpins,
+      betAmount: betAmount,
+      buyFeaturePrice: buyFeaturePrice,
+      vibrationEnabled: vibration,
+      notifyListeners: notifyListeners,
     );
-
-    _pool = taskOutput.pool;
-    _pendingResult = taskOutput.result;
-    _gridCtrl.setGrid(_pendingResult!.initialGrid);
   }
 
   void clearMultiplierResidues() {
-    _gridCtrl.clearMultiplierResidues();
+    _spinLifecycleCtrl.clearMultiplierResidues(gridController: _gridCtrl);
   }
 
   Future<void> onSpinComplete() async {
-    final result = _pendingResult;
-    _gridCtrl.clearMultiplierResidues();
-    if (result == null) {
-      _isSpinning = false;
-      notifyListeners();
-      return;
-    }
-
-    _isSpinning = false;
-
-    if (result.tumbles.isNotEmpty) {
-      _isTumbling = true;
-      notifyListeners();
-      for (final tumble in result.tumbles) {
-        _liveTumbleWin += tumble.winAmount;
-        _gridCtrl.startTumble(
-          fadingPaths: tumble.winningPaths,
-          activeExplosions: tumble.clusterWins,
-        );
-        notifyListeners();
-        if (_vibration) HapticFeedback.mediumImpact();
-        await Future.delayed(_tumbleFadeDuration);
-
-        _gridCtrl.endTumble(newGrid: tumble.gridAfter);
-        await Future.delayed(_tumbleSettleDuration);
-      }
-      _isTumbling = false;
-      notifyListeners();
-    }
-
-    _balanceCtrl.awardWin(result.totalWin);
-    final playedAt = DateTime.now();
-    _gameHistory.insert(
-      0,
-      GameHistoryEntry(
-        id: playedAt.microsecondsSinceEpoch.toString(),
-        playedAt: playedAt,
-        newBalance: userBalance,
-        bet: _pendingHistoryBet,
-        winAmount: result.totalWin,
+    await _spinCompletionCtrl.complete(
+      lifecycleController: _spinLifecycleCtrl,
+      roundController: _roundCtrl,
+      tumbleController: _tumbleCtrl,
+      settlementController: _settlementCtrl,
+      balanceController: _balanceCtrl,
+      historyController: _historyCtrl,
+      gridController: _gridCtrl,
+      freeSpinsController: _fsCtrl,
+      anteController: _anteCtrl,
+      poolController: _poolCtrl,
+      autoSpinController: _autoSpinCtrl,
+      userId: _persistenceCtrl.currentUserId,
+      vibrationEnabled: vibration,
+      isInFreeSpins: () => isInFreeSpins,
+      savePlayerState: () => _sessionLifecycleCtrl.savePlayerStateSilently(
+        persistenceController: _persistenceCtrl,
+        balanceController: _balanceCtrl,
+        freeSpinsController: _fsCtrl,
       ),
+      savePoolIfNeeded: () => _sessionLifecycleCtrl.savePoolIfNeeded(
+        poolController: _poolCtrl,
+        persistenceController: _persistenceCtrl,
+        balanceController: _balanceCtrl,
+        freeSpinsController: _fsCtrl,
+      ),
+      notifyListeners: notifyListeners,
     );
-    if (_gameHistory.length > 30) {
-      _gameHistory.removeLast();
-    }
-    _saveGameHistory();
-    if (_vibration && result.totalWin > 0) HapticFeedback.heavyImpact();
-    _gridCtrl.setWinningPositions(result.winningPositions);
-    _lastSpinResult = result;
-
-    if (result.freeSpinsTriggered) {
-      if (result.isRetrigger) {
-        _fsCtrl.awardRetrigger();
-      } else {
-        _fsCtrl.awardInitial();
-        _anteCtrl.captureForNewRound();
-        if (_currentSpinFromBuy) {
-          _fsCtrl.markCurrentRoundFromBuy();
-        }
-      }
-    }
-
-    if (!isInFreeSpins) {
-      _anteCtrl.clearRoundFlag();
-      _fsCtrl.clearRoundFlag();
-    }
-
-    _pool.recordPayout(result.totalWin);
-    _savePoolIfNeeded();
-
-    _pendingResult = null;
-    _pendingHistoryBet = 0;
-
-    if (_isAutoSpinning) {
-      if (_autoSpinsRemaining == 0) {
-        _isAutoSpinning = false;
-      }
-      notifyListeners();
-    }
   }
 
   void commitPendingFsConsume() {
-    if (!_pendingFsConsume) return;
-    _pendingFsConsume = false;
-    _fsCtrl.consumeOne();
+    if (!_fsCtrl.commitPendingConsume()) return;
+    _sessionLifecycleCtrl.savePlayerStateSilently(
+      persistenceController: _persistenceCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+    );
   }
 
   void releaseFsRoundHold() {
-    if (!_fsRoundHoldActive) return;
-    _fsRoundHoldActive = false;
+    if (!_fsCtrl.releaseRoundHold()) return;
     notifyListeners();
   }
 
   Future<void> signOut() async {
-    await _forceSavePool();
-    await _userSubscription?.cancel();
-    _userSubscription = null;
-    await _authRepository.signOut();
-    _loggedOut = true;
+    await _sessionLifecycleCtrl.signOut(
+      sessionController: _sessionCtrl,
+      poolController: _poolCtrl,
+      persistenceController: _persistenceCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+    );
     notifyListeners();
   }
 
   void resetLoggedOut() {
-    _loggedOut = false;
-  }
-
-  Future<File?> _gameHistoryFile() async {
-    final uid = _historyUserId;
-    if (uid == null) return null;
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/game_history_$uid.json');
-  }
-
-  Future<void> _loadGameHistory() async {
-    try {
-      final file = await _gameHistoryFile();
-      if (file == null || !await file.exists()) return;
-
-      final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
-      _gameHistory
-        ..clear()
-        ..addAll(
-          decoded
-              .cast<Map<String, dynamic>>()
-              .map(GameHistoryEntry.fromJson)
-              .take(30),
-        );
-    } catch (e) {
-      debugPrint('Game history load error: $e');
-    }
-  }
-
-  Future<void> _saveGameHistory() async {
-    try {
-      final file = await _gameHistoryFile();
-      if (file == null) return;
-      await file.writeAsString(
-        jsonEncode(_gameHistory.map((entry) => entry.toJson()).toList()),
-      );
-    } catch (e) {
-      debugPrint('Game history save error: $e');
-    }
+    _sessionCtrl.resetLoggedOut();
   }
 
   void deleteGameHistoryEntries(Set<String> ids) {
     if (ids.isEmpty) return;
-    _gameHistory.removeWhere((entry) => ids.contains(entry.id));
-    _saveGameHistory();
+    _historyCtrl.delete(userId: _persistenceCtrl.currentUserId, ids: ids);
     notifyListeners();
   }
 
-  void _savePlayerState() {
-    final uid = _authRepository.currentUserId;
-    if (uid != null) {
-      _authRepository.savePlayerState(
-        uid,
-        userBalance: userBalance,
-        freeSpinsRemaining: freeSpinsRemaining,
-      );
-    }
-  }
-
-  void _savePoolIfNeeded() {
-    if (_pool.shouldSave) {
-      final uid = _authRepository.currentUserId;
-      if (uid != null) {
-        _poolRepository.save(uid, _pool);
-        _savePlayerState();
-      }
-    }
-  }
-
-  Future<void> _forceSavePool() async {
-    final uid = _authRepository.currentUserId;
-    if (uid != null) {
-      await _poolRepository.save(uid, _pool);
-      await _authRepository.savePlayerState(
-        uid,
-        userBalance: userBalance,
-        freeSpinsRemaining: freeSpinsRemaining,
-      );
-    }
-  }
-
   Future<void> onAppLifecycleEvent() async {
-    await _forceSavePool();
-    if (_ambientMusic) {
-      await _audioPlayer.pause();
-    }
+    await _sessionLifecycleCtrl.onAppLifecycleEvent(
+      feedbackController: _feedbackCtrl,
+      poolController: _poolCtrl,
+      persistenceController: _persistenceCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+    );
   }
 
   void onAppResumed() {
-    if (_ambientMusic) {
-      _audioPlayer.setVolume(_ambientMusicVolume);
-      _audioPlayer.resume();
-    }
+    _sessionLifecycleCtrl.onAppResumed(feedbackController: _feedbackCtrl);
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
-    _userSubscription?.cancel();
-    _insufficientHintTimer?.cancel();
+    _feedbackCtrl.dispose();
+    _sessionCtrl.dispose();
+    _insufficientHintCtrl.dispose();
     _balanceCtrl.dispose();
     _anteCtrl.dispose();
     _fsCtrl.dispose();

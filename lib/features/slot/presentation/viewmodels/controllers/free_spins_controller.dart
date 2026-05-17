@@ -6,25 +6,50 @@ class FreeSpinsController extends ChangeNotifier {
 
   int _remaining = 0;
   bool _currentRoundFromBuy = false;
+  bool _roundHoldActive = false;
+  bool _pendingConsume = false;
 
   int get remaining => _remaining;
 
   bool get isActive => _remaining > 0;
 
+  bool get isInRound => isActive || _roundHoldActive;
+
   bool get currentRoundFromBuy => _currentRoundFromBuy;
 
   void hydrate(Map<String, dynamic> userData) {
-    _remaining = userData['freeSpinsRemaining'] ?? 0;
+    final storedRemaining = userData['freeSpinsRemaining'];
+    final remaining = storedRemaining is num ? storedRemaining.toInt() : 0;
+    _remaining = remaining < 0 ? 0 : remaining;
     notifyListeners();
   }
 
   void consumeOne() {
+    if (_remaining <= 0) return;
     _remaining--;
     notifyListeners();
   }
 
+  void beginSpinRound() {
+    _pendingConsume = true;
+    _roundHoldActive = true;
+  }
+
+  bool commitPendingConsume() {
+    if (!_pendingConsume) return false;
+    _pendingConsume = false;
+    consumeOne();
+    return true;
+  }
+
+  bool releaseRoundHold() {
+    if (!_roundHoldActive) return false;
+    _roundHoldActive = false;
+    return true;
+  }
+
   void awardInitial() {
-    _remaining += _initialAward;
+    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
     notifyListeners();
   }
 
@@ -34,7 +59,7 @@ class FreeSpinsController extends ChangeNotifier {
   }
 
   void awardBoughtRound() {
-    _remaining += _initialAward;
+    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
     _currentRoundFromBuy = true;
     notifyListeners();
   }
