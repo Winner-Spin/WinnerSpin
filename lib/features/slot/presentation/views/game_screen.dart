@@ -8,6 +8,7 @@ import '../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../audio/ui_click_sound.dart';
 import '../controllers/big_win_overlay_controller.dart';
 import '../controllers/flying_tumble_overlay_controller.dart';
+import '../controllers/free_spin_award_sequence_controller.dart';
 import '../controllers/free_spin_overlay_controller.dart';
 import '../models/big_win_presentation_rules.dart';
 import '../models/cluster_presentation_rules.dart';
@@ -19,8 +20,6 @@ import '../models/game_screen_listener_registry.dart';
 import '../models/game_screen_listenables.dart';
 import '../models/game_stage_metrics.dart';
 import '../models/game_screen_text_styles.dart';
-import '../models/pending_free_spin_award.dart';
-import '../models/scatter_cell.dart';
 import '../models/spin_result_presentation_rules.dart';
 import '../navigation/game_screen_navigation.dart';
 import '../services/game_asset_precache_service.dart';
@@ -58,6 +57,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       FreeSpinOverlayController();
   final FlyingTumbleOverlayController _flyingTumbleOverlayController =
       FlyingTumbleOverlayController();
+  final FreeSpinAwardSequenceController _freeSpinAwardSequenceController =
+      FreeSpinAwardSequenceController();
   final GameAssetPrecacheService _assetPrecacheService =
       GameAssetPrecacheService();
   final GameScreenStartupService _startupService =
@@ -85,8 +86,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   final FreeSpinAwardPresentationState _freeSpinAwardPresentation =
       FreeSpinAwardPresentationState();
-  Timer? _freeSpinTransitionTimer;
-  Timer? _scatterPulseTimer;
 
   bool _isFlyingTumble = false;
 
@@ -164,21 +163,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       result: _viewModel.lastSpinResult,
     );
     if (pending != null) {
-      _startFreeSpinAwardTransition(pending);
+      _freeSpinAwardSequenceController.startAwardTransition(
+        pending: pending,
+        freeSpinPresentation: _freeSpinPresentation,
+        awardPresentation: _freeSpinAwardPresentation,
+        setState: setState,
+      );
     }
     _freeSpinAwardPresentation.updateFreeSpinMode(isInFreeSpins);
-  }
-
-  void _startFreeSpinAwardTransition(PendingFreeSpinAward pending) {
-    _freeSpinTransitionTimer?.cancel();
-    _freeSpinPresentation.recordAward(
-      pending.value,
-      isRetrigger: pending.isRetrigger,
-    );
-
-    setState(() {
-      _freeSpinAwardPresentation.startAward(pending);
-    });
   }
 
   void _quickStopReels() {
@@ -188,144 +180,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _showFreeSpinWinPopup({
-    required int value,
-    required bool isRetrigger,
-    required double winAmount,
-  }) {
-    final overlay = _stageOverlayKey.currentState;
-    if (overlay == null) return;
-
-    _freeSpinOverlayController.showWinPopup(
-      overlay: overlay,
-      value: value,
-      isRetrigger: isRetrigger,
-      winAmount: winAmount,
-      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
-      onDismiss: () {
-        _freeSpinAwardPresentation.endSequence();
-        _continueAutoSpinIfPresentationIdle();
-      },
-    );
-  }
-
   void _showPendingFreeSpinAwardPopup() {
-    if (!_freeSpinAwardPresentation.hasPendingPopup ||
-        _freeSpinOverlayController.hasActiveOverlay) {
-      return;
-    }
-    final pending = _freeSpinAwardPresentation.takePendingPopup();
-    if (pending == null) return;
-    _showFreeSpinAwardSequence(pending);
-  }
-
-  void _showFreeSpinAwardSequence(PendingFreeSpinAward pending) {
-    _freeSpinAwardPresentation.beginSequence();
-    if (pending.isRetrigger) {
-      _showScatterPulse(
-        minScatterCount: 3,
-        onComplete: () => _showFreeSpinWinPopup(
-          value: pending.value,
-          isRetrigger: pending.isRetrigger,
-          winAmount: pending.winAmount,
-        ),
-      );
-      return;
-    }
-
-    _showScatterPulse(
-      minScatterCount: 4,
-      onComplete: () => _startInitialFreeSpinVisualTransition(pending),
+    _freeSpinAwardSequenceController.showPendingAwardPopup(
+      awardPresentation: _freeSpinAwardPresentation,
+      overlayController: _freeSpinOverlayController,
+      overlay: _stageOverlayKey.currentState,
+      scatterCells: ScatterCellFinder.findInGrid(_viewModel.grid),
+      isMounted: () => mounted,
+      setState: setState,
+      continueAutoSpinIfIdle: _continueAutoSpinIfPresentationIdle,
     );
-  }
-
-  void _startInitialFreeSpinVisualTransition(PendingFreeSpinAward pending) {
-    if (!mounted) return;
-    setState(_freeSpinAwardPresentation.showTransitionOverlay);
-    Future.delayed(GamePresentationTimings.freeSpinVisualRevealDelay, () {
-      if (!mounted || !_freeSpinAwardPresentation.showTransition) return;
-      setState(_freeSpinAwardPresentation.revealVisualMode);
-    });
-    _freeSpinTransitionTimer = Timer(
-      GamePresentationTimings.freeSpinTransitionDuration,
-      () {
-        if (!mounted) return;
-        setState(_freeSpinAwardPresentation.hideTransitionOverlay);
-        _showFreeSpinWinPopup(
-          value: pending.value,
-          isRetrigger: pending.isRetrigger,
-          winAmount: pending.winAmount,
-        );
-      },
-    );
-  }
-
-  void _showScatterPulse({
-    required int minScatterCount,
-    required VoidCallback onComplete,
-  }) {
-    final scatterCells = _currentScatterCells();
-    if (scatterCells.length < minScatterCount) {
-      onComplete();
-      return;
-    }
-
-    _scatterPulseTimer?.cancel();
-    setState(_freeSpinAwardPresentation.triggerScatterPulse);
-    _scatterPulseTimer = Timer(
-      GamePresentationTimings.scatterPulseDuration,
-      () {
-        if (!mounted) return;
-        setState(_freeSpinAwardPresentation.clearScatterPulse);
-        onComplete();
-      },
-    );
-  }
-
-  List<ScatterCell> _currentScatterCells() {
-    return ScatterCellFinder.findInGrid(_viewModel.grid);
   }
 
   void _showFreeSpinSummaryPopup() {
-    if (_freeSpinAwardPresentation.summaryPopupVisible) return;
-    final overlay = _stageOverlayKey.currentState;
-    if (overlay == null) {
-      _playFreeSpinExitTransitionThenRelease();
-      return;
-    }
-
-    _freeSpinOverlayController.clear();
-    _freeSpinAwardPresentation.clearPendingPopup();
-
-    setState(_freeSpinAwardPresentation.beginSummary);
-    _freeSpinOverlayController.showSummaryPopup(
-      overlay: overlay,
-      totalWin: _freeSpinPresentation.accumulatedWin,
-      totalFreeSpins: _freeSpinPresentation.awardedThisRound,
-      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
-      onDismiss: () {
-        if (!mounted) return;
-        setState(_freeSpinAwardPresentation.endSummary);
-        _playFreeSpinExitTransitionThenRelease();
-        _continueAutoSpinIfPresentationIdle();
-      },
-    );
-  }
-
-  void _playFreeSpinExitTransitionThenRelease() {
-    _freeSpinTransitionTimer?.cancel();
-    setState(_freeSpinAwardPresentation.showTransitionOverlay);
-    Future.delayed(GamePresentationTimings.freeSpinVisualRevealDelay, () {
-      if (!mounted || !_freeSpinAwardPresentation.showTransition) return;
-      _viewModel.releaseFsRoundHold();
-    });
-    _freeSpinTransitionTimer = Timer(
-      GamePresentationTimings.freeSpinTransitionDuration,
-      () {
-        if (!mounted) return;
-        setState(_freeSpinAwardPresentation.hideTransitionOverlay);
-        _continueAutoSpinIfPresentationIdle();
-      },
+    _freeSpinAwardSequenceController.showSummaryPopup(
+      freeSpinPresentation: _freeSpinPresentation,
+      awardPresentation: _freeSpinAwardPresentation,
+      overlayController: _freeSpinOverlayController,
+      overlay: _stageOverlayKey.currentState,
+      isMounted: () => mounted,
+      setState: setState,
+      releaseFsRoundHold: _viewModel.releaseFsRoundHold,
+      continueAutoSpinIfIdle: _continueAutoSpinIfPresentationIdle,
     );
   }
 
@@ -567,9 +443,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _bigWinOverlayController.dispose();
     _freeSpinOverlayController.dispose();
     _flyingTumbleOverlayController.dispose();
+    _freeSpinAwardSequenceController.dispose();
     _isBigWinShowing = false;
-    _freeSpinTransitionTimer?.cancel();
-    _scatterPulseTimer?.cancel();
     _assetPrecacheService.dispose();
     _lingeringClusterTimer?.cancel();
     _celebrationLockWatchdog?.cancel();
@@ -684,7 +559,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       celebrationActive: _isCelebrationActive,
       freeSpinAwardSequenceActive: _freeSpinAwardPresentation.sequenceActive,
       hasPendingFreeSpinAward: _freeSpinAwardPresentation.hasPendingPopup,
-      scatterPulseActive: _scatterPulseTimer?.isActive == true,
+      scatterPulseActive: _freeSpinAwardSequenceController.scatterPulseActive,
       hasActiveFreeSpinOverlay: _freeSpinOverlayController.hasActiveOverlay,
       showFreeSpinTransition: _freeSpinAwardPresentation.showTransition,
       fsSummaryPopupVisible: _freeSpinAwardPresentation.summaryPopupVisible,
