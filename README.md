@@ -6,11 +6,11 @@ The project is structured as a real application rather than a single demo screen
 
 ## Screenshots
 
-![Winner Spin base game screen](./docs/screenshots/winner-spin-base-game.jpeg)
-
-![Winner Spin free spins screen](./docs/screenshots/winner-spin-free-spins.jpeg)
-
-![Winner Spin super win screen](./docs/screenshots/winner-spin-super-win.jpeg)
+<p align="left">
+  <img src="./docs/screenshots/winner-spin-base-game.jpeg" width="250" alt="Winner Spin base game screen" />
+  <img src="./docs/screenshots/winner-spin-free-spins.jpeg" width="250" alt="Winner Spin free spins screen" />
+  <img src="./docs/screenshots/winner-spin-super-win.jpeg" width="250" alt="Winner Spin super win screen" />
+</p>
 
 ## Highlights
 
