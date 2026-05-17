@@ -290,8 +290,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   Future<void> _exitGame() async {
     if (_isExiting) return;
     setState(() => _isExiting = true);
+    final viewModel = widget.viewModel;
     Navigator.of(context).pop();
-    await widget.viewModel.signOut();
+    await WidgetsBinding.instance.endOfFrame;
+    await viewModel.signOut();
   }
 
   Widget _buildExitButton() {

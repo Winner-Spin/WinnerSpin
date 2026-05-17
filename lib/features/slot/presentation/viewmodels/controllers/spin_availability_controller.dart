@@ -22,6 +22,25 @@ class SpinAvailabilityController {
     return isInFreeSpins || canAffordBet;
   }
 
+  bool canToggleSpeed({required bool isBusy, required bool isAutoSpinning}) {
+    return !isBusy || isAutoSpinning;
+  }
+
+  bool canToggleAnte({
+    required bool isBusy,
+    required bool isAutoSpinning,
+    required bool isInFreeSpins,
+  }) {
+    return !isBusy && !isAutoSpinning && !isInFreeSpins;
+  }
+
+  bool canChangeBet({
+    required bool isAutoSpinning,
+    required bool isInFreeSpins,
+  }) {
+    return !isAutoSpinning && !isInFreeSpins;
+  }
+
   bool shouldPulseLandingScatters({
     required bool isInFreeSpins,
     required SpinResult? pendingResult,

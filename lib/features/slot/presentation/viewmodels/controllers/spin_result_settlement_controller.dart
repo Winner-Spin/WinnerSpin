@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 
-import '../../../domain/models/pool_state.dart';
 import '../../../domain/models/spin_result.dart';
 import 'ante_controller.dart';
 import 'balance_controller.dart';
@@ -58,10 +57,6 @@ class SpinResultSettlementController {
     if (isInFreeSpins) return;
     anteController.clearRoundFlag();
     freeSpinsController.clearRoundFlag();
-  }
-
-  void recordPayout({required PoolState pool, required double amount}) {
-    pool.recordPayout(amount);
   }
 
   void showWinningPositions({

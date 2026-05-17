@@ -28,13 +28,10 @@ import '../services/game_screen_startup_service.dart';
 import '../services/scatter_cell_finder.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'widgets/slot_reel.dart';
-import 'widgets/game_utility_buttons.dart';
-import 'widgets/game_feature_controls.dart';
 import 'widgets/free_spin_scatter_transition.dart';
 import 'widgets/game_background.dart';
-import 'widgets/game_bottom_info_slot.dart';
 import 'widgets/game_free_spin_info_slot.dart';
-import 'widgets/game_spin_controls_slot.dart';
+import 'widgets/game_stage_control_overlay.dart';
 import 'widgets/game_status_bands.dart';
 import 'widgets/game_status_text.dart';
 import 'widgets/game_tumble_win_slot.dart';
@@ -763,60 +760,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   style: _styles.statusBase.copyWith(fontSize: 16),
                 ),
               ),
-              GameFeatureControls(
-                screenH: metrics.screenH,
-                screenW: metrics.screenW,
-                buyFeatureListenable: _listenables.buyFeature,
-                anteToggleListenable: _listenables.anteToggle,
+              GameStageControlOverlay(
+                metrics: metrics,
+                viewModel: _viewModel,
+                listenables: _listenables,
+                styles: _styles,
                 isFreeSpinVisualMode: () => _isFreeSpinVisualMode,
                 isBigWinShowing: () => _isBigWinShowing,
-                isBusy: () => _viewModel.isBusy,
                 isCelebrationActive: () => _isCelebrationActive,
-                anteBetActive: () => _viewModel.anteBetActive,
-                canBuyFreeSpinsForUi: () => _viewModel.canBuyFreeSpinsForUi,
-                isAutoSpinning: () => _viewModel.isAutoSpinning,
-                isInFreeSpins: () => _viewModel.isInFreeSpins,
-                vibrationEnabled: () => _viewModel.vibration,
-                buyFeaturePrice: () => _viewModel.buyFeaturePrice,
-                anteCost: () => _viewModel.anteCost,
                 onBuyFeatureTap: _promptBuyFreeSpinsConfirm,
-                onAnteTap: _viewModel.toggleAnteBet,
-              ),
-              GameSpinControlsSlot(
-                screenH: metrics.screenH,
-                listenable: _listenables.spinControls,
-                autoSpinActive: () => _viewModel.isAutoSpinning,
-                bigWinShowing: () => _isBigWinShowing,
-                spinning: () => _viewModel.isBusy || _isCelebrationActive,
-                canDecreaseBet: () => _viewModel.canDecreaseBet,
-                canIncreaseBet: () => _viewModel.canIncreaseBet,
-                isInFreeSpins: () => _viewModel.isInFreeSpins,
-                autoSpinsRemaining: () => _viewModel.autoSpinsRemaining,
-                onDecreaseBet: _viewModel.decreaseBet,
-                onIncreaseBet: _viewModel.increaseBet,
-                onSpin: _viewModel.spin,
-                onStopAutoSpin: _viewModel.stopAutoSpin,
-              ),
-              GameUtilityButtons(
-                screenH: metrics.screenH,
-                screenW: metrics.screenW,
-                listenable: _viewModel,
-                bigWinShowing: () => _isBigWinShowing,
-                autoSpinning: () => _viewModel.isAutoSpinning,
-                betAmount: () => _viewModel.betAmount,
-                speedMultiplier: () => _viewModel.speedMultiplier,
                 onInfoTap: _showGameRules,
                 onSettingsTap: _showSystemSettings,
                 onAutoSpinTap: _showAutoPlaySettings,
-                onSpeedTap: _viewModel.toggleSpeed,
-              ),
-              GameBottomInfoSlot(
-                balanceListenable: _viewModel.balanceCtrl,
-                balance: () => _viewModel.balance,
-                betAmount: () => _viewModel.betAmount,
-                labelStyle: _styles.bottomLabel,
-                valueStyle: _styles.bottomValue,
-                clockStyle: _styles.bottomClock,
               ),
               if (_freeSpinAwardPresentation.showTransition)
                 const Positioned.fill(child: FreeSpinScatterTransition()),

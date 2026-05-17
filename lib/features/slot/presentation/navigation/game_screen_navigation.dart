@@ -106,10 +106,8 @@ class GameScreenNavigation {
         opaque: false,
         barrierDismissible: true,
         barrierColor: Colors.transparent,
-        pageBuilder: (_, _, _) => BuyFreeSpinsConfirmScreen(
-          spinCount: spinCount,
-          price: price,
-        ),
+        pageBuilder: (_, _, _) =>
+            BuyFreeSpinsConfirmScreen(spinCount: spinCount, price: price),
         transitionsBuilder: (_, anim, _, child) =>
             buildSpringPopupTransition(anim, child),
         transitionDuration: const Duration(milliseconds: 280),
@@ -126,9 +124,12 @@ class GameScreenNavigation {
   }) {
     if (!isMounted || !viewModel.loggedOut) return;
     viewModel.resetLoggedOut();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    });
   }
 }

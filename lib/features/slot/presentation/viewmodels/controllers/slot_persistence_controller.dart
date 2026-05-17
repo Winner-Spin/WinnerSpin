@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../../../../auth/domain/repositories/auth_repository.dart';
+import '../../../data/repositories/firestore_pool_repository.dart';
 import '../../../domain/models/pool_state.dart';
 import '../../../domain/repositories/pool_repository.dart';
 
@@ -10,6 +12,16 @@ class SlotPersistenceController {
     required PoolRepository poolRepository,
   }) : _authRepository = authRepository,
        _poolRepository = poolRepository;
+
+  factory SlotPersistenceController.withDefaults({
+    AuthRepository? authRepository,
+    PoolRepository? poolRepository,
+  }) {
+    return SlotPersistenceController(
+      authRepository: authRepository ?? FirebaseAuthRepository(),
+      poolRepository: poolRepository ?? FirestorePoolRepository(),
+    );
+  }
 
   final AuthRepository _authRepository;
   final PoolRepository _poolRepository;
@@ -26,6 +38,20 @@ class SlotPersistenceController {
 
   Future<PoolState> loadPool(String userId) {
     return _poolRepository.load(userId);
+  }
+
+  Future<({Map<String, dynamic>? userData, PoolState pool})> loadUserSession(
+    String userId,
+  ) async {
+    final results = await Future.wait<Object?>([
+      getUserData(userId),
+      loadPool(userId),
+    ]);
+
+    return (
+      userData: results[0] as Map<String, dynamic>?,
+      pool: results[1] as PoolState,
+    );
   }
 
   Future<void> savePlayerState({
