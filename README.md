@@ -1,4 +1,8 @@
-# Winner Spin
+# Winner Spin: Flutter Slot Game
+
+<img src="./assets/app_icon.png" alt="Winner Spin logo" width="120" height="120" />
+
+### App Name: Winner Spin
 
 Winner Spin is a Flutter slot game prototype with Firebase-backed user accounts, a custom cascading slot engine, free-spin features, multiplier collection, animated win presentation, audio feedback, and RTP-focused simulation tests.
 
