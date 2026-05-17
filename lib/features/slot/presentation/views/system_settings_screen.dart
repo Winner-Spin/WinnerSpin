@@ -5,9 +5,12 @@ import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
 import 'deposit_money_screen.dart';
 import 'game_history_screen.dart';
-import 'widgets/custom_switch.dart';
 import 'widgets/spring_popup_card.dart';
 import 'widgets/system_settings_bet_section.dart';
+import 'widgets/system_settings_footer.dart';
+import 'widgets/system_settings_header.dart';
+import 'widgets/system_settings_history_entry.dart';
+import 'widgets/system_settings_row.dart';
 
 class SystemSettingsScreen extends StatefulWidget {
   final GameViewModel viewModel;
@@ -78,7 +81,20 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                             borderRadius: BorderRadius.circular(26),
                             child: Column(
                               children: [
-                                _buildHeader(context),
+                                SystemSettingsHeader(
+                                  title: 'SETTINGS',
+                                  textColor: _textColor,
+                                  panelAccent: _panelAccent,
+                                  isExiting: _isExiting,
+                                  onExit: () {
+                                    UiClickSound.play();
+                                    _exitGame();
+                                  },
+                                  onClose: () {
+                                    UiClickSound.play();
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
                                 Expanded(
                                   child: RawScrollbar(
                                     controller: _scrollController,
@@ -105,7 +121,15 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
-                                          _buildGameHistory(),
+                                          SystemSettingsHistoryEntry(
+                                            textColor: _textColor,
+                                            onTap: () {
+                                              UiClickSound.play();
+                                              setState(
+                                                () => _showGameHistory = true,
+                                              );
+                                            },
+                                          ),
                                           const SizedBox(height: 24),
                                           const Divider(
                                             color: Color(0x332C2530),
@@ -123,9 +147,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                                       fontSize: 20,
                                                       fontWeight:
                                                           FontWeight.w900,
-                                                      color: const Color(
-                                                        0xFF2C2530,
-                                                      ),
+                                                      color: _textColor,
                                                       letterSpacing: 1.2,
                                                     ),
                                               ),
@@ -137,37 +159,40 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                             builder: (context, _) {
                                               return Column(
                                                 children: [
-                                                  _buildSettingRow(
+                                                  SystemSettingsRow(
                                                     title: 'AMBIENT MUSIC',
                                                     description:
                                                         'TURN GAME MUSIC ON OR OFF',
                                                     value: widget
                                                         .viewModel
                                                         .ambientMusic,
+                                                    textColor: _textColor,
                                                     onChanged: (v) => widget
                                                         .viewModel
                                                         .setAmbientMusic(v),
                                                   ),
                                                   const SizedBox(height: 24),
-                                                  _buildSettingRow(
+                                                  SystemSettingsRow(
                                                     title: 'SOUND EFFECTS',
                                                     description:
                                                         'TURN GAME SOUNDS ON OR OFF',
                                                     value: widget
                                                         .viewModel
                                                         .soundEffects,
+                                                    textColor: _textColor,
                                                     onChanged: (v) => widget
                                                         .viewModel
                                                         .setSoundEffects(v),
                                                   ),
                                                   const SizedBox(height: 24),
-                                                  _buildSettingRow(
+                                                  SystemSettingsRow(
                                                     title: 'VIBRATION',
                                                     description:
                                                         'TURN IN-GAME VIBRATIONS ON OR OFF',
                                                     value: widget
                                                         .viewModel
                                                         .vibration,
+                                                    textColor: _textColor,
                                                     onChanged: (v) => widget
                                                         .viewModel
                                                         .setVibration(v),
@@ -176,42 +201,18 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                               );
                                             },
                                           ),
-
                                           const SizedBox(height: 32),
                                           const Divider(
                                             color: Color(0x332C2530),
                                             height: 1,
                                           ),
                                           const SizedBox(height: 24),
-
                                           SystemSettingsBetSection(
                                             viewModel: widget.viewModel,
                                             onBuyGameMoney: _showDepositMoney,
                                           ),
                                           const SizedBox(height: 36),
-                                          Text(
-                                            'Made with ☕️ & 💻 by Hakan Güneş & Enes Eken',
-                                            textAlign: TextAlign.center,
-                                            style: GoogleFonts.barlowCondensed(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black,
-                                              letterSpacing: 0.3,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.',
-                                            textAlign: TextAlign.center,
-                                            style: GoogleFonts.barlowCondensed(
-                                              fontSize: 8.5,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black.withValues(
-                                                alpha: 0.74,
-                                              ),
-                                              height: 1.08,
-                                            ),
-                                          ),
+                                          const SystemSettingsFooter(),
                                         ],
                                       ),
                                     ),
@@ -241,52 +242,6 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      height: 74,
-      padding: const EdgeInsets.fromLTRB(18, 8, 14, 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6D7EB),
-        border: Border(
-          bottom: BorderSide(color: _textColor.withValues(alpha: 0.10)),
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(alignment: Alignment.centerLeft, child: _buildExitButton()),
-          Text(
-            'SETTINGS',
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 27,
-              fontWeight: FontWeight.w900,
-              color: _textColor,
-              letterSpacing: 1.2,
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () {
-                UiClickSound.play();
-                Navigator.of(context).pop();
-              },
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: _panelAccent.withValues(alpha: 0.88),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, size: 30, color: _textColor),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _exitGame() async {
     if (_isExiting) return;
     setState(() => _isExiting = true);
@@ -294,57 +249,6 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     Navigator.of(context).pop();
     await WidgetsBinding.instance.endOfFrame;
     await viewModel.signOut();
-  }
-
-  Widget _buildExitButton() {
-    return GestureDetector(
-      onTap: _isExiting
-          ? null
-          : () {
-              UiClickSound.play();
-              _exitGame();
-            },
-      child: AnimatedOpacity(
-        opacity: _isExiting ? 0.55 : 1,
-        duration: const Duration(milliseconds: 120),
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _panelAccent.withValues(alpha: 0.88),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.logout_rounded, size: 30, color: _textColor),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGameHistory() {
-    return GestureDetector(
-      onTap: () {
-        UiClickSound.play();
-        setState(() => _showGameHistory = true);
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'GAME HISTORY',
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: _textColor.withValues(alpha: 0.70),
-            ),
-          ),
-          Icon(
-            Icons.open_in_new,
-            color: _textColor.withValues(alpha: 0.70),
-            size: 24,
-          ),
-        ],
-      ),
-    );
   }
 
   void _showDepositMoney() {
@@ -371,44 +275,5 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       reverseCurve: Curves.easeInCubic,
     );
     return FadeTransition(opacity: fade, child: child);
-  }
-
-  Widget _buildSettingRow({
-    required String title,
-    required String description,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: _textColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _textColor.withValues(alpha: 0.58),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        CustomSwitch(value: value, onChanged: onChanged),
-      ],
-    );
   }
 }
