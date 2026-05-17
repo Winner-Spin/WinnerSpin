@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/game_stage_layout.dart';
 import 'game_bottom_gradient_panel.dart';
 import 'game_bottom_panel.dart';
 
@@ -24,17 +25,20 @@ class GameBottomInfoSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 12,
+      bottom: GameStageLayout.bottomInfoInset,
       left: 0,
       right: 0,
+      height: GameStageLayout.bottomInfoPanelHeight,
       child: GameBottomGradientPanel(
-        child: GameBottomPanel(
-          balanceListenable: balanceListenable,
-          balance: balance,
-          betAmount: betAmount,
-          labelStyle: labelStyle,
-          valueStyle: valueStyle,
-          clockStyle: clockStyle,
+        child: Center(
+          child: GameBottomPanel(
+            balanceListenable: balanceListenable,
+            balance: balance,
+            betAmount: betAmount,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+            clockStyle: clockStyle,
+          ),
         ),
       ),
     );

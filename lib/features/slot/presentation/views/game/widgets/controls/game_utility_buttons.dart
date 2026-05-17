@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/game_stage_layout.dart';
 import 'auto_spin_button.dart';
 import 'info_button.dart';
 import 'settings_button.dart';
@@ -35,10 +36,12 @@ class GameUtilityButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final buttonTop = GameStageLayout.utilityButtonTop(screenH);
+
     return Stack(
       children: [
         Positioned(
-          top: screenH * 0.90,
+          top: buttonTop,
           left: 0,
           child: ListenableBuilder(
             listenable: listenable,
@@ -49,12 +52,12 @@ class GameUtilityButtons extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: screenH * 0.90,
+          top: buttonTop,
           right: 0,
           child: SettingsButton(onTap: bigWinShowing() ? null : onSettingsTap),
         ),
         Positioned(
-          top: screenH * 0.90,
+          top: buttonTop,
           left: screenW * 0.30,
           child: ListenableBuilder(
             listenable: listenable,
@@ -64,7 +67,7 @@ class GameUtilityButtons extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: screenH * 0.90,
+          top: buttonTop,
           left: screenW * 0.5 + 42,
           child: ListenableBuilder(
             listenable: listenable,

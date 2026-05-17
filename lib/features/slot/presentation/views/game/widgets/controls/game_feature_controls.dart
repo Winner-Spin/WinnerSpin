@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/game_stage_layout.dart';
 import 'buy_feature_button.dart';
 import 'double_chance_button.dart';
 
@@ -48,7 +49,7 @@ class GameFeatureControls extends StatelessWidget {
     return Stack(
       children: [
         Positioned(
-          top: screenH * 0.55,
+          top: GameStageLayout.normalStatusBandBottom(screenH),
           left: screenW * 0.08,
           child: ListenableBuilder(
             listenable: buyFeatureListenable,
@@ -73,7 +74,7 @@ class GameFeatureControls extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: screenH * 0.55,
+          top: GameStageLayout.normalStatusBandBottom(screenH),
           right: screenW * 0.08,
           child: ListenableBuilder(
             listenable: anteToggleListenable,

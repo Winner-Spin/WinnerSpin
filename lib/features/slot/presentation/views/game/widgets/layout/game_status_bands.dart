@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/game_stage_layout.dart';
 import 'status_band.dart';
 
 class GameStatusBands extends StatelessWidget {
@@ -28,8 +29,8 @@ class GameStatusBands extends StatelessWidget {
       listenable: freeSpinVisualListenable,
       builder: (context, _) {
         final isFs = isFreeSpinVisualMode();
-        const bandHeight = 31.0;
-        const wideGap = 31.0;
+        const bandHeight = GameStageLayout.statusBandHeight;
+        const wideGap = GameStageLayout.statusBandGap;
         const infoTop = bandHeight;
         const kazancTop = infoTop + bandHeight + wideGap;
         const fsTotalHeight = kazancTop + bandHeight;
@@ -42,7 +43,7 @@ class GameStatusBands extends StatelessWidget {
         );
 
         return Positioned(
-          top: screenH * 0.5185,
+          top: screenH * GameStageLayout.statusBandTopRatio,
           left: 0,
           right: 0,
           height: totalHeight,
