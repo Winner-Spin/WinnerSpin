@@ -4,12 +4,12 @@ import '../../../auth/presentation/views/login_screen.dart';
 import '../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../audio/ui_click_sound.dart';
 import '../viewmodels/game_viewmodel.dart';
-import '../views/auto_play_settings_screen.dart';
-import '../views/buy_freespins_confirm_screen.dart';
-import '../views/game_rules_screen.dart';
-import '../views/system_settings_screen.dart';
-import '../views/widgets/first_launch_disclaimer_dialog.dart';
-import '../views/widgets/spring_popup_transition.dart';
+import '../views/auto_play/auto_play_settings_screen.dart';
+import '../views/buy_freespins/buy_freespins_confirm_screen.dart';
+import '../views/rules/game_rules_screen.dart';
+import '../views/settings/system_settings_screen.dart';
+import '../views/game/widgets/presentation/first_launch_disclaimer_dialog.dart';
+import '../views/shared/widgets/spring_popup_transition.dart';
 
 class GameScreenNavigation {
   const GameScreenNavigation._();

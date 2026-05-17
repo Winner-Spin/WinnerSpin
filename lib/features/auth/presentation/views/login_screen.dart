@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import 'register_screen.dart';
-import '../../../slot/presentation/views/game_screen.dart';
+import '../../../slot/presentation/views/game/game_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

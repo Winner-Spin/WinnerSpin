@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import '../../domain/models/symbol_registry.dart';
 import '../models/game_presentation_timings.dart';
 import '../models/win_tier.dart';
-import '../views/widgets/big_win_overlay.dart';
-import '../views/widgets/free_spin_scatter_transition.dart';
-import '../views/widgets/free_spin_summary_popup.dart';
-import '../views/widgets/free_spin_win_popup.dart';
-import '../views/widgets/multiplier_label.dart';
+import '../views/game/widgets/presentation/big_win_overlay.dart';
+import '../views/game/widgets/presentation/free_spin_scatter_transition.dart';
+import '../views/game/widgets/presentation/free_spin_summary_popup.dart';
+import '../views/game/widgets/presentation/free_spin_win_popup.dart';
+import '../views/game/widgets/playfield/multiplier_label.dart';
 
 class GameAssetPrecacheService {
   static const int freeSpinPopupCacheWidth = 1024;

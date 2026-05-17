@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../viewmodels/game_viewmodel.dart';
-import '../views/widgets/win_presentation_controller.dart';
+import '../views/game/widgets/presentation/win_presentation_controller.dart';
 
 class GameScreenListenables {
   final Listenable freeSpinVisual;
