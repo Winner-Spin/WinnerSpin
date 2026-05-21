@@ -32,6 +32,7 @@ class LoginViewModel extends ChangeNotifier {
   bool get isMusicMuted => _isMusicMuted;
 
   bool _isMusicInitialized = false;
+  bool _hasStartedMusic = false;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -41,7 +42,7 @@ class LoginViewModel extends ChangeNotifier {
       if (_isMusicMuted) {
         await _audioPlayer.pause();
       } else {
-        await _audioPlayer.resume();
+        await _playOrResumeMusic();
       }
       notifyListeners();
       return;
@@ -51,7 +52,7 @@ class LoginViewModel extends ChangeNotifier {
     await _audioPlayer.setAudioContext(AppAudioContext.game);
     await _audioPlayer.setReleaseMode(ReleaseMode.loop);
     if (AmbientMusicPreference.enabled) {
-      await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
+      await _playOrResumeMusic();
     }
     _isMusicMuted = !AmbientMusicPreference.enabled;
     notifyListeners();
@@ -105,7 +106,7 @@ class LoginViewModel extends ChangeNotifier {
     if (_isMusicMuted) {
       _audioPlayer.pause();
     } else {
-      _audioPlayer.resume();
+      _playOrResumeMusic();
     }
     notifyListeners();
   }
@@ -117,9 +118,13 @@ class LoginViewModel extends ChangeNotifier {
   }
 
   Future<void> onReturned() async {
-    if (!_isMusicMuted) {
-      await _audioPlayer.resume();
+    _isMusicMuted = !AmbientMusicPreference.enabled;
+    if (_isMusicMuted) {
+      await _audioPlayer.pause();
+    } else {
+      await _playOrResumeMusic();
     }
+    notifyListeners();
   }
 
   void _setLoading(bool value) {
@@ -144,5 +149,14 @@ class LoginViewModel extends ChangeNotifier {
       case AuthErrorCode.unknown:
         return 'Login failed. Please try again.';
     }
+  }
+
+  Future<void> _playOrResumeMusic() async {
+    if (_hasStartedMusic) {
+      await _audioPlayer.resume();
+      return;
+    }
+    _hasStartedMusic = true;
+    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
   }
 }

@@ -1,5 +1,10 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/audio/ambient_music_preference.dart';
+import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 
@@ -23,6 +28,38 @@ class RegisterViewModel extends ChangeNotifier {
 
   bool _registrationSuccess = false;
   bool get registrationSuccess => _registrationSuccess;
+
+  bool _isMusicMuted = !AmbientMusicPreference.enabled;
+  bool get isMusicMuted => _isMusicMuted;
+
+  bool _isMusicInitialized = false;
+  bool _hasStartedMusic = false;
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  Future<void> initMusic() async {
+    if (_isMusicInitialized) {
+      _isMusicMuted = !AmbientMusicPreference.enabled;
+      if (_isMusicMuted) {
+        await _audioPlayer.pause();
+      } else {
+        await _playOrResumeMusic();
+      }
+      notifyListeners();
+      return;
+    }
+
+    _isMusicInitialized = true;
+    await _audioPlayer.setAudioContext(AppAudioContext.game);
+    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+
+    if (AmbientMusicPreference.enabled) {
+      await _playOrResumeMusic();
+    }
+
+    _isMusicMuted = !AmbientMusicPreference.enabled;
+    notifyListeners();
+  }
 
   Future<void> register() async {
     _errorMessage = null;
@@ -85,6 +122,17 @@ class RegisterViewModel extends ChangeNotifier {
     _registrationSuccess = false;
   }
 
+  void toggleMusic() {
+    _isMusicMuted = !_isMusicMuted;
+    AmbientMusicPreference.enabled = !_isMusicMuted;
+    if (_isMusicMuted) {
+      _audioPlayer.pause();
+    } else {
+      _playOrResumeMusic();
+    }
+    notifyListeners();
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -107,8 +155,18 @@ class RegisterViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> _playOrResumeMusic() async {
+    if (_hasStartedMusic) {
+      await _audioPlayer.resume();
+      return;
+    }
+    _hasStartedMusic = true;
+    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
+  }
+
   @override
   void dispose() {
+    unawaited(_audioPlayer.dispose());
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();

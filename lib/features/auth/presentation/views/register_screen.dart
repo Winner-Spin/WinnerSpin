@@ -27,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   void initState() {
     super.initState();
     _viewModel.addListener(_onViewModelChange);
+    unawaited(_viewModel.initMusic());
     _errorPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -100,9 +101,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                     child: AnimatedImageButton(
                       imagePath: 'lib/images/register_screen/music_button.png',
                       width: 46,
-                      onTap: () {
-                        // TODO: Toggle music
-                      },
+                      isStrikeThrough: _viewModel.isMusicMuted,
+                      onTap: _viewModel.toggleMusic,
                     ),
                   ),
 
