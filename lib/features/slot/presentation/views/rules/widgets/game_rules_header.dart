@@ -22,7 +22,7 @@ class GameRulesHeader extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Text('OYUN KURALLARI', style: GameRulesStyles.headerTitle()),
+          Text('GAME RULES', style: GameRulesStyles.headerTitle()),
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
