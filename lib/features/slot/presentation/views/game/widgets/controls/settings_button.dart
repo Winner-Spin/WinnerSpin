@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -127,36 +128,36 @@ class GearIconPainter extends CustomPainter {
     final toothH = tipR - bodyR + w * 0.05;
     final holeR = w * 0.13;
 
-    canvas.saveLayer(Rect.fromLTWH(0, 0, w, h), Paint());
-
-    canvas.drawCircle(Offset(cx, cy), bodyR, paint);
+    final gearPath = Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: bodyR));
 
     for (var i = 0; i < 8; i++) {
       final angle = i * math.pi / 4;
-      canvas.save();
-      canvas.translate(cx, cy);
-      canvas.rotate(angle);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(0, -tipR + toothH / 2),
-            width: toothW,
-            height: toothH,
-          ),
-          Radius.circular(toothW * 0.28),
-        ),
-        paint,
+      
+      final toothRect = Rect.fromCenter(
+        center: Offset(0, -tipR + toothH / 2),
+        width: toothW,
+        height: toothH,
       );
-      canvas.restore();
+      
+      final toothPath = Path()
+        ..addRRect(RRect.fromRectAndRadius(toothRect, Radius.circular(toothW * 0.28)));
+      
+      final cosA = math.cos(angle);
+      final sinA = math.sin(angle);
+      final matrix = Float64List.fromList([
+        cosA, sinA, 0.0, 0.0,
+        -sinA, cosA, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        cx, cy, 0.0, 1.0,
+      ]);
+        
+      gearPath.addPath(toothPath, Offset.zero, matrix4: matrix);
     }
 
-    canvas.drawCircle(
-      Offset(cx, cy),
-      holeR,
-      Paint()..blendMode = BlendMode.clear,
-    );
+    final holePath = Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: holeR));
+    final finalPath = Path.combine(PathOperation.difference, gearPath, holePath);
 
-    canvas.restore();
+    canvas.drawPath(finalPath, paint);
   }
 
   @override
