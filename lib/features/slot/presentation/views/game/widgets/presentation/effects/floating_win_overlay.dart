@@ -209,10 +209,9 @@ class _EffectPainter extends CustomPainter {
         canvas.drawCircle(Offset(px, py), p.size * life, paint);
 
         final glow = Paint()
-          ..color = p.color.withValues(alpha: alpha * 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
+          ..color = p.color.withValues(alpha: alpha * 0.25)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset(px, py), p.size * 2 * life, glow);
+        canvas.drawCircle(Offset(px, py), p.size * 1.8 * life, glow);
       }
 
       final textT = Curves.easeOutCubic.transform(t);

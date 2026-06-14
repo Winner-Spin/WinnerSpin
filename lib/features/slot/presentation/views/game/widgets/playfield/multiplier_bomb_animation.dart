@@ -299,7 +299,7 @@ class _DustResiduePainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius * 0.55));
     canvas.drawCircle(center, radius * 0.55, coreGlow);
 
-    const rayCount = 30;
+    const rayCount = 16;
     for (var i = 0; i < rayCount; i++) {
       final base = (i / rayCount) * math.pi * 2;
       final jitter = (_h(11, i) - 0.5) * (math.pi / rayCount) * 1.4;
@@ -313,7 +313,7 @@ class _DustResiduePainter extends CustomPainter {
       _drawSpark(canvas, center, angle, inner, outer, width, color);
     }
 
-    for (var i = 0; i < 36; i++) {
+    for (var i = 0; i < 20; i++) {
       final angle = i * 2.399963229728653 + 0.7;
       final dist = radius * (0.30 + _h(53, i) * 0.70);
       final point =
@@ -321,10 +321,7 @@ class _DustResiduePainter extends CustomPainter {
       final dotRadius = shortest * (0.008 + _h(67, i) * 0.012);
       final color = _palette[(i * 5) % _palette.length];
 
-      final glow = Paint()
-        ..shader = RadialGradient(
-          colors: [color.withValues(alpha: 0.50), color.withValues(alpha: 0.0)],
-        ).createShader(Rect.fromCircle(center: point, radius: dotRadius * 2.6));
+      final glow = Paint()..color = color.withValues(alpha: 0.35);
       canvas.drawCircle(point, dotRadius * 2.6, glow);
       canvas.drawCircle(
         point,
@@ -350,23 +347,7 @@ class _DustResiduePainter extends CustomPainter {
     final paint = Paint()
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round
-      ..shader =
-          LinearGradient(
-            colors: [
-              _coreColor.withValues(alpha: 0.55),
-              color.withValues(alpha: 0.65),
-              color.withValues(alpha: 0.0),
-            ],
-            stops: const [0.0, 0.4, 1.0],
-            begin: const Alignment(-1, 0),
-            end: const Alignment(1, 0),
-            transform: GradientRotation(angle),
-          ).createShader(
-            Rect.fromPoints(
-              center.translate(-outerR, -outerR),
-              center.translate(outerR, outerR),
-            ),
-          );
+      ..color = color.withValues(alpha: 0.60);
     canvas.drawLine(p1, p2, paint);
   }
 

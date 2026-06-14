@@ -157,38 +157,14 @@ class _ScatterPulseState extends State<ScatterPulse>
                 ),
               if (glow > 0)
                 Positioned.fill(
-                  child: Container(
-                    margin: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xFFFFD700,
-                          ).withValues(alpha: glow * 0.95),
-                          blurRadius: 18,
-                          spreadRadius: 10,
-                        ),
-                        BoxShadow(
-                          color: const Color(
-                            0xFFFFFFFF,
-                          ).withValues(alpha: glow * 0.38),
-                          blurRadius: 8,
-                          spreadRadius: 3,
-                        ),
-                      ],
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _ScatterGlowPainter(opacity: glow),
                     ),
                   ),
                 ),
               Transform.scale(scale: scale, child: child),
-              if (haloOpacity > 0)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _ScatterGoldHaloPainter(opacity: haloOpacity),
-                    ),
-                  ),
-                ),
+
             ],
           );
         },
@@ -198,39 +174,34 @@ class _ScatterPulseState extends State<ScatterPulse>
   }
 }
 
-class _ScatterGoldHaloPainter extends CustomPainter {
-  _ScatterGoldHaloPainter({required this.opacity});
+class _ScatterGlowPainter extends CustomPainter {
+  _ScatterGlowPainter({required this.opacity});
 
   final double opacity;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) * 0.54;
-    final ringPaint = Paint()
-      ..color = const Color(0xFFFFD700).withValues(alpha: opacity * 0.75)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(2, radius * 0.08)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    final baseRadius = math.min(size.width, size.height) * 0.5;
 
-    canvas.drawCircle(center, radius, ringPaint);
+    final paint1 = Paint()
+      ..color = const Color(0xFFFFD700).withValues(alpha: opacity * 0.15)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, baseRadius * 1.5, paint1);
 
-    final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: opacity * 0.45)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.2, radius * 0.035);
+    final paint2 = Paint()
+      ..color = const Color(0xFFFFD700).withValues(alpha: opacity * 0.30)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, baseRadius * 1.2, paint2);
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius * 0.84),
-      -math.pi * 0.78,
-      math.pi * 0.62,
-      false,
-      highlightPaint,
-    );
+    final paint3 = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: opacity * 0.50)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, baseRadius * 1.0, paint3);
   }
 
   @override
-  bool shouldRepaint(covariant _ScatterGoldHaloPainter oldDelegate) {
+  bool shouldRepaint(covariant _ScatterGlowPainter oldDelegate) {
     return oldDelegate.opacity != opacity;
   }
 }
