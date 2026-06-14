@@ -61,15 +61,7 @@ class BigWinCoinsPainter extends CustomPainter {
       canvas.drawCircle(
         centre,
         r * 0.86,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _faceTop.withValues(alpha: alpha),
-              _faceBottom.withValues(alpha: alpha),
-            ],
-          ).createShader(Rect.fromCircle(center: centre, radius: r * 0.86)),
+        Paint()..color = _faceBottom.withValues(alpha: alpha),
       );
 
       canvas.drawCircle(

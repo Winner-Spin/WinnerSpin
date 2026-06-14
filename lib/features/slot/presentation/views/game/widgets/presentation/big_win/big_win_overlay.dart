@@ -131,11 +131,14 @@ class _BigWinOverlayState extends State<BigWinOverlay>
 
     final rng = Random();
 
-    _coins = List.generate(80, (i) {
+    // Coinlerin x koordinatlarını homojen dağıtmak için ekranı 40 dilime bölüp karıştırıyoruz
+    final xPositions = List.generate(40, (i) => i / 40.0)..shuffle(rng);
+
+    _coins = List.generate(40, (i) {
       final startProgress =
-          ((i + rng.nextDouble()) / 80) * bigWinCoinRainCycleProgress;
+          ((i + rng.nextDouble()) / 40) * bigWinCoinRainCycleProgress;
       return BigWinCoin(
-        x: rng.nextDouble(),
+        x: (xPositions[i] + (rng.nextDouble() - 0.5) * 0.05).clamp(0.0, 1.0),
         startProgress: startProgress,
         fallDuration: 0.30 + rng.nextDouble() * 0.24,
         size: 14.0 + rng.nextDouble() * 10.0,
