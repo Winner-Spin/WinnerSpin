@@ -24,6 +24,7 @@ class GameBackground extends StatelessWidget {
             fit: BoxFit.cover,
             alignment: const Alignment(0, -0.4),
             filterQuality: FilterQuality.low,
+            cacheWidth: 1080,
           ),
         );
       },
