@@ -121,7 +121,7 @@ class _TumbleCellState extends State<TumbleCell> with TickerProviderStateMixin {
 
   List<TumbleParticle> _generateParticles() {
     final rng = math.Random();
-    return List.generate(90, (_) => TumbleParticle.random(rng));
+    return List.generate(40, (_) => TumbleParticle.random(rng));
   }
 
   void _playPopSound() {

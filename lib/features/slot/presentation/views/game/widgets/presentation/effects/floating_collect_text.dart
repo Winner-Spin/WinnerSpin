@@ -85,7 +85,7 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
       Color(0xFFFF4081),
       Color(0xFFFFAB91),
     ];
-    _sparks = List.generate(36, (i) {
+    _sparks = List.generate(20, (i) {
       final angle = rng.nextDouble() * 2 * math.pi;
       final speed = i.isEven
           ? 0.55 + rng.nextDouble() * 0.30
@@ -343,17 +343,8 @@ class _SettleEffectPainter extends CustomPainter {
       final fade = (1.0 - progress).clamp(0.0, 1.0);
       final radius = s.size * (1.0 - progress * 0.4);
 
-      final glow = Paint()
-        ..shader =
-            RadialGradient(
-              colors: [
-                s.color.withValues(alpha: fade * 0.85),
-                s.color.withValues(alpha: 0),
-              ],
-            ).createShader(
-              Rect.fromCircle(center: Offset(px, py), radius: radius * 2.2),
-            );
-      canvas.drawCircle(Offset(px, py), radius * 2.2, glow);
+      final glow = Paint()..color = s.color.withValues(alpha: fade * 0.65);
+      canvas.drawCircle(Offset(px, py), radius * 1.6, glow);
 
       final core = Paint()..color = Colors.white.withValues(alpha: fade * 0.95);
       canvas.drawCircle(Offset(px, py), radius * 0.55, core);
