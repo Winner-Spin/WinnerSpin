@@ -153,6 +153,7 @@ class FreeSpinAwardSequenceController {
           awardPresentation: awardPresentation,
           overlayController: overlayController,
           overlay: overlay,
+          setState: setState,
           continueAutoSpinIfIdle: continueAutoSpinIfIdle,
         ),
       );
@@ -182,9 +183,14 @@ class FreeSpinAwardSequenceController {
     required FreeSpinAwardPresentationState awardPresentation,
     required FreeSpinOverlayController overlayController,
     required OverlayState? overlay,
+    required void Function(VoidCallback callback) setState,
     required VoidCallback continueAutoSpinIfIdle,
   }) {
     if (overlay == null) return;
+
+    if (pending.isRetrigger) {
+      setState(awardPresentation.revealDeferredAward);
+    }
 
     overlayController.showWinPopup(
       overlay: overlay,
@@ -224,6 +230,7 @@ class FreeSpinAwardSequenceController {
           awardPresentation: awardPresentation,
           overlayController: overlayController,
           overlay: overlay,
+          setState: setState,
           continueAutoSpinIfIdle: continueAutoSpinIfIdle,
         );
       },

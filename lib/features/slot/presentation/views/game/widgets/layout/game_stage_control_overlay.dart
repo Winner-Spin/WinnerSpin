@@ -17,6 +17,7 @@ class GameStageControlOverlay extends StatelessWidget {
     required this.listenables,
     required this.styles,
     required this.isFreeSpinVisualMode,
+    required this.displayedFreeSpinsRemaining,
     required this.isBigWinShowing,
     required this.isCelebrationActive,
     required this.onBuyFeatureTap,
@@ -30,6 +31,7 @@ class GameStageControlOverlay extends StatelessWidget {
   final GameScreenListenables listenables;
   final GameScreenTextStyles styles;
   final bool Function() isFreeSpinVisualMode;
+  final int Function() displayedFreeSpinsRemaining;
   final bool Function() isBigWinShowing;
   final bool Function() isCelebrationActive;
   final VoidCallback onBuyFeatureTap;
@@ -70,6 +72,7 @@ class GameStageControlOverlay extends StatelessWidget {
           canIncreaseBet: () => viewModel.canIncreaseBet,
           isInFreeSpins: () => viewModel.isInFreeSpins,
           autoSpinsRemaining: () => viewModel.autoSpinsRemaining,
+          freeSpinsRemaining: displayedFreeSpinsRemaining,
           onDecreaseBet: viewModel.decreaseBet,
           onIncreaseBet: viewModel.increaseBet,
           onSpin: viewModel.spin,

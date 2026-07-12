@@ -14,6 +14,7 @@ class GameSpinControlsSlot extends StatelessWidget {
     required this.canIncreaseBet,
     required this.isInFreeSpins,
     required this.autoSpinsRemaining,
+    required this.freeSpinsRemaining,
     required this.onDecreaseBet,
     required this.onIncreaseBet,
     required this.onSpin,
@@ -29,6 +30,7 @@ class GameSpinControlsSlot extends StatelessWidget {
   final bool Function() canIncreaseBet;
   final bool Function() isInFreeSpins;
   final int? Function() autoSpinsRemaining;
+  final int Function() freeSpinsRemaining;
   final VoidCallback onDecreaseBet;
   final VoidCallback onIncreaseBet;
   final VoidCallback onSpin;
@@ -50,6 +52,7 @@ class GameSpinControlsSlot extends StatelessWidget {
           canIncreaseBet: canIncreaseBet(),
           isInFreeSpins: isInFreeSpins(),
           autoSpinsRemaining: autoSpinsRemaining(),
+          freeSpinsRemaining: freeSpinsRemaining(),
           onDecreaseBet: onDecreaseBet,
           onIncreaseBet: onIncreaseBet,
           onSpin: onSpin,

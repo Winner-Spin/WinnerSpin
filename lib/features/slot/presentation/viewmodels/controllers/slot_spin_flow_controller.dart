@@ -46,7 +46,9 @@ class SlotSpinFlowController {
     );
     if (!start.started) return;
 
-    autoSpinController.consumeAtSpinStart();
+    if (!start.isFreeSpin) {
+      autoSpinController.consumeAtSpinStart();
+    }
     lifecycleController.prepareSpinStart(
       balanceController: balanceController,
       tumbleController: tumbleController,
@@ -61,21 +63,25 @@ class SlotSpinFlowController {
     final bool buyFlag =
         start.isFreeSpin && freeSpinsController.currentRoundFromBuy;
 
-    final taskOutput = await executionController.run(
-      pool: poolController.pool,
-      betAmount: betAmount,
-      isFreeSpins: start.isFreeSpin,
-      anteBet: anteFlag,
-      buyFs: buyFlag,
-    );
+    try {
+      final taskOutput = await executionController.run(
+        pool: poolController.pool,
+        betAmount: betAmount,
+        isFreeSpins: start.isFreeSpin,
+        anteBet: anteFlag,
+        buyFs: buyFlag,
+      );
 
-    _applySpinTaskOutput(
-      taskOutput: taskOutput,
-      lifecycleController: lifecycleController,
-      poolController: poolController,
-      roundController: roundController,
-      gridController: gridController,
-    );
+      _applySpinTaskOutput(
+        taskOutput: taskOutput,
+        lifecycleController: lifecycleController,
+        poolController: poolController,
+        roundController: roundController,
+        gridController: gridController,
+      );
+    } finally {
+      roundController.markSpinResultReady();
+    }
 
     if (start.isFreeSpin) {
       commitPendingFreeSpinConsume();
@@ -123,22 +129,26 @@ class SlotSpinFlowController {
       notifyListeners: notifyListeners,
     );
 
-    final taskOutput = await executionController.run(
-      pool: poolController.pool,
-      betAmount: betAmount,
-      isFreeSpins: false,
-      anteBet: false,
-      buyFs: false,
-      forceFsTrigger: true,
-    );
+    try {
+      final taskOutput = await executionController.run(
+        pool: poolController.pool,
+        betAmount: betAmount,
+        isFreeSpins: false,
+        anteBet: false,
+        buyFs: false,
+        forceFsTrigger: true,
+      );
 
-    _applySpinTaskOutput(
-      taskOutput: taskOutput,
-      lifecycleController: lifecycleController,
-      poolController: poolController,
-      roundController: roundController,
-      gridController: gridController,
-    );
+      _applySpinTaskOutput(
+        taskOutput: taskOutput,
+        lifecycleController: lifecycleController,
+        poolController: poolController,
+        roundController: roundController,
+        gridController: gridController,
+      );
+    } finally {
+      roundController.markSpinResultReady();
+    }
   }
 
   void _applySpinTaskOutput({

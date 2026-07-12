@@ -30,11 +30,13 @@ class SlotSpinCompletionController {
     required void Function() savePoolIfNeeded,
     required void Function() notifyListeners,
   }) async {
+    await roundController.waitForSpinResult();
     final result = roundController.pendingResult;
     lifecycleController.clearMultiplierResidues(gridController: gridController);
 
     if (result == null) {
       roundController.finishSpinning();
+      roundController.clearPendingResult();
       notifyListeners();
       return;
     }

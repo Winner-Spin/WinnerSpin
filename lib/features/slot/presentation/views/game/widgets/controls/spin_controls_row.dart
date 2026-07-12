@@ -12,6 +12,7 @@ class SpinControlsRow extends StatelessWidget {
   final bool canIncreaseBet;
   final bool isInFreeSpins;
   final int? autoSpinsRemaining;
+  final int freeSpinsRemaining;
   final VoidCallback onDecreaseBet;
   final VoidCallback onIncreaseBet;
   final VoidCallback onSpin;
@@ -26,6 +27,7 @@ class SpinControlsRow extends StatelessWidget {
     required this.canIncreaseBet,
     required this.isInFreeSpins,
     required this.autoSpinsRemaining,
+    required this.freeSpinsRemaining,
     required this.onDecreaseBet,
     required this.onIncreaseBet,
     required this.onSpin,
@@ -34,11 +36,17 @@ class SpinControlsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayedSpinsRemaining = isInFreeSpins
+        ? freeSpinsRemaining
+        : autoSpinActive
+        ? autoSpinsRemaining
+        : null;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        if (!autoSpinActive) ...[
+        if (!autoSpinActive && !isInFreeSpins) ...[
           RepaintBoundary(
             child: MinusButton(
               size: 42,
@@ -51,13 +59,18 @@ class SpinControlsRow extends StatelessWidget {
         RepaintBoundary(
           child: RespinButton(
             size: 84,
-            onTap: autoSpinActive ? onStopAutoSpin : onSpin,
+            onTap: isInFreeSpins
+                ? null
+                : autoSpinActive
+                ? onStopAutoSpin
+                : onSpin,
             spinning: spinning,
-            disabled: bigWinShowing,
-            autoSpinsRemaining: autoSpinActive ? autoSpinsRemaining : null,
+            disabled: bigWinShowing || isInFreeSpins,
+            dimWhenDisabled: !isInFreeSpins,
+            autoSpinsRemaining: displayedSpinsRemaining,
           ),
         ),
-        if (!autoSpinActive) ...[
+        if (!autoSpinActive && !isInFreeSpins) ...[
           const SizedBox(width: 16),
           RepaintBoundary(
             child: PlusButton(

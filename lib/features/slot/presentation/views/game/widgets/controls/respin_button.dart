@@ -10,6 +10,7 @@ class RespinButton extends StatelessWidget {
   final Color? iconColor;
   final double opacity;
   final bool disabled;
+  final bool dimWhenDisabled;
   final bool spinning;
   final int? autoSpinsRemaining;
 
@@ -20,6 +21,7 @@ class RespinButton extends StatelessWidget {
     this.iconColor,
     this.opacity = 0.75,
     this.disabled = false,
+    this.dimWhenDisabled = true,
     this.spinning = false,
     this.autoSpinsRemaining,
   });
@@ -59,7 +61,10 @@ class RespinButton extends StatelessWidget {
               ),
       ),
     );
-    return Opacity(opacity: disabled ? 0.65 : 1.0, child: button);
+    return Opacity(
+      opacity: disabled && dimWhenDisabled ? 0.65 : 1.0,
+      child: button,
+    );
   }
 }
 

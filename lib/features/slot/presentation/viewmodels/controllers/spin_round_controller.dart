@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../domain/models/spin_result.dart';
 
 class SpinRoundController {
@@ -13,6 +15,8 @@ class SpinRoundController {
   SpinResult? _pendingResult;
   SpinResult? get pendingResult => _pendingResult;
 
+  Completer<void>? _spinResultReady;
+
   double _pendingHistoryBet = 0;
   double get pendingHistoryBet => _pendingHistoryBet;
 
@@ -24,6 +28,7 @@ class SpinRoundController {
   }
 
   void beginNormalSpin(double historyBet) {
+    _prepareForSpinResult();
     _isSpinning = true;
     _lastSpinWasFreeSpin = false;
     _currentSpinFromBuy = false;
@@ -31,6 +36,7 @@ class SpinRoundController {
   }
 
   void beginFreeSpin() {
+    _prepareForSpinResult();
     _isSpinning = true;
     _lastSpinWasFreeSpin = true;
     _currentSpinFromBuy = false;
@@ -38,6 +44,7 @@ class SpinRoundController {
   }
 
   void beginBoughtFreeSpinTrigger() {
+    _prepareForSpinResult();
     _isSpinning = true;
     _lastSpinWasFreeSpin = false;
     _currentSpinFromBuy = true;
@@ -52,12 +59,30 @@ class SpinRoundController {
     _pendingResult = result;
   }
 
+  Future<void> waitForSpinResult() {
+    return _spinResultReady?.future ?? Future<void>.value();
+  }
+
+  void markSpinResultReady() {
+    final completer = _spinResultReady;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
   void markResultSettled(SpinResult result) {
     _lastSpinResult = result;
   }
 
   void clearPendingResult() {
     _pendingResult = null;
+    _spinResultReady = null;
     _pendingHistoryBet = 0;
+  }
+
+  void _prepareForSpinResult() {
+    markSpinResultReady();
+    _pendingResult = null;
+    _spinResultReady = Completer<void>();
   }
 }

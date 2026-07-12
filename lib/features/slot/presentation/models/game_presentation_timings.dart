@@ -7,6 +7,7 @@ class GamePresentationTimings {
   static const scatterPulseDuration = Duration(milliseconds: 1050);
   static const normalBigWinDelay = Duration(milliseconds: 800);
   static const freeSpinNoSequenceWinDelay = Duration(milliseconds: 600);
+  static const freeSpinAutoPlayDelay = Duration(milliseconds: 600);
   static const lingeringClusterHold = Duration(seconds: 1);
   static const flyingTumbleDuration = Duration(milliseconds: 700);
   static const flyingTumbleReleaseDelay = Duration(milliseconds: 700);
