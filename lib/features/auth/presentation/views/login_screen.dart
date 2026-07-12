@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _viewModel.addListener(_onViewModelChange);
-    _viewModel.initMusic();
+    unawaited(_viewModel.initMusic());
     _errorPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -39,10 +39,12 @@ class _LoginScreenState extends State<LoginScreen>
   void _onViewModelChange() {
     _showErrorIfNeeded(context);
     _handleLoginSuccess(context);
-    final hasError = _viewModel.errorMessage != null;
-    if (hasError && _errorPulseCtrl.value == 0) {
+    final showsErrorImage =
+        _viewModel.errorMessage != null &&
+        _viewModel.errorPresentation == LoginErrorPresentation.image;
+    if (showsErrorImage && _errorPulseCtrl.value == 0) {
       _errorPulseCtrl.forward(from: 0);
-    } else if (!hasError && _errorPulseCtrl.value != 0) {
+    } else if (!showsErrorImage && _errorPulseCtrl.value != 0) {
       _errorPulseCtrl.value = 0;
     }
   }
@@ -169,7 +171,9 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
 
-                  if (_viewModel.errorMessage != null)
+                  if (_viewModel.errorMessage != null &&
+                      _viewModel.errorPresentation ==
+                          LoginErrorPresentation.image)
                     Positioned(
                       top: screenH * 0.62,
                       left: screenW * 0.18,
@@ -200,7 +204,6 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     if (_viewModel.loginSuccess) {
       _viewModel.resetLoginSuccess();
-      unawaited(_viewModel.onNavigatingAway());
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const GameScreen()),
@@ -210,8 +213,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _navigateToSignUp(BuildContext context) async {
     final navigator = Navigator.of(context);
-
-    await _viewModel.onNavigatingAway();
 
     await navigator.push(
       MaterialPageRoute(builder: (context) => const RegisterScreen()),
@@ -228,6 +229,16 @@ class _LoginScreenState extends State<LoginScreen>
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
+      if (_viewModel.errorPresentation == LoginErrorPresentation.snackBar) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(error),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+      }
       _errorClearTimer?.cancel();
       _errorClearTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted) return;

@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/widgets/animated_image_button.dart';
 import '../viewmodels/register_viewmodel.dart';
-import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -176,14 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         imagePath: 'lib/images/register_screen/image.png',
                         width: 540,
                         height: 90,
-                        onTap: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                          );
-                        },
+                        onTap: () => Navigator.pop(context),
                       ),
                     ),
                   ),
@@ -268,6 +260,11 @@ class _RegisterScreenState extends State<RegisterScreen>
     final error = _viewModel.errorMessage;
     if (error != null && error != _lastShownError) {
       _lastShownError = error;
+      if (_errorImageFor(error) == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error)));
+      }
       _errorClearTimer?.cancel();
       _errorClearTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted) return;

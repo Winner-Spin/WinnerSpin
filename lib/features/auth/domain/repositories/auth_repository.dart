@@ -6,6 +6,7 @@ enum AuthErrorCode {
   invalidCredential,
   emailAlreadyInUse,
   weakPassword,
+  networkRequestFailed,
   unknown,
 }
 

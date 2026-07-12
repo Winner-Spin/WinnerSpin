@@ -395,6 +395,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _listenerRegistry.detach();
     _winCtrl.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 

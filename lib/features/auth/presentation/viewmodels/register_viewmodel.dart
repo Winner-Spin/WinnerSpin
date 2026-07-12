@@ -1,18 +1,23 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/audio/ambient_music_service.dart';
 import '../../../../core/audio/ambient_music_preference.dart';
-import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 
 class RegisterViewModel extends ChangeNotifier {
-  RegisterViewModel({AuthRepository? authRepository})
-    : _authRepository = authRepository ?? FirebaseAuthRepository();
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+
+  RegisterViewModel({
+    AuthRepository? authRepository,
+    Duration requestTimeout = defaultRequestTimeout,
+  }) : _authRepository = authRepository ?? FirebaseAuthRepository(),
+       _requestTimeout = requestTimeout;
 
   final AuthRepository _authRepository;
+  final Duration _requestTimeout;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -32,36 +37,19 @@ class RegisterViewModel extends ChangeNotifier {
   bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
-  bool _isMusicInitialized = false;
-  bool _hasStartedMusic = false;
-
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AmbientMusicService _musicService = AmbientMusicService.instance;
 
   Future<void> initMusic() async {
-    if (_isMusicInitialized) {
-      _isMusicMuted = !AmbientMusicPreference.enabled;
-      if (_isMusicMuted) {
-        await _audioPlayer.pause();
-      } else {
-        await _playOrResumeMusic();
-      }
-      notifyListeners();
-      return;
-    }
-
-    _isMusicInitialized = true;
-    await _audioPlayer.setAudioContext(AppAudioContext.game);
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-
-    if (AmbientMusicPreference.enabled) {
-      await _playOrResumeMusic();
-    }
-
     _isMusicMuted = !AmbientMusicPreference.enabled;
+    if (!_isMusicMuted) {
+      await _musicService.ensurePlaying();
+    }
     notifyListeners();
   }
 
   Future<void> register() async {
+    if (_isLoading) return;
+
     _errorMessage = null;
     _registrationSuccess = false;
 
@@ -94,16 +82,17 @@ class RegisterViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      await _authRepository.signUp(
-        email: email,
-        password: password,
-        username: username,
-      );
-      await _authRepository.signOut();
+      await _authRepository
+          .signUp(email: email, password: password, username: username)
+          .timeout(_requestTimeout);
+      await _authRepository.signOut().timeout(_requestTimeout);
       _registrationSuccess = true;
     } on AuthException catch (e) {
       debugPrint('Auth error: ${e.code} - ${e.rawMessage}');
       _errorMessage = _friendlyError(e.code);
+    } on TimeoutException {
+      _errorMessage =
+          'Connection timed out. Please check your internet connection.';
     } catch (e) {
       debugPrint('Unexpected register error: $e');
       _errorMessage = 'An unexpected error occurred: $e';
@@ -124,12 +113,7 @@ class RegisterViewModel extends ChangeNotifier {
 
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
-    AmbientMusicPreference.enabled = !_isMusicMuted;
-    if (_isMusicMuted) {
-      _audioPlayer.pause();
-    } else {
-      _playOrResumeMusic();
-    }
+    unawaited(_musicService.setEnabled(!_isMusicMuted));
     notifyListeners();
   }
 
@@ -152,21 +136,13 @@ class RegisterViewModel extends ChangeNotifier {
       case AuthErrorCode.invalidCredential:
       case AuthErrorCode.unknown:
         return 'Registration failed. Please try again.';
+      case AuthErrorCode.networkRequestFailed:
+        return 'No internet connection. Please check your connection.';
     }
-  }
-
-  Future<void> _playOrResumeMusic() async {
-    if (_hasStartedMusic) {
-      await _audioPlayer.resume();
-      return;
-    }
-    _hasStartedMusic = true;
-    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
   }
 
   @override
   void dispose() {
-    unawaited(_audioPlayer.dispose());
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();

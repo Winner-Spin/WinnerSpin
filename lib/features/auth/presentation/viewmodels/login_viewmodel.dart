@@ -1,20 +1,31 @@
-import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+
+import '../../../../core/audio/ambient_music_service.dart';
 import '../../../../core/audio/ambient_music_preference.dart';
-import '../../../../core/audio/app_audio_context.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 
+enum LoginErrorPresentation { image, snackBar }
+
 class LoginViewModel extends ChangeNotifier {
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+
   static final LoginViewModel _instance = LoginViewModel._internal();
   factory LoginViewModel() => _instance;
-  LoginViewModel._internal() : _authRepository = FirebaseAuthRepository();
+  LoginViewModel._internal()
+    : _authRepository = FirebaseAuthRepository(),
+      _requestTimeout = defaultRequestTimeout;
 
   @visibleForTesting
-  LoginViewModel.withRepository(this._authRepository);
+  LoginViewModel.withRepository(
+    this._authRepository, {
+    Duration requestTimeout = defaultRequestTimeout,
+  }) : _requestTimeout = requestTimeout;
 
   final AuthRepository _authRepository;
+  final Duration _requestTimeout;
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -25,41 +36,30 @@ class LoginViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  LoginErrorPresentation _errorPresentation = LoginErrorPresentation.image;
+  LoginErrorPresentation get errorPresentation => _errorPresentation;
+
   bool _loginSuccess = false;
   bool get loginSuccess => _loginSuccess;
 
   bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
-  bool _isMusicInitialized = false;
-  bool _hasStartedMusic = false;
+  final AmbientMusicService _musicService = AmbientMusicService.instance;
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  void initMusic() async {
-    if (_isMusicInitialized) {
-      _isMusicMuted = !AmbientMusicPreference.enabled;
-      if (_isMusicMuted) {
-        await _audioPlayer.pause();
-      } else {
-        await _playOrResumeMusic();
-      }
-      notifyListeners();
-      return;
-    }
-    _isMusicInitialized = true;
-
-    await _audioPlayer.setAudioContext(AppAudioContext.game);
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    if (AmbientMusicPreference.enabled) {
-      await _playOrResumeMusic();
-    }
+  Future<void> initMusic() async {
     _isMusicMuted = !AmbientMusicPreference.enabled;
+    if (!_isMusicMuted) {
+      await _musicService.ensurePlaying();
+    }
     notifyListeners();
   }
 
   Future<void> login() async {
+    if (_isLoading) return;
+
     _errorMessage = null;
+    _errorPresentation = LoginErrorPresentation.image;
     _loginSuccess = false;
 
     if (emailController.text.trim().isEmpty ||
@@ -72,10 +72,12 @@ class LoginViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      await _authRepository.signIn(
-        email: emailController.text,
-        password: passwordController.text,
-      );
+      await _authRepository
+          .signIn(
+            email: emailController.text,
+            password: passwordController.text,
+          )
+          .timeout(_requestTimeout);
 
       _errorMessage = null;
       emailController.clear();
@@ -83,8 +85,16 @@ class LoginViewModel extends ChangeNotifier {
       _loginSuccess = true;
     } on AuthException catch (e) {
       _errorMessage = _friendlyError(e.code);
+      _errorPresentation = e.code == AuthErrorCode.networkRequestFailed
+          ? LoginErrorPresentation.snackBar
+          : LoginErrorPresentation.image;
+    } on TimeoutException {
+      _errorMessage =
+          'Connection timed out. Please check your internet connection.';
+      _errorPresentation = LoginErrorPresentation.snackBar;
     } catch (e) {
       _errorMessage = 'An unexpected error occurred. Please try again.';
+      _errorPresentation = LoginErrorPresentation.snackBar;
     } finally {
       _setLoading(false);
     }
@@ -97,32 +107,20 @@ class LoginViewModel extends ChangeNotifier {
   void clearError() {
     if (_errorMessage == null) return;
     _errorMessage = null;
+    _errorPresentation = LoginErrorPresentation.image;
     notifyListeners();
   }
 
   void toggleMusic() {
     _isMusicMuted = !_isMusicMuted;
-    AmbientMusicPreference.enabled = !_isMusicMuted;
-    if (_isMusicMuted) {
-      _audioPlayer.pause();
-    } else {
-      _playOrResumeMusic();
-    }
+    unawaited(_musicService.setEnabled(!_isMusicMuted));
     notifyListeners();
-  }
-
-  Future<void> onNavigatingAway() async {
-    if (!_isMusicMuted) {
-      await _audioPlayer.pause();
-    }
   }
 
   Future<void> onReturned() async {
     _isMusicMuted = !AmbientMusicPreference.enabled;
-    if (_isMusicMuted) {
-      await _audioPlayer.pause();
-    } else {
-      await _playOrResumeMusic();
+    if (!_isMusicMuted) {
+      await _musicService.ensurePlaying();
     }
     notifyListeners();
   }
@@ -148,15 +146,8 @@ class LoginViewModel extends ChangeNotifier {
       case AuthErrorCode.weakPassword:
       case AuthErrorCode.unknown:
         return 'Login failed. Please try again.';
+      case AuthErrorCode.networkRequestFailed:
+        return 'No internet connection. Please check your connection.';
     }
-  }
-
-  Future<void> _playOrResumeMusic() async {
-    if (_hasStartedMusic) {
-      await _audioPlayer.resume();
-      return;
-    }
-    _hasStartedMusic = true;
-    await _audioPlayer.play(AssetSource('audio/Items/Basin_of_Light.mp3'));
   }
 }

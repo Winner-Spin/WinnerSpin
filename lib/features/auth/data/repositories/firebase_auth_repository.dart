@@ -1,16 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../../core/network/internet_connection_probe.dart';
 import '../../domain/repositories/auth_repository.dart';
+
+typedef InternetConnectionCheck = Future<bool> Function();
 
 /// Firebase implementation of [AuthRepository].
 class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _firestore = firestore ?? FirebaseFirestore.instance;
+  FirebaseAuthRepository({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    InternetConnectionCheck? internetConnectionCheck,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _firestore = firestore ?? FirebaseFirestore.instance,
+       _internetConnectionCheck =
+           internetConnectionCheck ?? hasInternetConnection;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final InternetConnectionCheck _internetConnectionCheck;
 
   static const String _usersCollection = 'users';
 
@@ -55,6 +64,10 @@ class FirebaseAuthRepository implements AuthRepository {
     required String password,
   }) async {
     try {
+      if (!await _internetConnectionCheck()) {
+        throw const AuthException(AuthErrorCode.networkRequestFailed);
+      }
+
       final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -125,6 +138,8 @@ class FirebaseAuthRepository implements AuthRepository {
         return AuthErrorCode.emailAlreadyInUse;
       case 'weak-password':
         return AuthErrorCode.weakPassword;
+      case 'network-request-failed':
+        return AuthErrorCode.networkRequestFailed;
       default:
         return AuthErrorCode.unknown;
     }
