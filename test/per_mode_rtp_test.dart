@@ -1,26 +1,14 @@
-// ─────────────────────────────────────────────────────────────────────────
-// PER-MODE RTP DIAGNOSTIC
-// ─────────────────────────────────────────────────────────────────────────
-//
-// Locks the engine into each individual GameMode and measures the resulting
-// RTP. Required for "per-mode RTP balancing" — once each mode produces ~96.5%
-// RTP independently, the session-injection mode dispatcher can mix them
-// freely without total-RTP drift.
-//
-// The 5 modes are tested in isolation: 5M spins each, FS enabled.
-// ─────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:winner_spin/features/slot/domain/engine/engine_runtime.dart';
+import 'package:winner_spin/features/slot/domain/engine/rtp_config.dart';
 import 'package:winner_spin/features/slot/domain/engine/slot_engine.dart';
 import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/enums/game_mode.dart';
 
-/// PoolState subclass that forces [currentMode] to a fixed value, so the
-/// engine's mode-dispatch logic doesn't interfere with per-mode measurement.
-/// All other mutation/state behavior inherits from PoolState.
 class _ForcedModePoolState extends PoolState {
   final GameMode forcedMode;
-  _ForcedModePoolState(this.forcedMode);
+  _ForcedModePoolState(this.forcedMode)
+    : super(totalBetsPlaced: 1000000000000, totalSpins: 50);
   @override
   GameMode get currentMode => forcedMode;
 }
@@ -33,6 +21,7 @@ void main() {
     final results = <GameMode, _ModeStats>{};
 
     for (final mode in GameMode.values) {
+      resetEngineRngForTesting(1000 + mode.index);
       final pool = _ForcedModePoolState(mode);
       final stats = _ModeStats();
 
@@ -74,17 +63,16 @@ void main() {
       results[mode] = stats;
     }
 
-    // ─── Output ───────────────────────────────────────────────────
     final buf = StringBuffer();
     buf.writeln('');
     buf.writeln('═══════════════════════════════════════════════════════════════');
     buf.writeln('         PER-MODE RTP MEASUREMENT — 5M spins each');
     buf.writeln('═══════════════════════════════════════════════════════════════');
     buf.writeln('');
-    buf.writeln('Target per-mode RTP: 96.50% (so any mode mix yields total 96.5%)');
+    buf.writeln('Funded-profile targets with visible payout math');
     buf.writeln('');
-    buf.writeln('Mode      | RTP     | Hit Rate | FS%   | Avg FS   | Max Win  | Δ from 96.5');
-    buf.writeln('----------|---------|----------|-------|----------|----------|------------');
+    buf.writeln('Mode      | RTP     | Target  | Hit Rate | FS%   | Avg FS   | Max Win  | Delta');
+    buf.writeln('----------|---------|---------|----------|-------|----------|----------|-------');
 
     for (final mode in GameMode.values) {
       final s = results[mode]!;
@@ -95,12 +83,14 @@ void main() {
           ? (s.totalFsPayout / s.initialTriggers) / betAmount
           : 0;
       final maxWinX = s.maxSingleWin / betAmount;
-      final delta = rtp - 96.5;
+      final target = RtpConfig.modeTargetRtp[mode]! * 100;
+      final delta = rtp - target;
       final deltaSign = delta >= 0 ? '+' : '';
 
       buf.writeln(
         '${mode.name.padRight(9)} | '
         '${rtp.toStringAsFixed(2).padLeft(6)}% | '
+        '${target.toStringAsFixed(2).padLeft(6)}% | '
         '${hitRate.toStringAsFixed(2).padLeft(5)}%   | '
         '${fsPercent.toStringAsFixed(2).padLeft(4)}% | '
         '${avgFsRound.toStringAsFixed(1).padLeft(7)}x | '
@@ -115,7 +105,16 @@ void main() {
     // ignore: avoid_print
     print(buf.toString());
 
-    expect(true, true); // diagnostic only
+    for (final mode in GameMode.values) {
+      final stats = results[mode]!;
+      final rtp = stats.totalPaidOut / stats.totalWagered * 100;
+      final target = RtpConfig.modeTargetRtp[mode]! * 100;
+      final tolerance = switch (mode) {
+        GameMode.generous || GameMode.jackpot => 2.0,
+        _ => 1.0,
+      };
+      expect(rtp, closeTo(target, tolerance));
+    }
   });
 }
 

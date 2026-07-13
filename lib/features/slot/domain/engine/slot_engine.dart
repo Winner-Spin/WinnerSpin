@@ -78,11 +78,18 @@ class SlotEngine {
     final bool triggersFs =
         forceFsTrigger || (canAffordFs && (engineRng.nextDouble() < fsRate));
 
+    double fsProfileScale = 1.0;
+    if (anteBet) {
+      fsProfileScale = AnteConfig.freeSpinHitRateScale;
+    } else if (buyFs) {
+      fsProfileScale = BuyConfig.freeSpinHitRateScaleFor(mode);
+    }
     final double effectiveHitRate = isFreeSpins
         ? _min(
             0.95,
             (RtpConfig.hitRate[mode] ?? 0.30) *
-                (RtpConfig.fsHitRateBoost[mode] ?? 1.25),
+                (RtpConfig.fsHitRateBoost[mode] ?? 1.25) *
+                fsProfileScale,
           )
         : (RtpConfig.hitRate[mode] ?? 0.30);
     final shouldWin = triggersFs || engineRng.nextDouble() < effectiveHitRate;

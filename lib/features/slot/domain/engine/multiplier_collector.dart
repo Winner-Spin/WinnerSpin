@@ -15,6 +15,6 @@ class MultiplierCollector {
     return total;
   }
 
-  /// Applies ante/buy FS scaling. Floor at 1.0.
+  /// Preserves the multiplier shown to the player in the final payout.
   static double finalize(double rawMultiplier) => rawMultiplier;
 }

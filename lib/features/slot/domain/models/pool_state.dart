@@ -17,14 +17,16 @@ class PoolState {
   static const int _minSessionSpins = 50;
   static const int _maxSessionExtraSpins = 200;
 
-  static final Random _rng = Random();
+  final Random _modeRandom;
 
   PoolState({
     this.totalBetsPlaced = 0,
     this.totalPaidOut = 0,
     this.totalSpins = 0,
     int spinsSinceLastSave = 0,
-  }) : _spinsSinceLastSave = spinsSinceLastSave;
+    Random? modeRandom,
+  }) : _spinsSinceLastSave = spinsSinceLastSave,
+       _modeRandom = modeRandom ?? Random();
 
   double get poolBalance => totalBetsPlaced - totalPaidOut;
 
@@ -47,7 +49,7 @@ class PoolState {
       return _sessionMode!;
     }
 
-    final roll = _rng.nextDouble();
+    final roll = _modeRandom.nextDouble();
     GameMode mode;
     if (roll < 0.65) {
       mode = GameMode.normal;
@@ -63,7 +65,9 @@ class PoolState {
 
     _sessionMode = mode;
     _sessionExpiresAtSpin =
-        totalSpins + _minSessionSpins + _rng.nextInt(_maxSessionExtraSpins + 1);
+        totalSpins +
+        _minSessionSpins +
+        _modeRandom.nextInt(_maxSessionExtraSpins + 1);
     return mode;
   }
 

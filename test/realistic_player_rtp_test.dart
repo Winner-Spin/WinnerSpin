@@ -4,13 +4,13 @@
 //
 // Simulates a realistic mixed-mode player session, repeating this cycle:
 //   1. 50 farm base spins (no ante, 1.0× cost, baseline FS trigger)
-//   2. 50 ante base spins (1.25× cost, 2× FS trigger, ante-FS reduction)
-//   3. 1  buy bonus       (100× cost, guaranteed FS round, buy-FS boost)
+//   2. 50 ante base spins (1.25× cost, 2× trigger, ante FS profile)
+//   3. 1  buy bonus       (100× cost, guaranteed FS, Buy FS profile)
 //
 // The cycle repeats 500,000 times → ~50.5M base actions + triggered FS rounds.
 //
 // Free spins always inherit the originating phase's flags (ante or buy)
-// so multiplier scaling stays consistent across an entire round.
+// so the probability profile stays consistent across an entire round.
 //
 // Reports per-phase RTP separately + total RTP. All three phases should
 // converge to ~96.5% RTP independently if the engine is well-isolated.
@@ -190,7 +190,26 @@ void main() {
       totalWagered += buyCost;
       buyWagered += buyCost;
       buyCount++;
-      fsRemaining = 10;
+
+      final modeNow = pool.currentMode;
+      modeCounts[modeNow] = (modeCounts[modeNow] ?? 0) + 1;
+      final triggerResult = SlotEngine.spin(
+        pool,
+        baseBet,
+        buyFs: true,
+        forceFsTrigger: true,
+      );
+      pool.recordPayout(triggerResult.totalWin);
+      totalPaidOut += triggerResult.totalWin;
+      buyPaidOut += triggerResult.totalWin;
+      buyFsRoundSum += triggerResult.totalWin;
+      totalSpins++;
+      if (triggerResult.totalWin > 0) winningSpins++;
+      if (triggerResult.totalWin > maxSingleWin) {
+        maxSingleWin = triggerResult.totalWin;
+      }
+
+      fsRemaining = triggerResult.freeSpinsTriggered ? 10 : 0;
       currentFsRoundFromBuy = true;
       while (fsRemaining > 0) {
         fsRemaining--;

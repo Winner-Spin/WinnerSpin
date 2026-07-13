@@ -3,8 +3,8 @@
 // ─────────────────────────────────────────────────────────────────────────
 //
 // Stress-tests the "Free Spins Satın Al" (Buy Bonus) feature in isolation.
-// Every iteration: charge 100x bet, run a full 10-spin FS round (with
-// retriggers), record payout. NO base-game spins.
+// Every iteration: charge 100x bet, run the visible scatter trigger spin,
+// then consume the full 10-spin FS round (with retriggers).
 //
 // This is the cleanest measurement of the BUY-only RTP — what a player
 // experiences if they exclusively buy the FS feature instead of farming.
@@ -22,7 +22,7 @@ import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/enums/game_mode.dart';
 
 void main() {
-  test('3,000,000 buy bonus RTP simulation (FS-only)', () {
+  test('3,000,000 buy bonus RTP simulation (trigger + FS)', () {
     const totalBuys = 3000000;
     const betAmount = 100.0;
     const buyPriceMultiplier = SlotEngine.buyFeaturePriceMultiplier; // 100x
@@ -62,16 +62,22 @@ void main() {
       modeAtBuyTime[pool.currentMode] =
           (modeAtBuyTime[pool.currentMode] ?? 0) + 1;
 
-      // 2. Consume 10 FS spins (with retriggers)
-      int fsRemaining = 10;
-      double thisRoundPayout = 0;
+      final triggerResult = SlotEngine.spin(
+        pool,
+        betAmount,
+        buyFs: true,
+        forceFsTrigger: true,
+      );
+      pool.recordPayout(triggerResult.totalWin);
+      totalPaidOut += triggerResult.totalWin;
+      double thisRoundPayout = triggerResult.totalWin;
+
+      int fsRemaining = triggerResult.freeSpinsTriggered ? 10 : 0;
 
       while (fsRemaining > 0) {
         fsRemaining--;
         totalFsSpins++;
 
-        // buyFs=true on every FS spin of a bought round → engine applies
-        // the buy-FS multiplier boost (mirrors GameViewModel state tracking).
         final result = SlotEngine.spin(
           pool,
           betAmount,
@@ -126,7 +132,7 @@ void main() {
     final buf = StringBuffer();
     buf.writeln('');
     buf.writeln('═══════════════════════════════════════════════════════════════');
-    buf.writeln('         BUY BONUS RTP SIMULATION (FS-ONLY, 3M BUYS)');
+    buf.writeln('       BUY BONUS RTP SIMULATION (TRIGGER + FS, 3M BUYS)');
     buf.writeln('═══════════════════════════════════════════════════════════════');
     buf.writeln('');
     buf.writeln('▼ VOLUME');

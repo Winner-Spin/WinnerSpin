@@ -54,9 +54,7 @@ void main() {
     double sumOfFsRoundPayouts = 0;
     double currentFsRoundPayout = 0;
 
-    // Tracks whether the current FS round was triggered by ante. Mirrors
-    // GameViewModel._currentFsRoundFromAnte — keeps ante-FS payout
-    // reduction active across all spins of an ante-triggered round.
+    // Mirrors the app state so the ante profile spans the complete FS round.
     bool currentFsRoundFromAnte = false;
 
     // ─── Main loop ────────────────────────────────────────────────

@@ -155,9 +155,16 @@ void main() {
       whaleWagered += buyCost;
       buysExecuted++;
 
-      // Run 10 FS spins of the bought round
-      double thisRoundPayout = 0;
-      int fsLeft = 10;
+      final triggerResult = SlotEngine.spin(
+        pool,
+        peakBet,
+        buyFs: true,
+        forceFsTrigger: true,
+      );
+      pool.recordPayout(triggerResult.totalWin);
+      whalePaidOut += triggerResult.totalWin;
+      double thisRoundPayout = triggerResult.totalWin;
+      int fsLeft = triggerResult.freeSpinsTriggered ? 10 : 0;
       while (fsLeft > 0) {
         fsLeft--;
         final result = SlotEngine.spin(

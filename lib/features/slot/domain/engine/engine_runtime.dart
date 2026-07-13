@@ -4,4 +4,8 @@ const int kEngineColumns = 6;
 const int kEngineRows = 5;
 const int kEngineTotalSlots = kEngineColumns * kEngineRows;
 
-final Random engineRng = Random();
+Random engineRng = Random();
+
+void resetEngineRngForTesting(int seed) {
+  engineRng = Random(seed);
+}

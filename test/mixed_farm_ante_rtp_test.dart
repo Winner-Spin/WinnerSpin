@@ -4,7 +4,7 @@
 //
 // Realistic player behavior simulation: alternates between phases of
 //   • 10 farm base spins (no ante, 1.0× cost, baseline FS trigger)
-//   • 10 ante base spins (1.25× cost, 2× FS trigger, ante-FS reduction)
+//   • 10 ante base spins (1.25× cost, 2× trigger, ante FS profile)
 //
 // Free spin rounds DO NOT count toward the 10-spin phase counter — only
 // base spins move the counter forward. An FS round triggered in one phase
