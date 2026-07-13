@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../services/game_background_image_provider.dart';
+
 class GameBackground extends StatelessWidget {
   const GameBackground({
     super.key,
@@ -15,16 +17,16 @@ class GameBackground extends StatelessWidget {
     return ListenableBuilder(
       listenable: listenable,
       builder: (context, _) {
-        final bgPath = isFreeSpinVisualMode()
-            ? 'lib/images/slot_main_screen/freespin arka plan.png'
-            : 'lib/images/slot_main_screen/nihai arka plan.png';
+        final imageProvider = GameBackgroundImageProvider.resolve(
+          context,
+          isFreeSpin: isFreeSpinVisualMode(),
+        );
         return RepaintBoundary(
-          child: Image.asset(
-            bgPath,
+          child: Image(
+            image: imageProvider,
             fit: BoxFit.cover,
             alignment: const Alignment(0, -0.4),
-            filterQuality: FilterQuality.low,
-            cacheWidth: 1080,
+            filterQuality: FilterQuality.medium,
           ),
         );
       },

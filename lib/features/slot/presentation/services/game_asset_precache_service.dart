@@ -11,6 +11,7 @@ import '../views/game/widgets/presentation/free_spins/free_spin_scatter_transiti
 import '../views/game/widgets/presentation/free_spins/free_spin_summary_popup.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_win_popup.dart';
 import '../views/game/widgets/playfield/multiplier_label.dart';
+import 'game_background_image_provider.dart';
 
 class GameAssetPrecacheService {
   static const int freeSpinPopupCacheWidth = 1024;
@@ -32,7 +33,7 @@ class GameAssetPrecacheService {
       isMounted: isMounted,
     );
     precacheImage(
-      const AssetImage('lib/images/slot_main_screen/freespin arka plan.png'),
+      GameBackgroundImageProvider.resolve(context, isFreeSpin: true),
       context,
     );
   }
