@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/symbol_registry.dart';
 import '../models/game_presentation_timings.dart';
-import '../models/win_tier.dart';
 import '../views/game/widgets/presentation/big_win/big_win_overlay.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_scatter_transition.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_summary_popup.dart';
@@ -25,7 +24,7 @@ class GameAssetPrecacheService {
   }) {
     _precacheOpeningGridSymbols(context, openingGrid);
     _precacheMultiplierLabels(context);
-    _precacheWinOverlayAssets(context);
+    _precachePopupAssets(context);
     unawaited(FreeSpinScatterTransition.precacheCupcakeImage());
     _scheduleDeferredSymbolPrecache(
       context: context,
@@ -102,13 +101,7 @@ class GameAssetPrecacheService {
     }
   }
 
-  void _precacheWinOverlayAssets(BuildContext context) {
-    for (final path in WinTier.assetPaths) {
-      precacheImage(
-        ResizeImage(AssetImage(path), width: BigWinOverlay.headlineCacheWidth),
-        context,
-      );
-    }
+  void _precachePopupAssets(BuildContext context) {
     precacheImage(
       const ResizeImage(
         AssetImage(BigWinOverlay.amountBannerAssetPath),

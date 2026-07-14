@@ -13,11 +13,11 @@ import 'big_win_headline.dart';
 class BigWinOverlay extends StatefulWidget {
   static const amountBannerAssetPath =
       'lib/images/slot_main_screen/WIN_ARTICLES/WINBOX.png';
-  static const headlineCacheWidth = 1280;
   static const amountBannerCacheWidth = 1024;
 
   final double amount;
   final WinTier tier;
+  final ImageProvider headlineImage;
   final Duration duration;
   final bool soundEnabled;
   final bool vibrationEnabled;
@@ -29,6 +29,7 @@ class BigWinOverlay extends StatefulWidget {
     super.key,
     required this.amount,
     required this.tier,
+    required this.headlineImage,
     required this.soundEnabled,
     required this.onComplete,
     this.vibrationEnabled = false,
@@ -303,7 +304,7 @@ class _BigWinOverlayState extends State<BigWinOverlay>
                           scale: _scaleAnim.value,
                           child: BigWinHeadline(
                             tier: widget.tier,
-                            cacheWidth: BigWinOverlay.headlineCacheWidth,
+                            imageProvider: widget.headlineImage,
                           ),
                         ),
                         AnimatedBuilder(

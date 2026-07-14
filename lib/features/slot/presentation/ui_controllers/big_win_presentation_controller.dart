@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../../domain/models/spin_result.dart';
 import '../models/big_win_presentation_rules.dart';
 import '../models/game_presentation_timings.dart';
 import '../models/spin_result_presentation_rules.dart';
+import '../services/big_win_headline_image_provider.dart';
 import 'big_win_overlay_controller.dart';
 
 class BigWinPresentationController {
@@ -14,6 +17,8 @@ class BigWinPresentationController {
 
   bool _isShowing = false;
   bool get isShowing => _isShowing;
+
+  ImageProvider? _cachedHeadlineImage;
 
   double _lastSeenLastWinNormal = 0;
 
@@ -69,6 +74,17 @@ class BigWinPresentationController {
     );
     if (tier == null || overlay == null) return;
 
+    final headlineImage = BigWinHeadlineImageProvider.resolve(
+      overlay.context,
+      tier,
+    );
+    final previousHeadlineImage = _cachedHeadlineImage;
+    if (previousHeadlineImage != null && previousHeadlineImage != headlineImage) {
+      unawaited(previousHeadlineImage.evict());
+    }
+    _cachedHeadlineImage = headlineImage;
+    unawaited(precacheImage(headlineImage, overlay.context));
+
     setState(() {
       _shownThisSpin = true;
       _isShowing = true;
@@ -78,6 +94,7 @@ class BigWinPresentationController {
       overlay: overlay,
       amount: amount,
       tier: tier,
+      headlineImage: headlineImage,
       instantAmount: speedMultiplier >= 3,
       soundEnabled: soundEnabled,
       vibrationEnabled: vibrationEnabled,
@@ -90,6 +107,11 @@ class BigWinPresentationController {
   }
 
   void dispose() {
+    final headlineImage = _cachedHeadlineImage;
+    _cachedHeadlineImage = null;
+    if (headlineImage != null) {
+      unawaited(headlineImage.evict());
+    }
     _overlayController.dispose();
     _isShowing = false;
   }

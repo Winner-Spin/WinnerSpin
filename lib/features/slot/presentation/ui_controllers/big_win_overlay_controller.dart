@@ -12,6 +12,7 @@ class BigWinOverlayController {
     required OverlayState overlay,
     required double amount,
     required WinTier tier,
+    required ImageProvider headlineImage,
     required bool instantAmount,
     required bool soundEnabled,
     required bool vibrationEnabled,
@@ -24,6 +25,7 @@ class BigWinOverlayController {
       builder: (context) => BigWinOverlay(
         amount: amount,
         tier: tier,
+        headlineImage: headlineImage,
         instantAmount: instantAmount,
         soundEnabled: soundEnabled,
         vibrationEnabled: vibrationEnabled,

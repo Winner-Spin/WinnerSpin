@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../../../../../../core/audio/app_audio_context.dart';
+import '../../../../../../../core/audio/bounded_audio_pool.dart';
 import 'multiplier_label.dart';
 
 class MultiplierBombAnimation {
@@ -248,21 +249,20 @@ class _BombPlayerState extends State<_BombPlayer>
 class _BombExplosionSound {
   static const _assetPath = 'audio/Items/Bomb_Explosion.wav';
   static const _volume = 0.72;
+  static const _playbackDuration = Duration(milliseconds: 200);
 
-  static Future<AudioPool>? _poolFuture;
+  static final BoundedAudioPool _pool = BoundedAudioPool(
+    debugLabel: 'bomb explosion',
+    source: AssetSource(_assetPath),
+    releaseAfter: _playbackDuration,
+    minPlayers: 3,
+    maxPlayers: 8,
+    maxConcurrent: 8,
+    playerMode: PlayerMode.mediaPlayer,
+    audioContext: AppAudioContext.game,
+  );
 
-  static Future<void> play() async {
-    try {
-      final pool = await (_poolFuture ??= AudioPool.create(
-        source: AssetSource(_assetPath),
-        minPlayers: 3,
-        maxPlayers: 8,
-        playerMode: PlayerMode.mediaPlayer,
-        audioContext: AppAudioContext.game,
-      ));
-      await pool.start(volume: _volume);
-    } catch (_) {}
-  }
+  static Future<void> play() => _pool.play(volume: _volume);
 }
 
 class _DustResiduePainter extends CustomPainter {

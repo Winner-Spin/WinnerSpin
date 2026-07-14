@@ -6,11 +6,11 @@ class BigWinHeadline extends StatelessWidget {
   const BigWinHeadline({
     super.key,
     required this.tier,
-    required this.cacheWidth,
+    required this.imageProvider,
   });
 
   final WinTier tier;
-  final int cacheWidth;
+  final ImageProvider imageProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +19,7 @@ class BigWinHeadline extends StatelessWidget {
       children: [
         const BigWinStarsRow(),
         const SizedBox(height: 8),
-        BigWinTierHeadline(tier: tier, cacheWidth: cacheWidth),
+        BigWinTierHeadline(imageProvider: imageProvider, tier: tier),
       ],
     );
   }
@@ -61,19 +61,18 @@ class BigWinTierHeadline extends StatelessWidget {
   const BigWinTierHeadline({
     super.key,
     required this.tier,
-    required this.cacheWidth,
+    required this.imageProvider,
   });
 
   final WinTier tier;
-  final int cacheWidth;
+  final ImageProvider imageProvider;
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(
-      tier.assetPath,
+    final image = Image(
+      image: imageProvider,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
-      cacheWidth: cacheWidth,
     );
     final scale = (tier == WinTier.bigWin || tier == WinTier.sensationalWin)
         ? 1.7

@@ -39,7 +39,4 @@ enum WinTier {
     if (multiplier >= bigWin.threshold) return bigWin;
     return null;
   }
-
-  static Iterable<String> get assetPaths =>
-      values.map((tier) => tier.assetPath);
 }
