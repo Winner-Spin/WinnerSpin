@@ -21,8 +21,12 @@ class _FreeSpinScatterTransitionState extends State<FreeSpinScatterTransition>
     with SingleTickerProviderStateMixin {
   static const _cupcakeAssetPath =
       'lib/images/slot_main_screen/Items/cupCake.png';
-  static const int _cupcakeCount = 420;
-  static const double _cupcakeCellSize = 0.19;
+  static const double _cupcakeCellSize = 0.255;
+  static const double _cupcakeSizeVariation = 0.065;
+  static const double _cupcakeHorizontalSpacing = 0.27;
+  static const double _cupcakeVerticalSpacing = 0.245;
+  static const double _cupcakeRowShift = 0.25;
+  static const double _cupcakeEntranceDelay = 0.28;
   static ui.Image? _cachedCupcakeImage;
   static Future<ui.Image>? _cupcakeImageFuture;
 
@@ -94,38 +98,41 @@ class _FreeSpinScatterTransitionState extends State<FreeSpinScatterTransition>
     }
 
     final particles = <_CupcakeBurstParticle>[];
+    final horizontalSpacing = size.width * _cupcakeHorizontalSpacing;
+    final verticalSpacing = size.width * _cupcakeVerticalSpacing;
+    final columnCount = (size.width / horizontalSpacing).ceil() + 1;
+    final rowCount = (size.height / verticalSpacing).ceil() + 1;
+    final horizontalStart =
+        (size.width - (columnCount - 1) * horizontalSpacing) / 2;
+    final verticalStart = (size.height - (rowCount - 1) * verticalSpacing) / 2;
 
-    for (int index = 0; index < _cupcakeCount; index++) {
-      final t = index / _cupcakeCount;
-      final angleBase = index * 2.399963229728653;
-      final angle = angleBase + (noise(index * 7 + 3) - 0.5) * 1.15;
-      final radius = math.sqrt(t) * (0.95 + noise(index * 11 + 5) * 0.58);
-      final aspect = size.height / size.width;
-      final x =
-          math.cos(angle) * radius * 0.88 +
-          (noise(index * 13 + 7) - 0.5) * 0.26;
-      final y =
-          math.sin(angle) * radius * 0.88 / aspect +
-          (noise(index * 17 + 9) - 0.5) * 0.26;
-      final sizeVar = _cupcakeCellSize + noise(index * 19 + 11) * 0.13;
-      final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
-      final delay = (radius * 0.22 + noise(index * 29 + 15) * 0.12).clamp(
-        0.0,
-        0.28,
-      );
-      final width = size.width * sizeVar;
+    var index = 0;
+    for (var row = 0; row < rowCount; row++) {
+      final rowShift =
+          (row.isEven ? -_cupcakeRowShift : _cupcakeRowShift) *
+          horizontalSpacing;
+      final centerY = verticalStart + row * verticalSpacing;
 
-      particles.add(
-        _CupcakeBurstParticle(
-          left: size.width * (0.5 + x) - (width / 2),
-          top: size.height * (0.46 + y) - (width / 2),
-          driftX: (noise(index * 31 + 17) - 0.5) * 95,
-          driftY: -85 - noise(index * 37 + 19) * 95,
-          rotation: rotation,
-          delay: delay,
-          width: width,
-        ),
-      );
+      for (var column = 0; column < columnCount; column++) {
+        final centerX = horizontalStart + column * horizontalSpacing + rowShift;
+        final sizeVar =
+            _cupcakeCellSize + noise(index * 19 + 11) * _cupcakeSizeVariation;
+        final rotation = (noise(index * 23 + 13) - 0.5) * 1.8;
+        final width = size.width * sizeVar;
+
+        particles.add(
+          _CupcakeBurstParticle(
+            left: centerX - width / 2,
+            top: centerY - width / 2,
+            driftX: (noise(index * 31 + 17) - 0.5) * 95,
+            driftY: -85 - noise(index * 37 + 19) * 95,
+            rotation: rotation,
+            delay: _cupcakeEntranceDelay,
+            width: width,
+          ),
+        );
+        index++;
+      }
     }
 
     _burstLayoutSize = size;
