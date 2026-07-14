@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -55,40 +54,37 @@ class _AutoSpinButtonState extends State<AutoSpinButton> {
           child: RepaintBoundary(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
-                child: Container(
-                  width: widget.width,
-                  height: widget.height,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(radius),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        const Color(0xFF2B211B).withValues(alpha: 0.58),
-                        const Color(0xFF120C09).withValues(alpha: 0.62),
-                        Colors.black.withValues(alpha: 0.46),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.22),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
+              child: Container(
+                width: widget.width,
+                height: widget.height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF2B211B).withValues(alpha: 0.58),
+                      const Color(0xFF120C09).withValues(alpha: 0.62),
+                      Colors.black.withValues(alpha: 0.46),
                     ],
                   ),
-                  child: Center(
-                    child: CustomPaint(
-                      size: const Size(22, 22),
-                      painter: AutoSpinIconPainter(
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: CustomPaint(
+                    size: const Size(22, 22),
+                    painter: AutoSpinIconPainter(
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
                 ),
