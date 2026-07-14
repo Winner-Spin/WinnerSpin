@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
+import '../models/auth_image_assets.dart';
 import 'register_screen.dart';
 import '../../../slot/presentation/views/game/game_screen.dart';
 
@@ -17,6 +18,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
+  static const _backgroundAsset = 'lib/images/login_screen/background_1.png';
+
   final LoginViewModel _viewModel = LoginViewModel();
 
   late final AnimationController _errorPulseCtrl;
@@ -54,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen>
     _errorClearTimer?.cancel();
     _errorPulseCtrl.dispose();
     _viewModel.removeListener(_onViewModelChange);
+    unawaited(const AssetImage(_backgroundAsset).evict());
     super.dispose();
   }
 
@@ -73,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   Positioned.fill(
                     child: Image.asset(
-                      'lib/images/login_screen/background_1.png',
+                      _backgroundAsset,
                       fit: BoxFit.cover,
                       filterQuality: FilterQuality.high,
                     ),
@@ -83,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen>
                     top: screenH * 0.125,
                     right: screenW * 0.07,
                     child: AnimatedImageButton(
-                      imagePath: 'lib/images/login_screen/music_button.png',
+                      imagePath: AuthImageAssets.musicButton,
                       width: 46,
                       isStrikeThrough: _viewModel.isMusicMuted,
                       onTap: () {
@@ -101,8 +105,7 @@ class _LoginScreenState extends State<LoginScreen>
                       controller: _viewModel.emailController,
                       icon: Icons.email,
                       hint: 'Email',
-                      backgroundImage:
-                          'lib/images/login_screen/email_button1_cropped.png',
+                      backgroundImage: AuthImageAssets.emailField,
                     ),
                   ),
 
@@ -116,8 +119,7 @@ class _LoginScreenState extends State<LoginScreen>
                       icon: Icons.lock,
                       hint: 'Password',
                       obscureText: true,
-                      backgroundImage:
-                          'lib/images/login_screen/password_button_cropped.png',
+                      backgroundImage: AuthImageAssets.passwordField,
                     ),
                   ),
 

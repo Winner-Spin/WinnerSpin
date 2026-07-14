@@ -7,7 +7,6 @@ import '../models/free_spin_presentation_state.dart';
 import '../models/game_presentation_timings.dart';
 import '../models/pending_free_spin_award.dart';
 import '../models/scatter_cell.dart';
-import '../services/game_asset_precache_service.dart';
 import 'free_spin_overlay_controller.dart';
 
 class FreeSpinAwardSequenceController {
@@ -91,7 +90,6 @@ class FreeSpinAwardSequenceController {
       overlay: overlay,
       totalWin: freeSpinPresentation.accumulatedWin,
       totalFreeSpins: freeSpinPresentation.awardedThisRound,
-      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
       onDismiss: () {
         if (!isMounted()) return;
         setState(awardPresentation.endSummary);
@@ -197,7 +195,6 @@ class FreeSpinAwardSequenceController {
       value: pending.value,
       isRetrigger: pending.isRetrigger,
       winAmount: pending.winAmount,
-      cacheWidth: GameAssetPrecacheService.freeSpinPopupCacheWidth,
       onDismiss: () {
         awardPresentation.endSequence();
         continueAutoSpinIfIdle();

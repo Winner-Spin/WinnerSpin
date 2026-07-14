@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/widgets/animated_image_button.dart';
+import '../models/auth_image_assets.dart';
 import '../viewmodels/register_viewmodel.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -15,6 +16,8 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
+  static const _backgroundAsset = 'lib/images/register_screen/register.png';
+
   final RegisterViewModel _viewModel = RegisterViewModel();
 
   late final AnimationController _errorPulseCtrl;
@@ -53,6 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _errorPulseCtrl.dispose();
     _viewModel.removeListener(_onViewModelChange);
     _viewModel.dispose();
+    unawaited(const AssetImage(_backgroundAsset).evict());
     super.dispose();
   }
 
@@ -88,7 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 children: [
                   Positioned.fill(
                     child: Image.asset(
-                      'lib/images/register_screen/register.png',
+                      _backgroundAsset,
                       fit: BoxFit.fill,
                       filterQuality: FilterQuality.high,
                     ),
@@ -98,7 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                     top: screenH * 0.07,
                     right: screenW * 0.07,
                     child: AnimatedImageButton(
-                      imagePath: 'lib/images/register_screen/music_button.png',
+                      imagePath: AuthImageAssets.musicButton,
                       width: 46,
                       isStrikeThrough: _viewModel.isMusicMuted,
                       onTap: _viewModel.toggleMusic,
@@ -131,8 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _viewModel.emailController,
                       icon: Icons.email,
                       hint: 'Email',
-                      backgroundImage:
-                          'lib/images/register_screen/email_button1_cropped.png',
+                      backgroundImage: AuthImageAssets.emailField,
                     ),
                   ),
 
@@ -146,8 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       icon: Icons.lock,
                       hint: 'Password',
                       obscureText: true,
-                      backgroundImage:
-                          'lib/images/register_screen/password_button_cropped.png',
+                      backgroundImage: AuthImageAssets.passwordField,
                     ),
                   ),
 
@@ -161,8 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       icon: Icons.lock_outline,
                       hint: 'Confirm Password',
                       obscureText: true,
-                      backgroundImage:
-                          'lib/images/register_screen/password_button_cropped.png',
+                      backgroundImage: AuthImageAssets.passwordField,
                     ),
                   ),
 

@@ -19,7 +19,7 @@ def get_real_bbox(img_path):
         print(f"Real size: {max_x-min_x}x{max_y-min_y}")
         # Crop and save it
         cropped = img.crop((min_x, min_y, max_x, max_y))
-        cropped.save("lib/images/login_screen/email_button1_cropped.png")
+        cropped.save("lib/images/auth_shared/email_button1_cropped.png")
         print("Cropped image saved.")
     else:
         print("No solid pixels found.")

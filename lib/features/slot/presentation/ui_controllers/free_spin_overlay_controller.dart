@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/free_spin_popup_image_provider.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_summary_popup.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_win_popup.dart';
 
@@ -13,18 +14,21 @@ class FreeSpinOverlayController {
     required int value,
     required bool isRetrigger,
     required double winAmount,
-    required int cacheWidth,
     required VoidCallback onDismiss,
   }) {
     clear();
 
+    final imageProvider = FreeSpinPopupImageProvider.resolve(
+      overlay.context,
+      FreeSpinWinPopup.assetPath,
+    );
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) => FreeSpinWinPopup(
         value: value,
         isRetrigger: isRetrigger,
         winAmount: winAmount,
-        cacheWidth: cacheWidth,
+        imageProvider: imageProvider,
         onDismiss: () {
           if (_activeEntry != entry) return;
           _activeEntry = null;
@@ -41,17 +45,20 @@ class FreeSpinOverlayController {
     required OverlayState overlay,
     required double totalWin,
     required int totalFreeSpins,
-    required int cacheWidth,
     required VoidCallback onDismiss,
   }) {
     clear();
 
+    final imageProvider = FreeSpinPopupImageProvider.resolve(
+      overlay.context,
+      FreeSpinSummaryPopup.assetPath,
+    );
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) => FreeSpinSummaryPopup(
         totalWin: totalWin,
         totalFreeSpins: totalFreeSpins,
-        cacheWidth: cacheWidth,
+        imageProvider: imageProvider,
         onDismiss: () {
           if (_activeEntry != entry) return;
           _activeEntry = null;

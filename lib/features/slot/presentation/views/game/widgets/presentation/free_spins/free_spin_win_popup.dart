@@ -10,7 +10,7 @@ class FreeSpinWinPopup extends StatefulWidget {
   final int value;
   final bool isRetrigger;
   final double winAmount;
-  final int cacheWidth;
+  final ImageProvider imageProvider;
   final VoidCallback onDismiss;
 
   const FreeSpinWinPopup({
@@ -18,7 +18,7 @@ class FreeSpinWinPopup extends StatefulWidget {
     required this.value,
     required this.isRetrigger,
     required this.winAmount,
-    required this.cacheWidth,
+    required this.imageProvider,
     required this.onDismiss,
   });
 
@@ -86,11 +86,10 @@ class _FreeSpinWinPopupState extends State<FreeSpinWinPopup>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Image.asset(
-                    FreeSpinWinPopup.assetPath,
+                  Image(
+                    image: widget.imageProvider,
                     width: width,
                     filterQuality: FilterQuality.medium,
-                    cacheWidth: widget.cacheWidth,
                   ),
                   Transform.translate(
                     offset: valueOffset,

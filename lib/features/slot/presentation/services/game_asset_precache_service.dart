@@ -10,12 +10,12 @@ import '../views/game/widgets/presentation/free_spins/free_spin_scatter_transiti
 import '../views/game/widgets/presentation/free_spins/free_spin_summary_popup.dart';
 import '../views/game/widgets/presentation/free_spins/free_spin_win_popup.dart';
 import '../views/game/widgets/playfield/multiplier_label.dart';
+import 'free_spin_popup_image_provider.dart';
 import 'game_background_image_provider.dart';
 
 class GameAssetPrecacheService {
-  static const int freeSpinPopupCacheWidth = 1024;
-
   Timer? _deferredSymbolTimer;
+  ImageProvider? _freeSpinSummaryImage;
 
   void precacheInitialAssets({
     required BuildContext context,
@@ -110,23 +110,37 @@ class GameAssetPrecacheService {
       context,
     );
     precacheImage(
-      const ResizeImage(
-        AssetImage(FreeSpinWinPopup.assetPath),
-        width: freeSpinPopupCacheWidth,
-      ),
+      FreeSpinPopupImageProvider.resolve(context, FreeSpinWinPopup.assetPath),
       context,
     );
-    precacheImage(
-      const ResizeImage(
-        AssetImage(FreeSpinSummaryPopup.assetPath),
-        width: freeSpinPopupCacheWidth,
-      ),
+  }
+
+  Future<void> precacheFreeSpinSummary(BuildContext context) async {
+    final image = FreeSpinPopupImageProvider.resolve(
       context,
+      FreeSpinSummaryPopup.assetPath,
     );
+    if (_freeSpinSummaryImage == image) return;
+
+    final previousImage = _freeSpinSummaryImage;
+    _freeSpinSummaryImage = image;
+    if (previousImage != null) unawaited(previousImage.evict());
+
+    await precacheImage(image, context);
+    if (_freeSpinSummaryImage != image) {
+      await image.evict();
+    }
+  }
+
+  void evictFreeSpinSummary() {
+    final image = _freeSpinSummaryImage;
+    _freeSpinSummaryImage = null;
+    if (image != null) unawaited(image.evict());
   }
 
   void dispose() {
     _deferredSymbolTimer?.cancel();
     _deferredSymbolTimer = null;
+    evictFreeSpinSummary();
   }
 }

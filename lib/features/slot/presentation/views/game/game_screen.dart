@@ -156,6 +156,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onFreeSpinStateChange() {
     final isInFreeSpins = _viewModel.isInFreeSpins;
+    final wasInFreeSpins = _freeSpinAwardPresentation.wasInFreeSpins;
     final result = _viewModel.lastSpinResult;
     final isRestoredRound = _freeSpinAwardPresentation.isRestoredRoundEntry(
       isInFreeSpins: isInFreeSpins,
@@ -173,6 +174,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         awardPresentation: _freeSpinAwardPresentation,
         setState: setState,
       );
+    }
+    if (isInFreeSpins && !wasInFreeSpins) {
+      unawaited(_assetPrecacheService.precacheFreeSpinSummary(context));
+    } else if (!isInFreeSpins && wasInFreeSpins) {
+      _assetPrecacheService.evictFreeSpinSummary();
     }
     _freeSpinAwardPresentation.updateFreeSpinMode(isInFreeSpins);
     if (isRestoredRound) {
@@ -629,8 +635,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 listenables: _listenables,
                 styles: _styles,
                 isFreeSpinVisualMode: () => _isFreeSpinVisualMode,
-                displayedFreeSpinsRemaining: () =>
-                    _displayedFreeSpinsRemaining,
+                displayedFreeSpinsRemaining: () => _displayedFreeSpinsRemaining,
                 isBigWinShowing: () => _bigWinPresentationController.isShowing,
                 isCelebrationActive: () => _isCelebrationActive,
                 onBuyFeatureTap: _promptBuyFreeSpinsConfirm,

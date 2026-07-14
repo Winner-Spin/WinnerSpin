@@ -11,14 +11,14 @@ class FreeSpinSummaryPopup extends StatefulWidget {
 
   final double totalWin;
   final int totalFreeSpins;
-  final int cacheWidth;
+  final ImageProvider imageProvider;
   final VoidCallback onDismiss;
 
   const FreeSpinSummaryPopup({
     super.key,
     required this.totalWin,
     required this.totalFreeSpins,
-    required this.cacheWidth,
+    required this.imageProvider,
     required this.onDismiss,
   });
 
@@ -87,11 +87,10 @@ class _FreeSpinSummaryPopupState extends State<FreeSpinSummaryPopup>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Image.asset(
-                    FreeSpinSummaryPopup.assetPath,
+                  Image(
+                    image: widget.imageProvider,
                     width: width,
                     filterQuality: FilterQuality.medium,
-                    cacheWidth: widget.cacheWidth,
                   ),
                   Transform.translate(
                     offset: Offset(0, width * 0.025),

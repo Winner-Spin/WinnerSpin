@@ -35,6 +35,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - lib/images/auth_shared/
     - lib/images/login_screen/
     - lib/images/register_screen/
     - lib/images/slot_main_screen/
