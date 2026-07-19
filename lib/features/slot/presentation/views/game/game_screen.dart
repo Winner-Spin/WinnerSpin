@@ -349,7 +349,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final isInFs = _viewModel.isInFreeSpins;
     if (_freeSpinPresentation.shouldResetRound(isInFs)) {
       setState(() {
-        _freeSpinPresentation.resetRound();
+        if (_viewModel.lastSpinResult == null) {
+          _freeSpinPresentation.restoreRound(
+            accumulatedWin: _viewModel.freeSpinAccumulatedWin,
+            awarded: _viewModel.freeSpinsAwardedThisRound,
+          );
+        } else {
+          _freeSpinPresentation.resetRound();
+        }
         _freeSpinAwardPresentation.endSummary();
       });
     }

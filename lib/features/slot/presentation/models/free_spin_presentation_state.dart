@@ -15,6 +15,12 @@ class FreeSpinPresentationState {
     awardedThisRound = 0;
   }
 
+  void restoreRound({required double accumulatedWin, required int awarded}) {
+    this.accumulatedWin = accumulatedWin < 0 ? 0 : accumulatedWin;
+    pendingSpinWin = 0;
+    awardedThisRound = awarded < 0 ? 0 : awarded;
+  }
+
   void updateFreeSpinMode(bool isInFreeSpins) {
     wasInFreeSpins = isInFreeSpins;
   }

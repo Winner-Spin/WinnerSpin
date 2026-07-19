@@ -15,7 +15,10 @@ class SlotSessionLifecycleController {
     return persistenceController.savePlayerState(
       userId: persistenceController.currentUserId,
       userBalance: balanceController.userBalance,
+      lastWin: balanceController.lastWin,
       freeSpinsRemaining: freeSpinsController.remaining,
+      freeSpinAccumulatedWin: freeSpinsController.accumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsController.awardedThisRound,
       debugLabel: debugLabel,
     );
   }
@@ -28,7 +31,10 @@ class SlotSessionLifecycleController {
     persistenceController.savePlayerStateSilently(
       userId: persistenceController.currentUserId,
       userBalance: balanceController.userBalance,
+      lastWin: balanceController.lastWin,
       freeSpinsRemaining: freeSpinsController.remaining,
+      freeSpinAccumulatedWin: freeSpinsController.accumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsController.awardedThisRound,
     );
   }
 
@@ -41,7 +47,10 @@ class SlotSessionLifecycleController {
     poolController.saveIfNeeded(
       persistenceController: persistenceController,
       userBalance: balanceController.userBalance,
+      lastWin: balanceController.lastWin,
       freeSpinsRemaining: freeSpinsController.remaining,
+      freeSpinAccumulatedWin: freeSpinsController.accumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsController.awardedThisRound,
     );
   }
 
@@ -54,7 +63,10 @@ class SlotSessionLifecycleController {
     return poolController.forceSave(
       persistenceController: persistenceController,
       userBalance: balanceController.userBalance,
+      lastWin: balanceController.lastWin,
       freeSpinsRemaining: freeSpinsController.remaining,
+      freeSpinAccumulatedWin: freeSpinsController.accumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsController.awardedThisRound,
     );
   }
 
@@ -83,13 +95,15 @@ class SlotSessionLifecycleController {
     required BalanceController balanceController,
     required FreeSpinsController freeSpinsController,
   }) async {
-    await feedbackController.pauseForLifecycle();
-    await forceSavePool(
-      poolController: poolController,
-      persistenceController: persistenceController,
-      balanceController: balanceController,
-      freeSpinsController: freeSpinsController,
-    );
+    await Future.wait([
+      feedbackController.pauseForLifecycle(),
+      forceSavePool(
+        poolController: poolController,
+        persistenceController: persistenceController,
+        balanceController: balanceController,
+        freeSpinsController: freeSpinsController,
+      ),
+    ]);
   }
 
   void onAppResumed({required GameFeedbackController feedbackController}) {

@@ -57,7 +57,10 @@ class SlotPersistenceController {
   Future<void> savePlayerState({
     String? userId,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
     String debugLabel = 'Player state save',
   }) async {
     if (userId == null) return;
@@ -65,7 +68,10 @@ class SlotPersistenceController {
       await _authRepository.savePlayerState(
         userId,
         userBalance: userBalance,
+        lastWin: lastWin,
         freeSpinsRemaining: freeSpinsRemaining,
+        freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+        freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
       );
     } catch (e) {
       debugPrint('$debugLabel error: $e');
@@ -75,13 +81,19 @@ class SlotPersistenceController {
   void savePlayerStateSilently({
     String? userId,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
   }) {
     if (userId == null) return;
     _authRepository.savePlayerState(
       userId,
       userBalance: userBalance,
+      lastWin: lastWin,
       freeSpinsRemaining: freeSpinsRemaining,
+      freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
     );
   }
 
@@ -89,14 +101,20 @@ class SlotPersistenceController {
     String? userId,
     required PoolState pool,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
   }) {
     if (userId == null || !pool.shouldSave) return;
     _poolRepository.save(userId, pool);
     savePlayerStateSilently(
       userId: userId,
       userBalance: userBalance,
+      lastWin: lastWin,
       freeSpinsRemaining: freeSpinsRemaining,
+      freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
     );
   }
 
@@ -104,15 +122,23 @@ class SlotPersistenceController {
     String? userId,
     required PoolState pool,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
   }) async {
     if (userId == null) return;
-    await _poolRepository.save(userId, pool);
-    await _authRepository.savePlayerState(
-      userId,
-      userBalance: userBalance,
-      freeSpinsRemaining: freeSpinsRemaining,
-    );
+    await Future.wait([
+      _poolRepository.save(userId, pool),
+      _authRepository.savePlayerState(
+        userId,
+        userBalance: userBalance,
+        lastWin: lastWin,
+        freeSpinsRemaining: freeSpinsRemaining,
+        freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+        freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
+      ),
+    ]);
   }
 
   Future<void> signOut() {

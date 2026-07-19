@@ -25,26 +25,38 @@ class SlotPoolController {
   void saveIfNeeded({
     required SlotPersistenceController persistenceController,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
   }) {
     persistenceController.savePoolIfNeeded(
       userId: persistenceController.currentUserId,
       pool: _pool,
       userBalance: userBalance,
+      lastWin: lastWin,
       freeSpinsRemaining: freeSpinsRemaining,
+      freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
     );
   }
 
   Future<void> forceSave({
     required SlotPersistenceController persistenceController,
     required double userBalance,
+    required double lastWin,
     required int freeSpinsRemaining,
+    required double freeSpinAccumulatedWin,
+    required int freeSpinsAwardedThisRound,
   }) {
     return persistenceController.forceSavePool(
       userId: persistenceController.currentUserId,
       pool: _pool,
       userBalance: userBalance,
+      lastWin: lastWin,
       freeSpinsRemaining: freeSpinsRemaining,
+      freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
     );
   }
 }

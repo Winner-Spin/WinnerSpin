@@ -39,6 +39,9 @@ abstract class AuthRepository {
   Future<void> savePlayerState(
     String uid, {
     double? userBalance,
+    double? lastWin,
     int? freeSpinsRemaining,
+    double? freeSpinAccumulatedWin,
+    int? freeSpinsAwardedThisRound,
   });
 }

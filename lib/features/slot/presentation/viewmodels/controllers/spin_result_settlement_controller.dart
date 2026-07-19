@@ -39,7 +39,7 @@ class SpinResultSettlementController {
     if (result.isRetrigger) {
       freeSpinsController.awardRetrigger();
     } else {
-      freeSpinsController.awardInitial();
+      freeSpinsController.awardInitial(initialWin: result.totalWin);
       anteController.captureForNewRound();
       if (currentSpinFromBuy) {
         freeSpinsController.markCurrentRoundFromBuy();

@@ -147,6 +147,10 @@ class GameViewModel extends ChangeNotifier {
 
   int get freeSpinsRemaining => _fsCtrl.remaining;
 
+  double get freeSpinAccumulatedWin => _fsCtrl.accumulatedWin;
+
+  int get freeSpinsAwardedThisRound => _fsCtrl.awardedThisRound;
+
   bool get isInFreeSpins => _fsCtrl.isInRound;
 
   bool get canBuyFreeSpins => _availabilityCtrl.canBuyFreeSpins(
@@ -405,6 +409,14 @@ class GameViewModel extends ChangeNotifier {
 
   void releaseFsRoundHold() {
     if (!_fsCtrl.releaseRoundHold()) return;
+    if (!_fsCtrl.isActive) {
+      _fsCtrl.finishRound();
+      _sessionLifecycleCtrl.savePlayerStateSilently(
+        persistenceController: _persistenceCtrl,
+        balanceController: _balanceCtrl,
+        freeSpinsController: _fsCtrl,
+      );
+    }
     notifyListeners();
   }
 

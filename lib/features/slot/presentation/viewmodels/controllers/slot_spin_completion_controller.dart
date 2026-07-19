@@ -64,13 +64,18 @@ class SlotSpinCompletionController {
     );
     roundController.markResultSettled(result);
 
+    final completedFreeSpin = roundController.lastSpinWasFreeSpin;
+    if (completedFreeSpin) {
+      freeSpinsController.recordRoundWin(result.totalWin);
+    }
+
     final freeSpinAwarded = settlementController.applyFreeSpinAward(
       result: result,
       freeSpinsController: freeSpinsController,
       anteController: anteController,
       currentSpinFromBuy: roundController.currentSpinFromBuy,
     );
-    if (freeSpinAwarded) {
+    if (freeSpinAwarded || completedFreeSpin) {
       savePlayerState();
     }
 

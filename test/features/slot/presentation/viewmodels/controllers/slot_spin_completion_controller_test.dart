@@ -36,6 +36,7 @@ void main() {
     final lifecycleController = SpinLifecycleController();
     final executionController = _DelayedSpinExecutionController();
     var completionFinished = false;
+    var playerStateSaveCount = 0;
 
     final spin = SlotSpinFlowController().spin(
       startController: SlotSpinStartController(),
@@ -54,8 +55,7 @@ void main() {
       isInFreeSpins: true,
       betAmount: balanceController.betAmount,
       vibrationEnabled: false,
-      commitPendingFreeSpinConsume:
-          freeSpinsController.commitPendingConsume,
+      commitPendingFreeSpinConsume: freeSpinsController.commitPendingConsume,
       notifyListeners: () {},
     );
 
@@ -77,7 +77,7 @@ void main() {
           userId: null,
           vibrationEnabled: false,
           isInFreeSpins: () => freeSpinsController.isInRound,
-          savePlayerState: () {},
+          savePlayerState: () => playerStateSaveCount++,
           savePoolIfNeeded: () {},
           notifyListeners: () {},
         )
@@ -90,7 +90,7 @@ void main() {
     final result = SpinResult(
       initialGrid: _emptyGrid(),
       tumbles: const [],
-      totalWin: 0,
+      totalWin: 42.5,
       tumbleCount: 0,
       freeSpinsTriggered: false,
       scatterCount: 0,
@@ -105,6 +105,8 @@ void main() {
     expect(roundController.lastSpinResult, same(result));
     expect(roundController.pendingResult, isNull);
     expect(freeSpinsController.remaining, 9);
+    expect(freeSpinsController.accumulatedWin, 42.5);
+    expect(playerStateSaveCount, 1);
 
     balanceController.dispose();
     freeSpinsController.dispose();

@@ -27,10 +27,7 @@ void main() {
         viewModel.errorMessage,
         'Connection timed out. Please check your internet connection.',
       );
-      expect(
-        viewModel.errorPresentation,
-        LoginErrorPresentation.snackBar,
-      );
+      expect(viewModel.errorPresentation, LoginErrorPresentation.snackBar);
     });
 
     test('stops loading and reports Firebase network errors', () async {
@@ -51,10 +48,7 @@ void main() {
         viewModel.errorMessage,
         'No internet connection. Please check your connection.',
       );
-      expect(
-        viewModel.errorPresentation,
-        LoginErrorPresentation.snackBar,
-      );
+      expect(viewModel.errorPresentation, LoginErrorPresentation.snackBar);
     });
 
     test(
@@ -114,6 +108,9 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> savePlayerState(
     String uid, {
     double? userBalance,
+    double? lastWin,
     int? freeSpinsRemaining,
+    double? freeSpinAccumulatedWin,
+    int? freeSpinsAwardedThisRound,
   }) => throw UnimplementedError();
 }

@@ -59,8 +59,12 @@ class BalanceController extends ChangeNotifier {
 
   void hydrate(Map<String, dynamic> userData) {
     final seed = (userData['userBalance'] ?? _defaultBalance).toDouble();
+    final storedLastWin = userData['lastWin'];
     _balance = seed;
     _userBalance = seed;
+    _lastWin = storedLastWin is num
+        ? storedLastWin.toDouble().clamp(0.0, double.infinity)
+        : 0.0;
     notifyListeners();
   }
 

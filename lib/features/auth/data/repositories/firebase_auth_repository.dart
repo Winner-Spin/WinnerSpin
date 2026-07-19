@@ -49,7 +49,10 @@ class FirebaseAuthRepository implements AuthRepository {
         'createdAt': FieldValue.serverTimestamp(),
         'balance': 10000.0,
         'userBalance': 10000.0,
+        'lastWin': 0.0,
         'freeSpinsRemaining': 0,
+        'freeSpinAccumulatedWin': 0.0,
+        'freeSpinsAwardedThisRound': 0,
       });
 
       return user.uid;
@@ -105,14 +108,27 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> savePlayerState(
     String uid, {
     double? userBalance,
+    double? lastWin,
     int? freeSpinsRemaining,
+    double? freeSpinAccumulatedWin,
+    int? freeSpinsAwardedThisRound,
   }) async {
     final patch = <String, dynamic>{};
     if (userBalance != null) {
       patch['userBalance'] = (userBalance * 100).round() / 100;
     }
+    if (lastWin != null) {
+      patch['lastWin'] = (lastWin * 100).round() / 100;
+    }
     if (freeSpinsRemaining != null) {
       patch['freeSpinsRemaining'] = freeSpinsRemaining;
+    }
+    if (freeSpinAccumulatedWin != null) {
+      patch['freeSpinAccumulatedWin'] =
+          (freeSpinAccumulatedWin * 100).round() / 100;
+    }
+    if (freeSpinsAwardedThisRound != null) {
+      patch['freeSpinsAwardedThisRound'] = freeSpinsAwardedThisRound;
     }
     if (patch.isEmpty) return;
 
