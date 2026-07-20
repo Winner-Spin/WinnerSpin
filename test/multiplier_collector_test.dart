@@ -13,7 +13,9 @@ void main() {
   });
 
   test('2x symbol win with a visible 5x multiplier pays exactly 10x', () {
-    final banana = SymbolRegistry.all.firstWhere((symbol) => symbol.id == 'muz');
+    final banana = SymbolRegistry.all.firstWhere(
+      (symbol) => symbol.id == 'banana',
+    );
     final multiplier = SymbolRegistry.all.firstWhere(
       (symbol) => symbol.id == 'multi_5x',
     );

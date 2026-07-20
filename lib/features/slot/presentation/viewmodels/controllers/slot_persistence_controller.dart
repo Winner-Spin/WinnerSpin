@@ -36,6 +36,18 @@ class SlotPersistenceController {
     return _authRepository.watchUserData(userId);
   }
 
+  Future<void> updateProfileAvatar(String avatarId) {
+    final userId = currentUserId;
+    if (userId == null) return Future.value();
+    return _authRepository.updateProfileAvatar(userId, avatarId);
+  }
+
+  Future<void> sendPasswordResetEmail(String email) {
+    final userId = currentUserId;
+    if (userId == null) return Future.value();
+    return _authRepository.sendPasswordResetEmail(userId, email);
+  }
+
   Future<PoolState> loadPool(String userId) {
     return _poolRepository.load(userId);
   }
@@ -143,5 +155,20 @@ class SlotPersistenceController {
 
   Future<void> signOut() {
     return _authRepository.signOut();
+  }
+
+  Future<bool> refreshCurrentSession() async {
+    if (currentUserId == null) return false;
+    try {
+      await _authRepository.reloadCurrentUser();
+    } catch (_) {
+      // A temporary network failure must not sign an otherwise valid user out.
+      return currentUserId != null;
+    }
+    return currentUserId != null;
+  }
+
+  Future<void> deleteAccount() {
+    return _authRepository.deleteAccount();
   }
 }

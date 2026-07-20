@@ -62,14 +62,14 @@ class RtpConfig {
   static const double chainProbBase = 0.0;
 
   static const Map<String, double> winSymbolWeights = {
-    'muz': 35,
-    'uzum': 25,
-    'karpuz': 18,
-    'seftali': 10,
-    'elma': 6,
-    'cilek': 3,
-    'pembe_ayi': 1.5,
-    'yesil_ayi': 0.8,
-    'kalp': 0.3,
+    'banana': 35,
+    'grapes': 25,
+    'watermelon': 18,
+    'peach': 10,
+    'apple': 6,
+    'strawberry': 3,
+    'pink_bear': 1.5,
+    'green_bear': 0.8,
+    'heart': 0.3,
   };
 }

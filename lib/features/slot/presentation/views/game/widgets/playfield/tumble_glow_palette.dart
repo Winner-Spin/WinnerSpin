@@ -112,20 +112,20 @@ class TumbleGlowPalette {
   static TumbleGlowPalette forPath(String path) {
     final id = SymbolRegistry.byPath(path)?.id;
     switch (id) {
-      case 'muz':
+      case 'banana':
         return _yellow;
-      case 'uzum':
+      case 'grapes':
         return _purple;
-      case 'karpuz':
-      case 'yesil_ayi':
+      case 'watermelon':
+      case 'green_bear':
         return _green;
-      case 'seftali':
+      case 'peach':
         return _orange;
-      case 'elma':
-      case 'cilek':
-      case 'kalp':
+      case 'apple':
+      case 'strawberry':
+      case 'heart':
         return _red;
-      case 'pembe_ayi':
+      case 'pink_bear':
         return _pink;
       case 'cupcake':
         return _cyan;

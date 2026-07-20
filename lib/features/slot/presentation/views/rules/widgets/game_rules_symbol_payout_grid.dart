@@ -10,15 +10,21 @@ class GameRulesSymbolPayoutGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kalp = SymbolRegistry.all.firstWhere((s) => s.id == 'kalp');
-    final yesilAyi = SymbolRegistry.all.firstWhere((s) => s.id == 'yesil_ayi');
-    final pembeAyi = SymbolRegistry.all.firstWhere((s) => s.id == 'pembe_ayi');
-    final cilek = SymbolRegistry.all.firstWhere((s) => s.id == 'cilek');
-    final elma = SymbolRegistry.all.firstWhere((s) => s.id == 'elma');
-    final seftali = SymbolRegistry.all.firstWhere((s) => s.id == 'seftali');
-    final karpuz = SymbolRegistry.all.firstWhere((s) => s.id == 'karpuz');
-    final uzum = SymbolRegistry.all.firstWhere((s) => s.id == 'uzum');
-    final muz = SymbolRegistry.all.firstWhere((s) => s.id == 'muz');
+    final heart = SymbolRegistry.all.firstWhere((s) => s.id == 'heart');
+    final greenBear = SymbolRegistry.all.firstWhere(
+      (s) => s.id == 'green_bear',
+    );
+    final pinkBear = SymbolRegistry.all.firstWhere((s) => s.id == 'pink_bear');
+    final strawberry = SymbolRegistry.all.firstWhere(
+      (s) => s.id == 'strawberry',
+    );
+    final apple = SymbolRegistry.all.firstWhere((s) => s.id == 'apple');
+    final peach = SymbolRegistry.all.firstWhere((s) => s.id == 'peach');
+    final watermelon = SymbolRegistry.all.firstWhere(
+      (s) => s.id == 'watermelon',
+    );
+    final grapes = SymbolRegistry.all.firstWhere((s) => s.id == 'grapes');
+    final banana = SymbolRegistry.all.firstWhere((s) => s.id == 'banana');
 
     return Column(
       children: [
@@ -28,13 +34,13 @@ class GameRulesSymbolPayoutGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: kalp,
+                  symbol: heart,
                   betAmount: betAmount,
                 ),
               ),
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: yesilAyi,
+                  symbol: greenBear,
                   betAmount: betAmount,
                 ),
               ),
@@ -48,13 +54,13 @@ class GameRulesSymbolPayoutGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: pembeAyi,
+                  symbol: pinkBear,
                   betAmount: betAmount,
                 ),
               ),
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: cilek,
+                  symbol: strawberry,
                   betAmount: betAmount,
                 ),
               ),
@@ -68,19 +74,19 @@ class GameRulesSymbolPayoutGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: elma,
+                  symbol: apple,
                   betAmount: betAmount,
                 ),
               ),
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: seftali,
+                  symbol: peach,
                   betAmount: betAmount,
                 ),
               ),
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: karpuz,
+                  symbol: watermelon,
                   betAmount: betAmount,
                 ),
               ),
@@ -94,13 +100,13 @@ class GameRulesSymbolPayoutGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: uzum,
+                  symbol: grapes,
                   betAmount: betAmount,
                 ),
               ),
               Expanded(
                 child: GameRulesSymbolPayoutCard(
-                  symbol: muz,
+                  symbol: banana,
                   betAmount: betAmount,
                 ),
               ),

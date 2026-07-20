@@ -6,11 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
+import 'email_verification_screen.dart';
 import 'register_screen.dart';
 import '../../../slot/presentation/views/game/game_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.viewModel});
+
+  final LoginViewModel? viewModel;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,14 +23,16 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   static const _backgroundAsset = 'lib/images/login_screen/background_1.png';
 
-  final LoginViewModel _viewModel = LoginViewModel();
+  late final LoginViewModel _viewModel;
 
   late final AnimationController _errorPulseCtrl;
   late final Animation<double> _errorPulseScale;
+  bool _isRoutingToVerification = false;
 
   @override
   void initState() {
     super.initState();
+    _viewModel = widget.viewModel ?? LoginViewModel();
     _viewModel.addListener(_onViewModelChange);
     unawaited(_viewModel.initMusic());
     _errorPulseCtrl = AnimationController(
@@ -41,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _onViewModelChange() {
     _showErrorIfNeeded(context);
+    _handleVerificationRequired(context);
     _handleLoginSuccess(context);
     final showsErrorImage =
         _viewModel.errorMessage != null &&
@@ -211,6 +217,27 @@ class _LoginScreenState extends State<LoginScreen>
         MaterialPageRoute(builder: (context) => const GameScreen()),
       );
     }
+  }
+
+  void _handleVerificationRequired(BuildContext context) {
+    if (!mounted ||
+        !_viewModel.verificationRequired ||
+        _isRoutingToVerification) {
+      return;
+    }
+    final email = _viewModel.verificationEmail;
+    if (email == null || email.isEmpty) return;
+
+    _isRoutingToVerification = true;
+    _viewModel.resetVerificationRequired();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(email: email),
+        ),
+      );
+    });
   }
 
   Future<void> _navigateToSignUp(BuildContext context) async {

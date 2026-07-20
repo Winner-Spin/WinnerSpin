@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/repositories/local_game_history_repository.dart';
 import '../../domain/models/game_history_entry.dart';
 import '../../domain/models/spin_result.dart';
+import '../../domain/models/symbol_registry.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../audio/game_music_service.dart';
 import '../../domain/repositories/game_history_repository.dart';
@@ -98,6 +99,8 @@ class GameViewModel extends ChangeNotifier {
   String get username => _sessionCtrl.username;
 
   String get email => _sessionCtrl.email;
+
+  String get profileAvatarId => _sessionCtrl.profileAvatarId;
 
   bool get isLoading => _sessionCtrl.isLoading;
 
@@ -431,6 +434,14 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    await _sessionLifecycleCtrl.deleteAccount(
+      sessionController: _sessionCtrl,
+      persistenceController: _persistenceCtrl,
+    );
+    notifyListeners();
+  }
+
   void resetLoggedOut() {
     _sessionCtrl.resetLoggedOut();
   }
@@ -439,6 +450,28 @@ class GameViewModel extends ChangeNotifier {
     if (ids.isEmpty) return;
     _historyCtrl.delete(userId: _persistenceCtrl.currentUserId, ids: ids);
     notifyListeners();
+  }
+
+  Future<bool> selectProfileAvatar(String avatarId) async {
+    if (!SymbolRegistry.isProfileAvatar(avatarId)) return false;
+    final previousAvatarId = _sessionCtrl.profileAvatarId;
+    if (previousAvatarId == avatarId) return true;
+
+    _sessionCtrl.setProfileAvatarId(avatarId);
+    notifyListeners();
+    try {
+      await _persistenceCtrl.updateProfileAvatar(avatarId);
+      return true;
+    } catch (error) {
+      debugPrint('Profile avatar save error: $error');
+      _sessionCtrl.setProfileAvatarId(previousAvatarId);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> sendPasswordResetEmail() {
+    return _persistenceCtrl.sendPasswordResetEmail(email);
   }
 
   Future<void> onAppLifecycleEvent() async {
@@ -453,6 +486,15 @@ class GameViewModel extends ChangeNotifier {
 
   void onAppResumed() {
     _sessionLifecycleCtrl.onAppResumed(feedbackController: _feedbackCtrl);
+  }
+
+  Future<bool> validateSessionOnResume() async {
+    final isSessionActive = await _sessionLifecycleCtrl.validateSessionOnResume(
+      sessionController: _sessionCtrl,
+      persistenceController: _persistenceCtrl,
+    );
+    if (!isSessionActive) notifyListeners();
+    return isSessionActive;
   }
 
   @override

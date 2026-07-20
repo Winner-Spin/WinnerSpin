@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/network/internet_connection_probe.dart';
+import '../../domain/models/email_verification_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/services/password_reset_rate_limiter.dart';
 
 typedef InternetConnectionCheck = Future<bool> Function();
 
@@ -11,20 +14,36 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
     InternetConnectionCheck? internetConnectionCheck,
+    DateTime Function()? now,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1'),
        _internetConnectionCheck =
-           internetConnectionCheck ?? hasInternetConnection;
+           internetConnectionCheck ?? hasInternetConnection,
+       _now = now ?? DateTime.now;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
   final InternetConnectionCheck _internetConnectionCheck;
+  final DateTime Function() _now;
 
   static const String _usersCollection = 'users';
+  static const String _passwordResetRequestedAtField =
+      'passwordResetRequestedAt';
+  static const String _passwordResetRequestIdField = 'passwordResetRequestId';
 
   @override
   String? get currentUserId => _auth.currentUser?.uid;
+
+  @override
+  String? get currentUserEmail => _auth.currentUser?.email;
+
+  @override
+  bool get currentUserEmailVerified => _auth.currentUser?.emailVerified == true;
 
   @override
   Future<String?> signUp({
@@ -46,6 +65,8 @@ class FirebaseAuthRepository implements AuthRepository {
         'uid': user.uid,
         'username': username.trim(),
         'email': email.trim(),
+        'emailVerified': false,
+        'profileAvatarId': 'pink_bear',
         'createdAt': FieldValue.serverTimestamp(),
         'balance': 10000.0,
         'userBalance': 10000.0,
@@ -75,7 +96,15 @@ class FirebaseAuthRepository implements AuthRepository {
         email: email.trim(),
         password: password,
       );
-      return credential.user?.uid;
+      await credential.user?.reload();
+      final user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        throw AuthException(
+          AuthErrorCode.emailVerificationRequired,
+          user.email,
+        );
+      }
+      return user?.uid;
     } on FirebaseAuthException catch (e) {
       throw AuthException(_mapFirebaseCode(e.code), e.message);
     }
@@ -83,6 +112,77 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() => _auth.signOut();
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _functions.httpsCallable('deleteAccount').call<void>();
+      await _auth.signOut();
+    } on FirebaseFunctionsException catch (error) {
+      throw AuthException(AuthErrorCode.unknown, error.message);
+    }
+  }
+
+  @override
+  Future<void> reloadCurrentUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      // Password resets revoke the previous refresh token. Forcing a token
+      // refresh makes the client observe that revocation immediately instead
+      // of continuing with an ID token that may remain cached for up to an hour.
+      await currentUser.getIdToken(true);
+      await currentUser.reload();
+    } on FirebaseAuthException catch (error) {
+      if (_isInvalidSessionError(error.code)) {
+        await _auth.signOut();
+        return;
+      }
+      rethrow;
+    }
+
+    final user = _auth.currentUser;
+    if (user == null || !user.emailVerified) return;
+
+    // Firebase Authentication owns the verification state. Keep the public
+    // profile document in sync without making sign-in depend on this write.
+    try {
+      await _firestore.collection(_usersCollection).doc(user.uid).set({
+        'emailVerified': true,
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // A later app start or profile refresh will retry this best-effort sync.
+    }
+  }
+
+  @override
+  Future<void> sendEmailVerificationLink() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const EmailVerificationException(
+        EmailVerificationFailureCode.unavailable,
+        rawMessage: 'There is no authenticated user.',
+      );
+    }
+    if (user.emailVerified) return;
+
+    try {
+      await user.sendEmailVerification();
+    } on FirebaseAuthException catch (error) {
+      throw _mapVerificationError(error);
+    }
+  }
+
+  EmailVerificationException _mapVerificationError(
+    FirebaseAuthException error,
+  ) {
+    return EmailVerificationException(switch (error.code) {
+      'too-many-requests' => EmailVerificationFailureCode.tooManyRequests,
+      'network-request-failed' => EmailVerificationFailureCode.unavailable,
+      _ => EmailVerificationFailureCode.unknown,
+    }, rawMessage: error.message);
+  }
 
   @override
   Future<Map<String, dynamic>?> getUserData(String uid) async {
@@ -102,6 +202,93 @@ class FirebaseAuthRepository implements AuthRepository {
         .doc(uid)
         .snapshots()
         .map((snapshot) => snapshot.data());
+  }
+
+  @override
+  Future<void> updateProfileAvatar(String uid, String avatarId) {
+    return _firestore.collection(_usersCollection).doc(uid).set({
+      'profileAvatarId': avatarId,
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String uid, String email) async {
+    final requestedAt = _now().toUtc();
+    final requestId = '$uid-${requestedAt.microsecondsSinceEpoch}';
+    final userRef = _firestore.collection(_usersCollection).doc(uid);
+    DateTime? previousRequestAt;
+    Object? previousRequestId;
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final data = snapshot.data();
+        previousRequestAt = _readFirestoreDate(
+          data?[_passwordResetRequestedAtField],
+        );
+        previousRequestId = data?[_passwordResetRequestIdField];
+        PasswordResetRateLimiter.ensureAllowed(
+          lastRequestAt: previousRequestAt,
+          now: requestedAt,
+        );
+        transaction.set(userRef, {
+          _passwordResetRequestedAtField: Timestamp.fromDate(requestedAt),
+          _passwordResetRequestIdField: requestId,
+        }, SetOptions(merge: true));
+      });
+
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      await _rollbackPasswordResetReservation(
+        userRef: userRef,
+        requestId: requestId,
+        previousRequestAt: previousRequestAt,
+        previousRequestId: previousRequestId,
+      );
+      throw AuthException(_mapFirebaseCode(e.code), e.message);
+    } on PasswordResetLimitException {
+      rethrow;
+    } catch (_) {
+      await _rollbackPasswordResetReservation(
+        userRef: userRef,
+        requestId: requestId,
+        previousRequestAt: previousRequestAt,
+        previousRequestId: previousRequestId,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _rollbackPasswordResetReservation({
+    required DocumentReference<Map<String, dynamic>> userRef,
+    required String requestId,
+    required DateTime? previousRequestAt,
+    required Object? previousRequestId,
+  }) async {
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final data = snapshot.data();
+        if (data?[_passwordResetRequestIdField] != requestId) return;
+
+        transaction.set(userRef, {
+          _passwordResetRequestedAtField: previousRequestAt == null
+              ? FieldValue.delete()
+              : Timestamp.fromDate(previousRequestAt),
+          _passwordResetRequestIdField:
+              previousRequestId ?? FieldValue.delete(),
+        }, SetOptions(merge: true));
+      });
+    } catch (_) {
+      // Preserve the original password-reset error.
+    }
+  }
+
+  DateTime? _readFirestoreDate(Object? value) {
+    if (value is Timestamp) return value.toDate().toUtc();
+    if (value is DateTime) return value.toUtc();
+    if (value is String) return DateTime.tryParse(value)?.toUtc();
+    return null;
   }
 
   @override
@@ -159,5 +346,15 @@ class FirebaseAuthRepository implements AuthRepository {
       default:
         return AuthErrorCode.unknown;
     }
+  }
+
+  static bool _isInvalidSessionError(String code) {
+    return switch (code) {
+      'invalid-user-token' ||
+      'user-token-expired' ||
+      'user-disabled' ||
+      'user-not-found' => true,
+      _ => false,
+    };
   }
 }

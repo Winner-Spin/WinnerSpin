@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
 import '../viewmodels/register_viewmodel.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,6 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   late final Animation<double> _errorPulseScale;
   Timer? _errorClearTimer;
   String? _lastShownError;
+  bool _isRoutingToVerification = false;
 
   @override
   void initState() {
@@ -244,16 +246,20 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _handleRegistrationSuccess(BuildContext context) {
     if (!mounted) return;
-    if (_viewModel.registrationSuccess) {
-      _viewModel.resetRegistrationSuccess();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful! Please log in.'),
-          backgroundColor: Colors.green,
+    if (!_viewModel.registrationSuccess || _isRoutingToVerification) return;
+    final email = _viewModel.verificationEmail;
+    if (email == null || email.isEmpty) return;
+
+    _isRoutingToVerification = true;
+    _viewModel.resetRegistrationSuccess();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(email: email),
         ),
       );
-      Navigator.pop(context);
-    }
+    });
   }
 
   void _showErrorIfNeeded(BuildContext context) {

@@ -5,10 +5,12 @@ import '../enums/symbol_tier.dart';
 class SymbolRegistry {
   SymbolRegistry._();
 
+  static const String defaultProfileAvatarId = 'pink_bear';
+
   static const List<SlotSymbol> all = [
     // Low tier
     SlotSymbol(
-      id: 'muz',
+      id: 'banana',
       assetPath: 'lib/images/slot_main_screen/Items/muz.png',
       baseWeight: 35,
       tier: SymbolTier.low,
@@ -16,14 +18,14 @@ class SymbolRegistry {
       displayScale: 1.12,
     ),
     SlotSymbol(
-      id: 'uzum',
+      id: 'grapes',
       assetPath: 'lib/images/slot_main_screen/Items/uzum.png',
       baseWeight: 30,
       tier: SymbolTier.low,
       payouts: {8: 0.40, 10: 0.90, 12: 4.0},
     ),
     SlotSymbol(
-      id: 'karpuz',
+      id: 'watermelon',
       assetPath: 'lib/images/slot_main_screen/Items/karpuz.png',
       baseWeight: 28,
       tier: SymbolTier.low,
@@ -33,14 +35,14 @@ class SymbolRegistry {
 
     // Mid tier
     SlotSymbol(
-      id: 'seftali',
+      id: 'peach',
       assetPath: 'lib/images/slot_main_screen/Items/seftali.png',
       baseWeight: 22,
       tier: SymbolTier.mid,
       payouts: {8: 0.80, 10: 1.20, 12: 8.0},
     ),
     SlotSymbol(
-      id: 'elma',
+      id: 'apple',
       assetPath: 'lib/images/slot_main_screen/Items/Apple.png',
       baseWeight: 18,
       tier: SymbolTier.mid,
@@ -50,28 +52,28 @@ class SymbolRegistry {
 
     // High tier
     SlotSymbol(
-      id: 'cilek',
+      id: 'strawberry',
       assetPath: 'lib/images/slot_main_screen/Items/cilek.png',
       baseWeight: 14,
       tier: SymbolTier.high,
       payouts: {8: 1.50, 10: 2.00, 12: 12.0},
     ),
     SlotSymbol(
-      id: 'pembe_ayi',
+      id: 'pink_bear',
       assetPath: 'lib/images/slot_main_screen/Items/pembe_ayi.png',
       baseWeight: 10,
       tier: SymbolTier.high,
       payouts: {8: 2.00, 10: 5.00, 12: 15.0},
     ),
     SlotSymbol(
-      id: 'yesil_ayi',
+      id: 'green_bear',
       assetPath: 'lib/images/slot_main_screen/Items/yesil_ayi.png',
       baseWeight: 7,
       tier: SymbolTier.high,
       payouts: {8: 5.00, 10: 10.00, 12: 25.0},
     ),
     SlotSymbol(
-      id: 'kalp',
+      id: 'heart',
       assetPath: 'lib/images/slot_main_screen/Items/Kalp.png',
       baseWeight: 4,
       tier: SymbolTier.high,
@@ -144,7 +146,22 @@ class SymbolRegistry {
     for (final s in all) s.assetPath: s,
   };
 
+  static final Map<String, SlotSymbol> _byId = {
+    for (final symbol in all) symbol.id: symbol,
+  };
+
+  static final List<SlotSymbol> profileAvatars = List.unmodifiable(
+    all.where((symbol) => !symbol.isMultiplier),
+  );
+
   static SlotSymbol? byPath(String path) => _byPath[path];
+
+  static SlotSymbol? byId(String id) => _byId[id];
+
+  static bool isProfileAvatar(String id) {
+    final symbol = byId(id);
+    return symbol != null && !symbol.isMultiplier;
+  }
 
   static const Map<GameMode, Map<SymbolTier, double>> weightMultipliers = {
     GameMode.recovery: {

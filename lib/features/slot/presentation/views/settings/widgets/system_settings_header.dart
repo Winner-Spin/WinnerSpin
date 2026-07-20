@@ -7,16 +7,12 @@ class SystemSettingsHeader extends StatelessWidget {
     required this.title,
     required this.textColor,
     required this.panelAccent,
-    required this.isExiting,
-    required this.onExit,
     required this.onClose,
   });
 
   final String title;
   final Color textColor;
   final Color panelAccent;
-  final bool isExiting;
-  final VoidCallback onExit;
   final VoidCallback onClose;
 
   @override
@@ -33,17 +29,6 @@ class SystemSettingsHeader extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _HeaderIconButton(
-              icon: Icons.logout_rounded,
-              textColor: textColor,
-              panelAccent: panelAccent,
-              isEnabled: !isExiting,
-              opacity: isExiting ? 0.55 : 1,
-              onTap: onExit,
-            ),
-          ),
           Text(
             title,
             style: GoogleFonts.barlowCondensed(
@@ -74,33 +59,25 @@ class _HeaderIconButton extends StatelessWidget {
     required this.textColor,
     required this.panelAccent,
     required this.onTap,
-    this.isEnabled = true,
-    this.opacity = 1,
   });
 
   final IconData icon;
   final Color textColor;
   final Color panelAccent;
   final VoidCallback onTap;
-  final bool isEnabled;
-  final double opacity;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: isEnabled ? onTap : null,
-      child: AnimatedOpacity(
-        opacity: opacity,
-        duration: const Duration(milliseconds: 120),
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: panelAccent.withValues(alpha: 0.88),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 30, color: textColor),
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: panelAccent.withValues(alpha: 0.88),
+          shape: BoxShape.circle,
         ),
+        child: Icon(icon, size: 30, color: textColor),
       ),
     );
   }

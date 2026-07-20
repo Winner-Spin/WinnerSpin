@@ -34,6 +34,9 @@ class RegisterViewModel extends ChangeNotifier {
   bool _registrationSuccess = false;
   bool get registrationSuccess => _registrationSuccess;
 
+  String? _verificationEmail;
+  String? get verificationEmail => _verificationEmail;
+
   bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
@@ -52,6 +55,7 @@ class RegisterViewModel extends ChangeNotifier {
 
     _errorMessage = null;
     _registrationSuccess = false;
+    _verificationEmail = null;
 
     final username = nameController.text.trim();
     final email = emailController.text.trim();
@@ -85,7 +89,7 @@ class RegisterViewModel extends ChangeNotifier {
       await _authRepository
           .signUp(email: email, password: password, username: username)
           .timeout(_requestTimeout);
-      await _authRepository.signOut().timeout(_requestTimeout);
+      _verificationEmail = email;
       _registrationSuccess = true;
     } on AuthException catch (e) {
       debugPrint('Auth error: ${e.code} - ${e.rawMessage}');
@@ -138,6 +142,8 @@ class RegisterViewModel extends ChangeNotifier {
         return 'Registration failed. Please try again.';
       case AuthErrorCode.networkRequestFailed:
         return 'No internet connection. Please check your connection.';
+      case AuthErrorCode.emailVerificationRequired:
+        return 'Please verify your email to continue.';
     }
   }
 

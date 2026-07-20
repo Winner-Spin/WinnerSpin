@@ -7,6 +7,7 @@ enum AuthErrorCode {
   emailAlreadyInUse,
   weakPassword,
   networkRequestFailed,
+  emailVerificationRequired,
   unknown,
 }
 
@@ -19,8 +20,22 @@ class AuthException implements Exception {
   String toString() => 'AuthException($code, $rawMessage)';
 }
 
+class PasswordResetLimitException implements Exception {
+  const PasswordResetLimitException(this.nextAllowedAt);
+
+  final DateTime nextAllowedAt;
+
+  @override
+  String toString() =>
+      'PasswordResetLimitException(nextAllowedAt: $nextAllowedAt)';
+}
+
 abstract class AuthRepository {
   String? get currentUserId;
+
+  String? get currentUserEmail;
+
+  bool get currentUserEmailVerified;
 
   Future<String?> signUp({
     required String email,
@@ -32,9 +47,19 @@ abstract class AuthRepository {
 
   Future<void> signOut();
 
+  Future<void> deleteAccount();
+
+  Future<void> reloadCurrentUser();
+
+  Future<void> sendEmailVerificationLink();
+
   Future<Map<String, dynamic>?> getUserData(String uid);
 
   Stream<Map<String, dynamic>?> watchUserData(String uid);
+
+  Future<void> updateProfileAvatar(String uid, String avatarId);
+
+  Future<void> sendPasswordResetEmail(String uid, String email);
 
   Future<void> savePlayerState(
     String uid, {

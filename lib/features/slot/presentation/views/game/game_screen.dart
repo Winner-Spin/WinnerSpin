@@ -413,9 +413,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _viewModel.onAppLifecycleEvent();
       case AppLifecycleState.resumed:
         _viewModel.onAppResumed();
-        _continueAutoSpinIfPresentationIdle();
+        unawaited(_validateSessionAfterResume());
         break;
     }
+  }
+
+  Future<void> _validateSessionAfterResume() async {
+    final isSessionActive = await _viewModel.validateSessionOnResume();
+    if (!mounted || !isSessionActive) return;
+    _continueAutoSpinIfPresentationIdle();
   }
 
   @override

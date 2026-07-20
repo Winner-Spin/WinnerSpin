@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../audio/ui_click_sound.dart';
+import '../../../domain/models/symbol_registry.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import '../deposit/deposit_money_screen.dart';
 import '../history/game_history_screen.dart';
+import '../profile/profile_screen.dart';
 import '../shared/widgets/spring_popup_card.dart';
 import '../shared/widgets/spring_popup_transition.dart';
 import 'widgets/system_settings_bet_section.dart';
 import 'widgets/system_settings_footer.dart';
 import 'widgets/system_settings_header.dart';
 import 'widgets/system_settings_history_entry.dart';
+import 'widgets/system_settings_profile_entry.dart';
 import 'widgets/system_settings_row.dart';
 
 class SystemSettingsScreen extends StatefulWidget {
@@ -28,8 +31,8 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   static const Color _textColor = Color(0xFF2C2530);
 
   final ScrollController _scrollController = ScrollController();
-  bool _isExiting = false;
   bool _showGameHistory = false;
+  bool _showProfile = false;
 
   @override
   void dispose() {
@@ -86,11 +89,6 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                   title: 'SETTINGS',
                                   textColor: _textColor,
                                   panelAccent: _panelAccent,
-                                  isExiting: _isExiting,
-                                  onExit: () {
-                                    UiClickSound.play();
-                                    _exitGame();
-                                  },
                                   onClose: () {
                                     UiClickSound.play();
                                     Navigator.of(context).pop();
@@ -122,6 +120,38 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
+                                          ListenableBuilder(
+                                            listenable: widget.viewModel,
+                                            builder: (context, _) {
+                                              final selectedAvatar =
+                                                  SymbolRegistry.byId(
+                                                    widget
+                                                        .viewModel
+                                                        .profileAvatarId,
+                                                  ) ??
+                                                  SymbolRegistry.byId(
+                                                    SymbolRegistry
+                                                        .defaultProfileAvatarId,
+                                                  )!;
+                                              return SystemSettingsProfileEntry(
+                                                textColor: _textColor,
+                                                avatarAssetPath:
+                                                    selectedAvatar.assetPath,
+                                                onTap: () {
+                                                  UiClickSound.play();
+                                                  setState(
+                                                    () => _showProfile = true,
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(height: 18),
+                                          const Divider(
+                                            color: Color(0x332C2530),
+                                            height: 1,
+                                          ),
+                                          const SizedBox(height: 18),
                                           SystemSettingsHistoryEntry(
                                             textColor: _textColor,
                                             onTap: () {
@@ -238,18 +268,16 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 onClose: () => setState(() => _showGameHistory = false),
               ),
             ),
+          if (_showProfile)
+            Positioned.fill(
+              child: ProfileScreen(
+                viewModel: widget.viewModel,
+                onClose: () => setState(() => _showProfile = false),
+              ),
+            ),
         ],
       ),
     );
-  }
-
-  Future<void> _exitGame() async {
-    if (_isExiting) return;
-    setState(() => _isExiting = true);
-    final viewModel = widget.viewModel;
-    Navigator.of(context).pop();
-    await WidgetsBinding.instance.endOfFrame;
-    await viewModel.signOut();
   }
 
   void _showDepositMoney() {

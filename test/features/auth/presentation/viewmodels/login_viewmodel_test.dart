@@ -71,6 +71,27 @@ void main() {
         expect(viewModel.errorPresentation, LoginErrorPresentation.image);
       },
     );
+
+    test('routes an unverified account to email verification', () async {
+      final repository = _FakeAuthRepository(
+        signInResult: Future<String?>.error(
+          const AuthException(
+            AuthErrorCode.emailVerificationRequired,
+            'player@example.com',
+          ),
+        ),
+      );
+      final viewModel = LoginViewModel.withRepository(repository);
+      viewModel.emailController.text = 'player@example.com';
+      viewModel.passwordController.text = 'password';
+
+      await viewModel.login();
+
+      expect(viewModel.loginSuccess, isFalse);
+      expect(viewModel.verificationRequired, isTrue);
+      expect(viewModel.verificationEmail, 'player@example.com');
+      expect(viewModel.errorMessage, isNull);
+    });
   });
 }
 
@@ -81,6 +102,12 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   String? get currentUserId => null;
+
+  @override
+  String? get currentUserEmail => null;
+
+  @override
+  bool get currentUserEmailVerified => false;
 
   @override
   Future<String?> signIn({required String email, required String password}) =>
@@ -97,11 +124,28 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
+  Future<void> deleteAccount() => throw UnimplementedError();
+
+  @override
+  Future<void> reloadCurrentUser() => throw UnimplementedError();
+
+  @override
+  Future<void> sendEmailVerificationLink() => throw UnimplementedError();
+
+  @override
   Future<Map<String, dynamic>?> getUserData(String uid) =>
       throw UnimplementedError();
 
   @override
   Stream<Map<String, dynamic>?> watchUserData(String uid) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> updateProfileAvatar(String uid, String avatarId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendPasswordResetEmail(String uid, String email) =>
       throw UnimplementedError();
 
   @override

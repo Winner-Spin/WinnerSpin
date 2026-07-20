@@ -18,7 +18,6 @@ class LoginViewModel extends ChangeNotifier {
     : _authRepository = FirebaseAuthRepository(),
       _requestTimeout = defaultRequestTimeout;
 
-  @visibleForTesting
   LoginViewModel.withRepository(
     this._authRepository, {
     Duration requestTimeout = defaultRequestTimeout,
@@ -42,6 +41,12 @@ class LoginViewModel extends ChangeNotifier {
   bool _loginSuccess = false;
   bool get loginSuccess => _loginSuccess;
 
+  bool _verificationRequired = false;
+  bool get verificationRequired => _verificationRequired;
+
+  String? _verificationEmail;
+  String? get verificationEmail => _verificationEmail;
+
   bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
@@ -61,6 +66,8 @@ class LoginViewModel extends ChangeNotifier {
     _errorMessage = null;
     _errorPresentation = LoginErrorPresentation.image;
     _loginSuccess = false;
+    _verificationRequired = false;
+    _verificationEmail = null;
 
     if (emailController.text.trim().isEmpty ||
         passwordController.text.isEmpty) {
@@ -84,6 +91,13 @@ class LoginViewModel extends ChangeNotifier {
       passwordController.clear();
       _loginSuccess = true;
     } on AuthException catch (e) {
+      if (e.code == AuthErrorCode.emailVerificationRequired) {
+        _verificationEmail = e.rawMessage ?? emailController.text.trim();
+        _verificationRequired = true;
+        _errorMessage = null;
+        _errorPresentation = LoginErrorPresentation.snackBar;
+        return;
+      }
       _errorMessage = _friendlyError(e.code);
       _errorPresentation = e.code == AuthErrorCode.networkRequestFailed
           ? LoginErrorPresentation.snackBar
@@ -102,6 +116,11 @@ class LoginViewModel extends ChangeNotifier {
 
   void resetLoginSuccess() {
     _loginSuccess = false;
+  }
+
+  void resetVerificationRequired() {
+    _verificationRequired = false;
+    _verificationEmail = null;
   }
 
   void clearError() {
@@ -148,6 +167,8 @@ class LoginViewModel extends ChangeNotifier {
         return 'Login failed. Please try again.';
       case AuthErrorCode.networkRequestFailed:
         return 'No internet connection. Please check your connection.';
+      case AuthErrorCode.emailVerificationRequired:
+        return 'Please verify your email to continue.';
     }
   }
 }

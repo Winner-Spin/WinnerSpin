@@ -6,6 +6,7 @@ import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/repositories/pool_repository.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/balance_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/free_spins_controller.dart';
+import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/player_session_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_persistence_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_session_lifecycle_controller.dart';
 
@@ -69,13 +70,86 @@ void main() {
     poolRepository.completeSave();
     await save;
   });
+
+  test('forwards profile avatar and password reset operations', () async {
+    final authRepository = _MemoryAuthRepository();
+    final persistenceController = SlotPersistenceController(
+      authRepository: authRepository,
+      poolRepository: _MemoryPoolRepository(),
+    );
+
+    await persistenceController.updateProfileAvatar('heart');
+    await persistenceController.sendPasswordResetEmail('player@example.com');
+
+    expect(
+      (await authRepository.getUserData('user-1'))!['profileAvatarId'],
+      'heart',
+    );
+    expect(authRepository.passwordResetEmail, 'player@example.com');
+  });
+
+  test(
+    'marks the player logged out when the refreshed session expired',
+    () async {
+      final authRepository = _MemoryAuthRepository()
+        ..expireSessionOnReload = true;
+      final persistenceController = SlotPersistenceController(
+        authRepository: authRepository,
+        poolRepository: _MemoryPoolRepository(),
+      );
+      final sessionController = PlayerSessionController();
+
+      final isSessionActive = await SlotSessionLifecycleController()
+          .validateSessionOnResume(
+            sessionController: sessionController,
+            persistenceController: persistenceController,
+          );
+
+      expect(isSessionActive, isFalse);
+      expect(sessionController.loggedOut, isTrue);
+      sessionController.dispose();
+    },
+  );
+
+  test(
+    'keeps the player signed in during a temporary refresh failure',
+    () async {
+      final authRepository = _MemoryAuthRepository()
+        ..reloadError = Exception('offline');
+      final persistenceController = SlotPersistenceController(
+        authRepository: authRepository,
+        poolRepository: _MemoryPoolRepository(),
+      );
+      final sessionController = PlayerSessionController();
+
+      final isSessionActive = await SlotSessionLifecycleController()
+          .validateSessionOnResume(
+            sessionController: sessionController,
+            persistenceController: persistenceController,
+          );
+
+      expect(isSessionActive, isTrue);
+      expect(sessionController.loggedOut, isFalse);
+      sessionController.dispose();
+    },
+  );
 }
 
 class _MemoryAuthRepository implements AuthRepository {
   final Map<String, dynamic> _userData = {};
+  String? passwordResetEmail;
+  String? activeUserId = 'user-1';
+  bool expireSessionOnReload = false;
+  Object? reloadError;
 
   @override
-  String? get currentUserId => 'user-1';
+  String? get currentUserId => activeUserId;
+
+  @override
+  String? get currentUserEmail => 'player@example.com';
+
+  @override
+  bool get currentUserEmailVerified => true;
 
   @override
   Future<Map<String, dynamic>?> getUserData(String uid) async => _userData;
@@ -110,6 +184,18 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
+  Future<void> deleteAccount() => throw UnimplementedError();
+
+  @override
+  Future<void> reloadCurrentUser() async {
+    if (reloadError case final error?) throw error;
+    if (expireSessionOnReload) activeUserId = null;
+  }
+
+  @override
+  Future<void> sendEmailVerificationLink() => throw UnimplementedError();
+
+  @override
   Future<String?> signUp({
     required String email,
     required String password,
@@ -119,6 +205,16 @@ class _MemoryAuthRepository implements AuthRepository {
   @override
   Stream<Map<String, dynamic>?> watchUserData(String uid) =>
       Stream.value(_userData);
+
+  @override
+  Future<void> updateProfileAvatar(String uid, String avatarId) async {
+    _userData['profileAvatarId'] = avatarId;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String uid, String email) async {
+    passwordResetEmail = email;
+  }
 }
 
 class _MemoryPoolRepository implements PoolRepository {

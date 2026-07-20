@@ -88,6 +88,15 @@ class SlotSessionLifecycleController {
     );
   }
 
+  Future<void> deleteAccount({
+    required PlayerSessionController sessionController,
+    required SlotPersistenceController persistenceController,
+  }) {
+    return sessionController.deleteAccount(
+      deleteAccount: persistenceController.deleteAccount,
+    );
+  }
+
   Future<void> onAppLifecycleEvent({
     required GameFeedbackController feedbackController,
     required SlotPoolController poolController,
@@ -108,5 +117,16 @@ class SlotSessionLifecycleController {
 
   void onAppResumed({required GameFeedbackController feedbackController}) {
     feedbackController.resumeAfterLifecycle();
+  }
+
+  Future<bool> validateSessionOnResume({
+    required PlayerSessionController sessionController,
+    required SlotPersistenceController persistenceController,
+  }) async {
+    final isSessionActive = await persistenceController.refreshCurrentSession();
+    if (isSessionActive) return true;
+
+    await sessionController.markSessionExpired();
+    return false;
   }
 }
