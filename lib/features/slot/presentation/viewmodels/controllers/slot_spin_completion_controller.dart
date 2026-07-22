@@ -28,6 +28,7 @@ class SlotSpinCompletionController {
     required bool Function() isInFreeSpins,
     required void Function() savePlayerState,
     required void Function() savePoolIfNeeded,
+    required void Function(String spinId) finalizeRecovery,
     required void Function() notifyListeners,
   }) async {
     await roundController.waitForSpinResult();
@@ -50,6 +51,7 @@ class SlotSpinCompletionController {
       notifyListeners: notifyListeners,
     );
 
+    final recoveryId = roundController.pendingRecoveryId;
     settlementController.awardWinAndRecordHistory(
       result: result,
       balanceController: balanceController,
@@ -57,6 +59,7 @@ class SlotSpinCompletionController {
       userId: userId,
       pendingHistoryBet: roundController.pendingHistoryBet,
       vibrationEnabled: vibrationEnabled,
+      historyId: recoveryId,
     );
     settlementController.showWinningPositions(
       result: result,
@@ -75,7 +78,7 @@ class SlotSpinCompletionController {
       anteController: anteController,
       currentSpinFromBuy: roundController.currentSpinFromBuy,
     );
-    if (freeSpinAwarded || completedFreeSpin) {
+    if (recoveryId == null && (freeSpinAwarded || completedFreeSpin)) {
       savePlayerState();
     }
 
@@ -87,6 +90,9 @@ class SlotSpinCompletionController {
 
     poolController.recordPayout(result.totalWin);
     savePoolIfNeeded();
+    if (recoveryId != null) {
+      finalizeRecovery(recoveryId);
+    }
 
     roundController.clearPendingResult();
 

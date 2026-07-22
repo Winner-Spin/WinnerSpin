@@ -15,6 +15,8 @@ class SlotSessionHydrationController {
     required PlayerSessionController sessionController,
     required BalanceController balanceController,
     required FreeSpinsController freeSpinsController,
+    required Future<bool> Function() recoverPendingSpin,
+    required ValueChanged<double> applyRemoteUserBalance,
     required VoidCallback savePlayerState,
   }) async {
     try {
@@ -27,11 +29,6 @@ class SlotSessionHydrationController {
       final userData = sessionData.userData;
       poolController.hydrate(sessionData.pool);
 
-      sessionController.listenToUserBalance(
-        stream: persistenceController.watchUserData(userId),
-        onBalanceChanged: balanceController.applyRemoteUserBalance,
-      );
-
       if (userData == null) {
         sessionController.applyUserData(null);
         return;
@@ -39,7 +36,15 @@ class SlotSessionHydrationController {
 
       sessionController.applyUserData(userData);
       balanceController.hydrate(userData);
-      freeSpinsController.hydrate(userData);
+      final recoveredPendingSpin = await recoverPendingSpin();
+      if (!recoveredPendingSpin) {
+        freeSpinsController.hydrate(userData);
+      }
+
+      sessionController.listenToUserBalance(
+        stream: persistenceController.watchUserData(userId),
+        onBalanceChanged: applyRemoteUserBalance,
+      );
 
       if (!userData.containsKey('userBalance')) {
         savePlayerState();

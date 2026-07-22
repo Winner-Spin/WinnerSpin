@@ -1,30 +1,40 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../../../../auth/domain/repositories/auth_repository.dart';
 import '../../../data/repositories/firestore_pool_repository.dart';
+import '../../../data/repositories/local_spin_recovery_repository.dart';
+import '../../../domain/models/pending_spin_recovery.dart';
 import '../../../domain/models/pool_state.dart';
 import '../../../domain/repositories/pool_repository.dart';
+import '../../../domain/repositories/spin_recovery_repository.dart';
 
 class SlotPersistenceController {
   SlotPersistenceController({
     required AuthRepository authRepository,
     required PoolRepository poolRepository,
+    SpinRecoveryRepository? spinRecoveryRepository,
   }) : _authRepository = authRepository,
-       _poolRepository = poolRepository;
+       _poolRepository = poolRepository,
+       _spinRecoveryRepository = spinRecoveryRepository;
 
   factory SlotPersistenceController.withDefaults({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
+    SpinRecoveryRepository? spinRecoveryRepository,
   }) {
     return SlotPersistenceController(
       authRepository: authRepository ?? FirebaseAuthRepository(),
       poolRepository: poolRepository ?? FirestorePoolRepository(),
+      spinRecoveryRepository: spinRecoveryRepository,
     );
   }
 
   final AuthRepository _authRepository;
   final PoolRepository _poolRepository;
+  SpinRecoveryRepository? _spinRecoveryRepository;
 
   String? get currentUserId => _authRepository.currentUserId;
 
@@ -64,6 +74,55 @@ class SlotPersistenceController {
       userData: results[0] as Map<String, dynamic>?,
       pool: results[1] as PoolState,
     );
+  }
+
+  Future<PendingSpinRecovery?> loadSpinRecovery() {
+    final userId = currentUserId;
+    if (userId == null) return Future.value();
+    return _recoveryRepository.load(userId);
+  }
+
+  Future<void> saveSpinRecovery(PendingSpinRecovery recovery) {
+    final userId = currentUserId;
+    if (userId == null) return Future.value();
+    return _recoveryRepository.save(userId, recovery);
+  }
+
+  Future<void> clearSpinRecovery(String spinId, {String? userId}) {
+    final recoveryUserId = userId ?? currentUserId;
+    if (recoveryUserId == null) return Future.value();
+    return _recoveryRepository.clear(recoveryUserId, spinId);
+  }
+
+  Future<void> persistSpinRecoveryPlayer({
+    required String userId,
+    required PendingSpinRecovery recovery,
+  }) {
+    return _authRepository.savePlayerState(
+      userId,
+      userBalance: recovery.userBalance,
+      lastWin: recovery.winAmount,
+      freeSpinsRemaining: recovery.freeSpinsRemaining,
+      freeSpinAccumulatedWin: recovery.freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: recovery.freeSpinsAwardedThisRound,
+    );
+  }
+
+  Future<void> persistRecoveredSpin({
+    required String userId,
+    required PendingSpinRecovery recovery,
+  }) async {
+    await Future.wait([
+      persistSpinRecoveryPlayer(userId: userId, recovery: recovery),
+      _poolRepository.save(
+        userId,
+        PoolState(
+          totalBetsPlaced: recovery.poolTotalBetsPlaced,
+          totalPaidOut: recovery.poolTotalPaidOut,
+          totalSpins: recovery.poolTotalSpins,
+        ),
+      ),
+    ]);
   }
 
   Future<void> savePlayerState({
@@ -119,7 +178,7 @@ class SlotPersistenceController {
     required int freeSpinsAwardedThisRound,
   }) {
     if (userId == null || !pool.shouldSave) return;
-    _poolRepository.save(userId, pool);
+    unawaited(_savePoolSilently(userId, pool));
     savePlayerStateSilently(
       userId: userId,
       userBalance: userBalance,
@@ -141,7 +200,7 @@ class SlotPersistenceController {
   }) async {
     if (userId == null) return;
     await Future.wait([
-      _poolRepository.save(userId, pool),
+      _savePoolSilently(userId, pool),
       _authRepository.savePlayerState(
         userId,
         userBalance: userBalance,
@@ -151,6 +210,18 @@ class SlotPersistenceController {
         freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
       ),
     ]);
+  }
+
+  SpinRecoveryRepository get _recoveryRepository {
+    return _spinRecoveryRepository ??= LocalSpinRecoveryRepository();
+  }
+
+  Future<void> _savePoolSilently(String userId, PoolState pool) async {
+    try {
+      await _poolRepository.save(userId, pool);
+    } catch (error) {
+      debugPrint('Pool save error: $error');
+    }
   }
 
   Future<void> signOut() {

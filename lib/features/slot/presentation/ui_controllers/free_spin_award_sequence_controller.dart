@@ -20,12 +20,15 @@ class FreeSpinAwardSequenceController {
     required FreeSpinPresentationState freeSpinPresentation,
     required FreeSpinAwardPresentationState awardPresentation,
     required void Function(VoidCallback callback) setState,
+    bool awardAlreadyApplied = false,
   }) {
     _freeSpinTransitionTimer?.cancel();
-    freeSpinPresentation.recordAward(
-      pending.value,
-      isRetrigger: pending.isRetrigger,
-    );
+    if (!awardAlreadyApplied) {
+      freeSpinPresentation.recordAward(
+        pending.value,
+        isRetrigger: pending.isRetrigger,
+      );
+    }
 
     setState(() {
       awardPresentation.startAward(pending);

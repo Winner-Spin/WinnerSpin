@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/local_game_history_repository.dart';
+import '../../domain/models/pending_spin_recovery.dart';
+import '../../domain/repositories/spin_recovery_repository.dart';
 import '../../domain/models/game_history_entry.dart';
 import '../../domain/models/spin_result.dart';
 import '../../domain/models/symbol_registry.dart';
@@ -12,6 +14,7 @@ import '../../domain/repositories/game_history_repository.dart';
 import '../../domain/repositories/pool_repository.dart';
 import '../../domain/engine/slot_engine.dart';
 import '../../domain/models/cluster_win.dart';
+import '../models/pending_free_spin_award.dart';
 import 'controllers/ante_controller.dart';
 import 'controllers/auto_spin_controller.dart';
 import 'controllers/balance_controller.dart';
@@ -42,6 +45,7 @@ class GameViewModel extends ChangeNotifier {
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
     GameHistoryRepository? gameHistoryRepository,
+    SpinRecoveryRepository? spinRecoveryRepository,
     GameMusicService? musicService,
     SpinExecutionController? spinExecutionController,
   }) : _historyCtrl = GameHistoryController(
@@ -53,6 +57,7 @@ class GameViewModel extends ChangeNotifier {
     _persistenceCtrl = SlotPersistenceController.withDefaults(
       authRepository: authRepository,
       poolRepository: poolRepository,
+      spinRecoveryRepository: spinRecoveryRepository,
     );
     final result = SlotEngine.spin(_poolCtrl.pool, 0);
     _gridCtrl = GridController(result.initialGrid);
@@ -90,6 +95,15 @@ class GameViewModel extends ChangeNotifier {
   final SlotSpinCompletionController _spinCompletionCtrl =
       SlotSpinCompletionController();
   late final GridController _gridCtrl;
+  final Map<String, ({String userId, PendingSpinRecovery recovery})>
+  _preparedSpinRecoveries = {};
+  Future<void> _recoveryPersistenceTail = Future<void>.value();
+  final Set<String> _acknowledgedRecoveryAwards = {};
+  final Set<String> _failedRecoveryFinalizations = {};
+  ({String userId, String spinId})? _pendingAwardRecovery;
+  PendingFreeSpinAward? _recoveredPendingFreeSpinAward;
+  double? _expectedRemoteUserBalance;
+  bool _balanceSyncLocked = false;
 
   BalanceController get balanceCtrl => _balanceCtrl;
   AnteController get anteCtrl => _anteCtrl;
@@ -105,6 +119,12 @@ class GameViewModel extends ChangeNotifier {
   bool get isLoading => _sessionCtrl.isLoading;
 
   bool get loggedOut => _sessionCtrl.loggedOut;
+
+  PendingFreeSpinAward? takeRecoveredFreeSpinAward() {
+    final pending = _recoveredPendingFreeSpinAward;
+    _recoveredPendingFreeSpinAward = null;
+    return pending;
+  }
 
   static const int columns = SlotEngine.columns;
   static const int rows = SlotEngine.rows;
@@ -252,8 +272,9 @@ class GameViewModel extends ChangeNotifier {
       availabilityController: _availabilityCtrl,
       autoSpinController: _autoSpinCtrl,
       isBusy: isBusy,
-    ))
+    )) {
       return;
+    }
     notifyListeners();
   }
 
@@ -265,8 +286,9 @@ class GameViewModel extends ChangeNotifier {
       balanceController: _balanceCtrl,
       isBusy: isBusy,
       isInFreeSpins: isInFreeSpins,
-    ))
+    )) {
       return;
+    }
   }
 
   void increaseBet() {
@@ -292,8 +314,9 @@ class GameViewModel extends ChangeNotifier {
       amount: amount,
       balanceController: _balanceCtrl,
       insufficientHintController: _insufficientHintCtrl,
-    ))
+    )) {
       return;
+    }
     notifyListeners();
 
     await _sessionLifecycleCtrl.savePlayerState(
@@ -312,6 +335,8 @@ class GameViewModel extends ChangeNotifier {
       sessionController: _sessionCtrl,
       balanceController: _balanceCtrl,
       freeSpinsController: _fsCtrl,
+      recoverPendingSpin: _recoverPendingSpin,
+      applyRemoteUserBalance: _applyRemoteUserBalance,
       savePlayerState: () => _sessionLifecycleCtrl.savePlayerStateSilently(
         persistenceController: _persistenceCtrl,
         balanceController: _balanceCtrl,
@@ -322,48 +347,200 @@ class GameViewModel extends ChangeNotifier {
   }
 
   Future<void> spin() async {
-    await _spinFlowCtrl.spin(
-      startController: _spinStartCtrl,
-      lifecycleController: _spinLifecycleCtrl,
-      executionController: _spinExecutionCtrl,
-      balanceController: _balanceCtrl,
-      freeSpinsController: _fsCtrl,
-      autoSpinController: _autoSpinCtrl,
-      insufficientHintController: _insufficientHintCtrl,
-      poolController: _poolCtrl,
-      roundController: _roundCtrl,
-      anteController: _anteCtrl,
-      tumbleController: _tumbleCtrl,
-      gridController: _gridCtrl,
-      isBusy: isBusy,
-      isInFreeSpins: isInFreeSpins,
-      betAmount: betAmount,
-      vibrationEnabled: vibration,
-      commitPendingFreeSpinConsume: commitPendingFsConsume,
-      notifyListeners: notifyListeners,
-    );
+    if (isLoading) return;
+    _balanceSyncLocked = true;
+    try {
+      await _spinFlowCtrl.spin(
+        startController: _spinStartCtrl,
+        lifecycleController: _spinLifecycleCtrl,
+        executionController: _spinExecutionCtrl,
+        balanceController: _balanceCtrl,
+        freeSpinsController: _fsCtrl,
+        autoSpinController: _autoSpinCtrl,
+        insufficientHintController: _insufficientHintCtrl,
+        poolController: _poolCtrl,
+        roundController: _roundCtrl,
+        anteController: _anteCtrl,
+        tumbleController: _tumbleCtrl,
+        gridController: _gridCtrl,
+        isBusy: isBusy,
+        isInFreeSpins: isInFreeSpins,
+        betAmount: betAmount,
+        vibrationEnabled: vibration,
+        prepareRecovery: _prepareSpinRecovery,
+        commitPendingFreeSpinConsume: commitPendingFsConsume,
+        notifyListeners: notifyListeners,
+      );
+    } finally {
+      if (!_roundCtrl.isSpinning) _balanceSyncLocked = false;
+    }
   }
 
   Future<void> buyFreeSpins() async {
-    await _spinFlowCtrl.buyFreeSpins(
-      startController: _spinStartCtrl,
-      lifecycleController: _spinLifecycleCtrl,
-      executionController: _spinExecutionCtrl,
-      balanceController: _balanceCtrl,
-      autoSpinController: _autoSpinCtrl,
-      insufficientHintController: _insufficientHintCtrl,
-      poolController: _poolCtrl,
+    if (isLoading) return;
+    _balanceSyncLocked = true;
+    try {
+      await _spinFlowCtrl.buyFreeSpins(
+        startController: _spinStartCtrl,
+        lifecycleController: _spinLifecycleCtrl,
+        executionController: _spinExecutionCtrl,
+        balanceController: _balanceCtrl,
+        autoSpinController: _autoSpinCtrl,
+        insufficientHintController: _insufficientHintCtrl,
+        poolController: _poolCtrl,
+        roundController: _roundCtrl,
+        anteController: _anteCtrl,
+        tumbleController: _tumbleCtrl,
+        gridController: _gridCtrl,
+        isBusy: isBusy,
+        isInFreeSpins: isInFreeSpins,
+        betAmount: betAmount,
+        buyFeaturePrice: buyFeaturePrice,
+        vibrationEnabled: vibration,
+        notifyListeners: notifyListeners,
+      );
+    } finally {
+      if (!_roundCtrl.isSpinning) _balanceSyncLocked = false;
+    }
+  }
+
+  Future<void> _prepareSpinRecovery(SpinResult result) async {
+    final userId = _persistenceCtrl.currentUserId;
+    if (userId == null) return;
+
+    final playedAt = DateTime.now().toUtc();
+    final recovery = _settlementCtrl.createRecovery(
+      spinId: '$userId-${playedAt.microsecondsSinceEpoch}',
+      playedAt: playedAt,
+      result: result,
       roundController: _roundCtrl,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
       anteController: _anteCtrl,
-      tumbleController: _tumbleCtrl,
-      gridController: _gridCtrl,
-      isBusy: isBusy,
-      isInFreeSpins: isInFreeSpins,
-      betAmount: betAmount,
-      buyFeaturePrice: buyFeaturePrice,
-      vibrationEnabled: vibration,
-      notifyListeners: notifyListeners,
+      poolController: _poolCtrl,
     );
+    try {
+      await _persistenceCtrl.saveSpinRecovery(recovery);
+      _preparedSpinRecoveries[recovery.spinId] = (
+        userId: userId,
+        recovery: recovery,
+      );
+      _expectedRemoteUserBalance = recovery.userBalance;
+      if (recovery.pendingFreeSpinAward > 0) {
+        _pendingAwardRecovery = (userId: userId, spinId: recovery.spinId);
+      }
+      _roundCtrl.attachRecovery(recovery.spinId);
+    } catch (error) {
+      debugPrint('Spin recovery preparation error: $error');
+    }
+  }
+
+  void _finalizeSpinRecovery(String spinId) {
+    final prepared = _preparedSpinRecoveries.remove(spinId);
+    if (prepared == null) return;
+
+    _recoveryPersistenceTail = _recoveryPersistenceTail.then((_) async {
+      try {
+        await Future.wait([
+          _persistenceCtrl.persistSpinRecoveryPlayer(
+            userId: prepared.userId,
+            recovery: prepared.recovery,
+          ),
+          _historyCtrl.recordOnce(
+            userId: prepared.userId,
+            id: prepared.recovery.spinId,
+            playedAt: prepared.recovery.playedAt,
+            newBalance: prepared.recovery.userBalance,
+            bet: prepared.recovery.historyBet,
+            winAmount: prepared.recovery.winAmount,
+          ),
+        ]);
+        _failedRecoveryFinalizations.remove(spinId);
+        final awardAcknowledged = _acknowledgedRecoveryAwards.remove(spinId);
+        if (prepared.recovery.pendingFreeSpinAward == 0 || awardAcknowledged) {
+          await _persistenceCtrl.clearSpinRecovery(
+            spinId,
+            userId: prepared.userId,
+          );
+        }
+      } catch (error) {
+        _failedRecoveryFinalizations.add(spinId);
+        debugPrint('Spin recovery finalization error: $error');
+      }
+    });
+  }
+
+  void acknowledgePendingFreeSpinAward() {
+    final pending = _pendingAwardRecovery;
+    if (pending == null) return;
+    _pendingAwardRecovery = null;
+
+    if (_preparedSpinRecoveries.containsKey(pending.spinId)) {
+      _acknowledgedRecoveryAwards.add(pending.spinId);
+      return;
+    }
+    _enqueueRecoveryClear(pending);
+  }
+
+  void _enqueueRecoveryClear(({String userId, String spinId}) pending) {
+    _recoveryPersistenceTail = _recoveryPersistenceTail.then((_) async {
+      if (_failedRecoveryFinalizations.contains(pending.spinId)) return;
+      try {
+        await _persistenceCtrl.clearSpinRecovery(
+          pending.spinId,
+          userId: pending.userId,
+        );
+      } catch (error) {
+        debugPrint('Spin recovery acknowledgement error: $error');
+      }
+    });
+  }
+
+  Future<bool> _recoverPendingSpin() async {
+    final recovery = await _persistenceCtrl.loadSpinRecovery();
+    if (recovery == null) return false;
+    final userId = _persistenceCtrl.currentUserId;
+    if (userId == null) {
+      throw StateError('A signed-in player is required for spin recovery.');
+    }
+
+    _expectedRemoteUserBalance = recovery.userBalance;
+    await _persistRecoveredSpin(userId: userId, recovery: recovery);
+    if (recovery.pendingFreeSpinAward > 0) {
+      _pendingAwardRecovery = (userId: userId, spinId: recovery.spinId);
+      _recoveredPendingFreeSpinAward = PendingFreeSpinAward(
+        value: recovery.pendingFreeSpinAward,
+        isRetrigger: recovery.pendingFreeSpinAward == 5,
+        winAmount: recovery.winAmount,
+      );
+    } else {
+      await _persistenceCtrl.clearSpinRecovery(recovery.spinId, userId: userId);
+    }
+    _settlementCtrl.restoreRecovery(
+      recovery: recovery,
+      balanceController: _balanceCtrl,
+      freeSpinsController: _fsCtrl,
+      anteController: _anteCtrl,
+      poolController: _poolCtrl,
+    );
+    return true;
+  }
+
+  Future<void> _persistRecoveredSpin({
+    required String userId,
+    required PendingSpinRecovery recovery,
+  }) async {
+    await Future.wait([
+      _persistenceCtrl.persistRecoveredSpin(userId: userId, recovery: recovery),
+      _historyCtrl.recordOnce(
+        userId: userId,
+        id: recovery.spinId,
+        playedAt: recovery.playedAt,
+        newBalance: recovery.userBalance,
+        bet: recovery.historyBet,
+        winAmount: recovery.winAmount,
+      ),
+    ]);
   }
 
   void clearMultiplierResidues() {
@@ -371,38 +548,56 @@ class GameViewModel extends ChangeNotifier {
   }
 
   Future<void> onSpinComplete() async {
-    await _spinCompletionCtrl.complete(
-      lifecycleController: _spinLifecycleCtrl,
-      roundController: _roundCtrl,
-      tumbleController: _tumbleCtrl,
-      settlementController: _settlementCtrl,
-      balanceController: _balanceCtrl,
-      historyController: _historyCtrl,
-      gridController: _gridCtrl,
-      freeSpinsController: _fsCtrl,
-      anteController: _anteCtrl,
-      poolController: _poolCtrl,
-      autoSpinController: _autoSpinCtrl,
-      userId: _persistenceCtrl.currentUserId,
-      vibrationEnabled: vibration,
-      isInFreeSpins: () => isInFreeSpins,
-      savePlayerState: () => _sessionLifecycleCtrl.savePlayerStateSilently(
-        persistenceController: _persistenceCtrl,
+    try {
+      await _spinCompletionCtrl.complete(
+        lifecycleController: _spinLifecycleCtrl,
+        roundController: _roundCtrl,
+        tumbleController: _tumbleCtrl,
+        settlementController: _settlementCtrl,
         balanceController: _balanceCtrl,
+        historyController: _historyCtrl,
+        gridController: _gridCtrl,
         freeSpinsController: _fsCtrl,
-      ),
-      savePoolIfNeeded: () => _sessionLifecycleCtrl.savePoolIfNeeded(
+        anteController: _anteCtrl,
         poolController: _poolCtrl,
-        persistenceController: _persistenceCtrl,
-        balanceController: _balanceCtrl,
-        freeSpinsController: _fsCtrl,
-      ),
-      notifyListeners: notifyListeners,
-    );
+        autoSpinController: _autoSpinCtrl,
+        userId: _persistenceCtrl.currentUserId,
+        vibrationEnabled: vibration,
+        isInFreeSpins: () => isInFreeSpins,
+        savePlayerState: () => _sessionLifecycleCtrl.savePlayerStateSilently(
+          persistenceController: _persistenceCtrl,
+          balanceController: _balanceCtrl,
+          freeSpinsController: _fsCtrl,
+        ),
+        savePoolIfNeeded: () => _sessionLifecycleCtrl.savePoolIfNeeded(
+          poolController: _poolCtrl,
+          persistenceController: _persistenceCtrl,
+          balanceController: _balanceCtrl,
+          freeSpinsController: _fsCtrl,
+        ),
+        finalizeRecovery: _finalizeSpinRecovery,
+        notifyListeners: notifyListeners,
+      );
+    } finally {
+      _balanceSyncLocked = false;
+    }
+  }
+
+  void _applyRemoteUserBalance(double remoteValue) {
+    final expectedValue = _expectedRemoteUserBalance;
+    if (expectedValue != null) {
+      if ((expectedValue * 100).round() == (remoteValue * 100).round()) {
+        _expectedRemoteUserBalance = null;
+      }
+      return;
+    }
+    if (_balanceSyncLocked) return;
+    _balanceCtrl.applyRemoteUserBalance(remoteValue);
   }
 
   void commitPendingFsConsume() {
     if (!_fsCtrl.commitPendingConsume()) return;
+    if (_roundCtrl.pendingRecoveryId != null) return;
     _sessionLifecycleCtrl.savePlayerStateSilently(
       persistenceController: _persistenceCtrl,
       balanceController: _balanceCtrl,

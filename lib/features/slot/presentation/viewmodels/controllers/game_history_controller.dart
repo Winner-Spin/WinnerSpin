@@ -10,6 +10,7 @@ class GameHistoryController {
 
   final GameHistoryRepository _repository;
   final List<GameHistoryEntry> _entries = [];
+  final Map<String, Future<void>> _pendingRecordSaves = {};
 
   List<GameHistoryEntry> get entries => List.unmodifiable(_entries);
 
@@ -28,13 +29,18 @@ class GameHistoryController {
     required double newBalance,
     required double bet,
     required double winAmount,
+    String? id,
+    DateTime? playedAt,
   }) {
-    final playedAt = DateTime.now();
+    final timestamp = playedAt ?? DateTime.now();
+    final entryId = id ?? timestamp.microsecondsSinceEpoch.toString();
+    if (_entries.any((entry) => entry.id == entryId)) return;
+
     _entries.insert(
       0,
       GameHistoryEntry(
-        id: playedAt.microsecondsSinceEpoch.toString(),
-        playedAt: playedAt,
+        id: entryId,
+        playedAt: timestamp,
         newBalance: newBalance,
         bet: bet,
         winAmount: winAmount,
@@ -43,7 +49,54 @@ class GameHistoryController {
     if (_entries.length > 30) {
       _entries.removeLast();
     }
-    _saveIfPossible(userId);
+    if (userId == null) return;
+
+    final save = _repository.save(userId, List.of(_entries));
+    _pendingRecordSaves[entryId] = save;
+    unawaited(
+      save.then<void>(
+        (_) {
+          if (identical(_pendingRecordSaves[entryId], save)) {
+            _pendingRecordSaves.remove(entryId);
+          }
+        },
+        onError: (Object error, StackTrace _) {
+          debugPrint('Game history save error: $error');
+        },
+      ),
+    );
+  }
+
+  Future<void> recordOnce({
+    required String? userId,
+    required String id,
+    required DateTime playedAt,
+    required double newBalance,
+    required double bet,
+    required double winAmount,
+  }) async {
+    if (_entries.any((entry) => entry.id == id)) {
+      final pendingSave = _pendingRecordSaves[id];
+      if (pendingSave != null) await pendingSave;
+      return;
+    }
+
+    final nextEntries = <GameHistoryEntry>[
+      GameHistoryEntry(
+        id: id,
+        playedAt: playedAt,
+        newBalance: newBalance,
+        bet: bet,
+        winAmount: winAmount,
+      ),
+      ..._entries,
+    ].take(30).toList(growable: false);
+    if (userId != null) {
+      await _repository.save(userId, nextEntries);
+    }
+    _entries
+      ..clear()
+      ..addAll(nextEntries);
   }
 
   void delete({required String? userId, required Set<String> ids}) {
@@ -54,14 +107,14 @@ class GameHistoryController {
 
   void _saveIfPossible(String? userId) {
     if (userId == null) return;
-    unawaited(_save(userId));
+    unawaited(
+      _save(userId).catchError((Object error) {
+        debugPrint('Game history save error: $error');
+      }),
+    );
   }
 
   Future<void> _save(String userId) async {
-    try {
-      await _repository.save(userId, _entries);
-    } catch (e) {
-      debugPrint('Game history save error: $e');
-    }
+    await _repository.save(userId, List.of(_entries));
   }
 }

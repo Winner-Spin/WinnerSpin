@@ -71,6 +71,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GlobalKey _tumbleWinAnchorKey = GlobalKey();
 
   bool _wasBusy = false;
+  bool _wasLoading = true;
 
   Timer? _celebrationLockWatchdog;
 
@@ -142,6 +143,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _onViewModelChange() {
+    final loadingCompleted = _wasLoading && !_viewModel.isLoading;
+    _wasLoading = _viewModel.isLoading;
     UiClickSound.enabled = _viewModel.soundEffects;
     GameScreenNavigation.handleLogout(
       context: context,
@@ -152,6 +155,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _trackLingeringCluster();
     _trackFsAccumulator();
     _trackNormalBigWin();
+    if (loadingCompleted) {
+      _continueAutoSpinIfPresentationIdle();
+    }
   }
 
   void _onFreeSpinStateChange() {
@@ -162,10 +168,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       isInFreeSpins: isInFreeSpins,
       result: result,
     );
-    final pending = _freeSpinAwardPresentation.takeAwardForFreeSpinState(
-      isInFreeSpins: isInFreeSpins,
-      result: result,
-    );
+    final recoveredPending = _viewModel.takeRecoveredFreeSpinAward();
+    final pending =
+        recoveredPending ??
+        _freeSpinAwardPresentation.takeAwardForFreeSpinState(
+          isInFreeSpins: isInFreeSpins,
+          result: result,
+        );
     if (pending != null) {
       _freeSpinAutoPlayController.pauseForAwardAcknowledgement();
       _freeSpinAwardSequenceController.startAwardTransition(
@@ -173,7 +182,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         freeSpinPresentation: _freeSpinPresentation,
         awardPresentation: _freeSpinAwardPresentation,
         setState: setState,
+        awardAlreadyApplied: recoveredPending != null,
       );
+      if (recoveredPending != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showPendingFreeSpinAwardPopup();
+        });
+      }
     }
     if (isInFreeSpins && !wasInFreeSpins) {
       unawaited(_assetPrecacheService.precacheFreeSpinSummary(context));
@@ -206,6 +221,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _onFreeSpinAwardAcknowledged() {
+    _viewModel.acknowledgePendingFreeSpinAward();
     _freeSpinAutoPlayController.acknowledgeAward();
     _continueAutoSpinIfPresentationIdle();
   }
@@ -354,6 +370,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             accumulatedWin: _viewModel.freeSpinAccumulatedWin,
             awarded: _viewModel.freeSpinsAwardedThisRound,
           );
+          _freeSpinPresentation.updateLastSeenWin(_viewModel.lastWin);
         } else {
           _freeSpinPresentation.resetRound();
         }
@@ -542,6 +559,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _continueAutoSpinIfPresentationIdle() {
     if (!mounted) return;
+    if (_viewModel.isLoading) return;
     if (!_isSpinPresentationIdle()) return;
 
     if (_viewModel.isInFreeSpins) {
@@ -559,6 +577,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   bool _canStartAutomaticFreeSpin() {
     return mounted &&
+        !_viewModel.isLoading &&
         _viewModel.isInFreeSpins &&
         _viewModel.freeSpinsRemaining > 0 &&
         !_viewModel.isBusy &&

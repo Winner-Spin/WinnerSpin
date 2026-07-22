@@ -15,6 +15,9 @@ class SpinRoundController {
   SpinResult? _pendingResult;
   SpinResult? get pendingResult => _pendingResult;
 
+  String? _pendingRecoveryId;
+  String? get pendingRecoveryId => _pendingRecoveryId;
+
   Completer<void>? _spinResultReady;
 
   double _pendingHistoryBet = 0;
@@ -59,6 +62,10 @@ class SpinRoundController {
     _pendingResult = result;
   }
 
+  void attachRecovery(String spinId) {
+    _pendingRecoveryId = spinId;
+  }
+
   Future<void> waitForSpinResult() {
     return _spinResultReady?.future ?? Future<void>.value();
   }
@@ -76,6 +83,7 @@ class SpinRoundController {
 
   void clearPendingResult() {
     _pendingResult = null;
+    _pendingRecoveryId = null;
     _spinResultReady = null;
     _pendingHistoryBet = 0;
   }
@@ -83,6 +91,7 @@ class SpinRoundController {
   void _prepareForSpinResult() {
     markSpinResultReady();
     _pendingResult = null;
+    _pendingRecoveryId = null;
     _spinResultReady = Completer<void>();
   }
 }

@@ -1,4 +1,5 @@
 import '../../../domain/engine/spin_task.dart';
+import '../../../domain/models/spin_result.dart';
 import 'ante_controller.dart';
 import 'auto_spin_controller.dart';
 import 'balance_controller.dart';
@@ -30,6 +31,7 @@ class SlotSpinFlowController {
     required bool isInFreeSpins,
     required double betAmount,
     required bool vibrationEnabled,
+    required Future<void> Function(SpinResult result) prepareRecovery,
     required void Function() commitPendingFreeSpinConsume,
     required void Function() notifyListeners,
   }) async {
@@ -72,10 +74,13 @@ class SlotSpinFlowController {
         buyFs: buyFlag,
       );
 
-      _applySpinTaskOutput(
+      lifecycleController.applySpinTaskOutput(
         taskOutput: taskOutput,
-        lifecycleController: lifecycleController,
         poolController: poolController,
+        roundController: roundController,
+      );
+      await prepareRecovery(taskOutput.result);
+      lifecycleController.showPendingInitialGrid(
         roundController: roundController,
         gridController: gridController,
       );

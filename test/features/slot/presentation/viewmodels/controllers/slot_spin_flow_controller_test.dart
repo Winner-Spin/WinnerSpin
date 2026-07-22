@@ -78,6 +78,7 @@ class _SpinFlowFixture {
       isInFreeSpins: isInFreeSpins,
       betAmount: balanceController.betAmount,
       vibrationEnabled: false,
+      prepareRecovery: (_) async {},
       commitPendingFreeSpinConsume: freeSpinsController.commitPendingConsume,
       notifyListeners: () {},
     );

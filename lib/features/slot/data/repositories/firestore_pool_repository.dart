@@ -31,13 +31,9 @@ class FirestorePoolRepository implements PoolRepository {
 
   @override
   Future<void> save(String uid, PoolState state) async {
-    try {
-      await _db.collection(_collection).doc(uid).set({
-        _poolField: state.toMap(),
-      }, SetOptions(merge: true));
-      state.markSaved();
-    } catch (_) {
-      // Fail silently — will retry on next save interval.
-    }
+    await _db.collection(_collection).doc(uid).set({
+      _poolField: state.toMap(),
+    }, SetOptions(merge: true));
+    state.markSaved();
   }
 }

@@ -21,6 +21,12 @@ class AnteController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void restoreRoundFlag(bool value) {
+    if (_currentRoundFromAnte == value) return;
+    _currentRoundFromAnte = value;
+    notifyListeners();
+  }
+
   void clearRoundFlag() {
     if (!_currentRoundFromAnte) return;
     _currentRoundFromAnte = false;

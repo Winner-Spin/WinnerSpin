@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class FreeSpinsController extends ChangeNotifier {
-  static const int _initialAward = 10;
-  static const int _retriggerAward = 5;
+  static const int initialAwardCount = 10;
+  static const int retriggerAwardCount = 5;
 
   int _remaining = 0;
   double _accumulatedWin = 0;
@@ -35,7 +35,7 @@ class FreeSpinsController extends ChangeNotifier {
       final storedAwarded = userData['freeSpinsAwardedThisRound'];
       final awarded = storedAwarded is num
           ? storedAwarded.toInt()
-          : _initialAward;
+          : initialAwardCount;
       _awardedThisRound = awarded < 0 ? 0 : awarded;
     } else {
       _accumulatedWin = 0;
@@ -69,22 +69,26 @@ class FreeSpinsController extends ChangeNotifier {
   }
 
   void awardInitial({double initialWin = 0}) {
-    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
+    _remaining = _remaining <= 0
+        ? initialAwardCount
+        : _remaining + initialAwardCount;
     _accumulatedWin = initialWin < 0 ? 0 : initialWin;
-    _awardedThisRound = _initialAward;
+    _awardedThisRound = initialAwardCount;
     notifyListeners();
   }
 
   void awardRetrigger() {
-    _remaining += _retriggerAward;
-    _awardedThisRound += _retriggerAward;
+    _remaining += retriggerAwardCount;
+    _awardedThisRound += retriggerAwardCount;
     notifyListeners();
   }
 
   void awardBoughtRound({double initialWin = 0}) {
-    _remaining = _remaining <= 0 ? _initialAward : _remaining + _initialAward;
+    _remaining = _remaining <= 0
+        ? initialAwardCount
+        : _remaining + initialAwardCount;
     _accumulatedWin = initialWin < 0 ? 0 : initialWin;
-    _awardedThisRound = _initialAward;
+    _awardedThisRound = initialAwardCount;
     _currentRoundFromBuy = true;
     notifyListeners();
   }
@@ -92,6 +96,12 @@ class FreeSpinsController extends ChangeNotifier {
   void recordRoundWin(double amount) {
     if (amount <= 0) return;
     _accumulatedWin += amount;
+    notifyListeners();
+  }
+
+  void restoreRoundFlag(bool value) {
+    if (_currentRoundFromBuy == value) return;
+    _currentRoundFromBuy = value;
     notifyListeners();
   }
 

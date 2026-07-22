@@ -55,6 +55,7 @@ void main() {
       isInFreeSpins: true,
       betAmount: balanceController.betAmount,
       vibrationEnabled: false,
+      prepareRecovery: (_) async {},
       commitPendingFreeSpinConsume: freeSpinsController.commitPendingConsume,
       notifyListeners: () {},
     );
@@ -79,6 +80,7 @@ void main() {
           isInFreeSpins: () => freeSpinsController.isInRound,
           savePlayerState: () => playerStateSaveCount++,
           savePoolIfNeeded: () {},
+          finalizeRecovery: (_) {},
           notifyListeners: () {},
         )
         .then((_) => completionFinished = true);
