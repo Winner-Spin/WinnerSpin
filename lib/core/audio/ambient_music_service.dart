@@ -74,14 +74,14 @@ class AmbientMusicService implements AmbientMusicLifecycle {
     return _requestSynchronization();
   }
 
-  Future<void> setEnabled(bool enabled) {
-    AmbientMusicPreference.enabled = enabled;
+  Future<void> setEnabled(bool enabled) async {
+    final persistence = AmbientMusicPreference.setEnabled(enabled);
     if (enabled) {
       _playbackRequested = true;
     } else {
       _cancelRecovery();
     }
-    return _requestSynchronization();
+    await Future.wait([persistence, _requestSynchronization()]);
   }
 
   @override

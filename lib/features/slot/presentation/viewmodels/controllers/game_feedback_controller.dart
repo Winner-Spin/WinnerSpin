@@ -32,7 +32,6 @@ class GameFeedbackController {
   bool setAmbientMusic(bool value) {
     if (_ambientMusic == value) return false;
     _ambientMusic = value;
-    AmbientMusicPreference.enabled = value;
     unawaited(_musicService.setEnabled(_ambientMusic));
     return true;
   }

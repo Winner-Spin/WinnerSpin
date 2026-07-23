@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/core/audio/ambient_music_preference.dart';
+import 'package:winner_spin/core/audio/ambient_music_preference_store.dart';
 import 'package:winner_spin/core/audio/ambient_music_service.dart';
 
 void main() {
@@ -19,11 +20,11 @@ void main() {
   });
 
   setUp(() {
-    AmbientMusicPreference.enabled = true;
+    AmbientMusicPreference.resetForTesting();
   });
 
   tearDown(() {
-    AmbientMusicPreference.enabled = true;
+    AmbientMusicPreference.resetForTesting();
   });
 
   test('coalesces concurrent playback requests into one player', () async {
@@ -61,6 +62,28 @@ void main() {
     expect(players, isEmpty);
     await service.disposeForTesting();
   });
+
+  test(
+    'does not create a player when the stored preference is disabled',
+    () async {
+      await AmbientMusicPreference.initialize(
+        store: const _StaticAmbientMusicPreferenceStore(false),
+      );
+      final players = <_FakeAmbientMusicPlayer>[];
+      final service = AmbientMusicService.forTesting(
+        playerFactory: () {
+          final player = _FakeAmbientMusicPlayer();
+          players.add(player);
+          return player;
+        },
+      );
+
+      await service.ensurePlaying();
+
+      expect(players, isEmpty);
+      await service.disposeForTesting();
+    },
+  );
 
   test('applies resume after an in-flight lifecycle pause', () async {
     final player = _FakeAmbientMusicPlayer();
@@ -183,6 +206,19 @@ void main() {
 
     await service.disposeForTesting();
   });
+}
+
+class _StaticAmbientMusicPreferenceStore
+    implements AmbientMusicPreferenceStore {
+  const _StaticAmbientMusicPreferenceStore(this.value);
+
+  final bool value;
+
+  @override
+  Future<bool?> readEnabled() async => value;
+
+  @override
+  Future<void> writeEnabled(bool enabled) async {}
 }
 
 class _FakeAmbientMusicPlayer implements AmbientMusicPlayer {
