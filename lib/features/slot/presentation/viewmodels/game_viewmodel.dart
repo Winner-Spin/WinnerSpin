@@ -671,16 +671,11 @@ class GameViewModel extends ChangeNotifier {
 
   Future<void> onAppLifecycleEvent() async {
     await _sessionLifecycleCtrl.onAppLifecycleEvent(
-      feedbackController: _feedbackCtrl,
       poolController: _poolCtrl,
       persistenceController: _persistenceCtrl,
       balanceController: _balanceCtrl,
       freeSpinsController: _fsCtrl,
     );
-  }
-
-  void onAppResumed() {
-    _sessionLifecycleCtrl.onAppResumed(feedbackController: _feedbackCtrl);
   }
 
   Future<bool> validateSessionOnResume() async {

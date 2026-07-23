@@ -429,7 +429,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _freeSpinAutoPlayController.cancelPending();
         _viewModel.onAppLifecycleEvent();
       case AppLifecycleState.resumed:
-        _viewModel.onAppResumed();
         unawaited(_validateSessionAfterResume());
         break;
     }

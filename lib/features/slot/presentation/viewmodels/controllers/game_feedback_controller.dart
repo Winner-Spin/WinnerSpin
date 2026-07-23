@@ -43,14 +43,6 @@ class GameFeedbackController {
     if (value) unawaited(UiClickSound.preload());
   }
 
-  Future<void> pauseForLifecycle() {
-    return _musicService.pauseForLifecycle(enabled: _ambientMusic);
-  }
-
-  void resumeAfterLifecycle() {
-    unawaited(_musicService.resumeAfterLifecycle(enabled: _ambientMusic));
-  }
-
   void dispose() {
     unawaited(_musicService.dispose());
   }

@@ -8,9 +8,44 @@ import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/ba
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/free_spins_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/player_session_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_persistence_controller.dart';
+import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_pool_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_session_lifecycle_controller.dart';
 
 void main() {
+  test('persists gameplay state when the app leaves the foreground', () async {
+    final authRepository = _MemoryAuthRepository();
+    final poolRepository = _MemoryPoolRepository();
+    final persistenceController = SlotPersistenceController(
+      authRepository: authRepository,
+      poolRepository: poolRepository,
+    );
+    final poolController = SlotPoolController()
+      ..recordBet(100)
+      ..recordPayout(25);
+    final balanceController = BalanceController()..awardWin(40);
+    final freeSpinsController = FreeSpinsController()
+      ..awardInitial(initialWin: 15);
+
+    await SlotSessionLifecycleController().onAppLifecycleEvent(
+      poolController: poolController,
+      persistenceController: persistenceController,
+      balanceController: balanceController,
+      freeSpinsController: freeSpinsController,
+    );
+
+    final savedPlayer = (await authRepository.getUserData('user-1'))!;
+    expect(poolRepository.saveCalls, 1);
+    expect(poolRepository.lastSavedPool?.totalBetsPlaced, 100);
+    expect(poolRepository.lastSavedPool?.totalPaidOut, 25);
+    expect(savedPlayer['userBalance'], 10040);
+    expect(savedPlayer['lastWin'], 40);
+    expect(savedPlayer['freeSpinsRemaining'], 10);
+    expect(savedPlayer['freeSpinAccumulatedWin'], 15);
+
+    balanceController.dispose();
+    freeSpinsController.dispose();
+  });
+
   test('persists and restores the active free-spin round total', () async {
     final authRepository = _MemoryAuthRepository();
     final persistenceController = SlotPersistenceController(
@@ -218,11 +253,17 @@ class _MemoryAuthRepository implements AuthRepository {
 }
 
 class _MemoryPoolRepository implements PoolRepository {
+  int saveCalls = 0;
+  PoolState? lastSavedPool;
+
   @override
   Future<PoolState> load(String uid) async => PoolState();
 
   @override
-  Future<void> save(String uid, PoolState state) async {}
+  Future<void> save(String uid, PoolState state) async {
+    saveCalls++;
+    lastSavedPool = PoolState.fromMap(state.toMap());
+  }
 }
 
 class _BlockingPoolRepository implements PoolRepository {

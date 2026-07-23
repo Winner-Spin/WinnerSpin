@@ -16,18 +16,6 @@ class GameMusicService {
   Future<void> setEnabled(bool enabled) =>
       _ambientMusicService.setEnabled(enabled);
 
-  Future<void> pauseForLifecycle({required bool enabled}) async {
-    if (enabled) {
-      await _ambientMusicService.pauseForLifecycle();
-    }
-  }
-
-  Future<void> resumeAfterLifecycle({required bool enabled}) async {
-    if (enabled) {
-      await _ambientMusicService.resumeAfterLifecycle();
-    }
-  }
-
   // Ambient music is application-scoped and must survive screen disposal.
   Future<void> dispose() async {}
 }

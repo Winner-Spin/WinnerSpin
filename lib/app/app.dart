@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../core/audio/ambient_music_service.dart';
 import '../features/auth/data/repositories/firebase_auth_repository.dart';
 import '../features/auth/domain/repositories/auth_repository.dart';
 import '../features/auth/presentation/viewmodels/login_viewmodel.dart';
@@ -8,10 +11,58 @@ import '../features/auth/presentation/views/login_screen.dart';
 import '../features/slot/presentation/views/game/game_screen.dart';
 
 /// Root application widget.
-class WinnerSpinApp extends StatelessWidget {
-  const WinnerSpinApp({super.key, this.authRepository});
+class WinnerSpinApp extends StatefulWidget {
+  const WinnerSpinApp({
+    super.key,
+    this.authRepository,
+    this.ambientMusicLifecycle,
+  });
 
   final AuthRepository? authRepository;
+  final AmbientMusicLifecycle? ambientMusicLifecycle;
+
+  @override
+  State<WinnerSpinApp> createState() => _WinnerSpinAppState();
+}
+
+class _WinnerSpinAppState extends State<WinnerSpinApp>
+    with WidgetsBindingObserver {
+  late final AmbientMusicLifecycle _ambientMusicLifecycle;
+  bool? _isForeground;
+
+  @override
+  void initState() {
+    super.initState();
+    _ambientMusicLifecycle =
+        widget.ambientMusicLifecycle ?? AmbientMusicService.instance;
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isForeground = lifecycleState == null
+        ? null
+        : lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+    if (_isForeground == false) {
+      unawaited(_ambientMusicLifecycle.pauseForLifecycle());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground == isForeground) return;
+
+    _isForeground = isForeground;
+    unawaited(
+      isForeground
+          ? _ambientMusicLifecycle.resumeAfterLifecycle()
+          : _ambientMusicLifecycle.pauseForLifecycle(),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +73,7 @@ class WinnerSpinApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: _AuthGate(authRepository: authRepository),
+      home: _AuthGate(authRepository: widget.authRepository),
     );
   }
 }

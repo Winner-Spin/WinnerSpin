@@ -1,6 +1,5 @@
 import 'balance_controller.dart';
 import 'free_spins_controller.dart';
-import 'game_feedback_controller.dart';
 import 'player_session_controller.dart';
 import 'slot_persistence_controller.dart';
 import 'slot_pool_controller.dart';
@@ -98,25 +97,17 @@ class SlotSessionLifecycleController {
   }
 
   Future<void> onAppLifecycleEvent({
-    required GameFeedbackController feedbackController,
     required SlotPoolController poolController,
     required SlotPersistenceController persistenceController,
     required BalanceController balanceController,
     required FreeSpinsController freeSpinsController,
-  }) async {
-    await Future.wait([
-      feedbackController.pauseForLifecycle(),
-      forceSavePool(
-        poolController: poolController,
-        persistenceController: persistenceController,
-        balanceController: balanceController,
-        freeSpinsController: freeSpinsController,
-      ),
-    ]);
-  }
-
-  void onAppResumed({required GameFeedbackController feedbackController}) {
-    feedbackController.resumeAfterLifecycle();
+  }) {
+    return forceSavePool(
+      poolController: poolController,
+      persistenceController: persistenceController,
+      balanceController: balanceController,
+      freeSpinsController: freeSpinsController,
+    );
   }
 
   Future<bool> validateSessionOnResume({
