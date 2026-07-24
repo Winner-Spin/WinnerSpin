@@ -1,13 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "emailVerifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "deleteEligibleAt", "order": "ASCENDING"}
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }
