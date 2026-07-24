@@ -80,7 +80,6 @@ class GameStageControlOverlay extends StatelessWidget {
         ),
         GameUtilityButtons(
           screenH: metrics.screenH,
-          screenW: metrics.screenW,
           listenable: viewModel,
           bigWinShowing: isBigWinShowing,
           autoSpinning: () => viewModel.isAutoSpinning,

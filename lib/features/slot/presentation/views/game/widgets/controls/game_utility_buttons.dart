@@ -8,7 +8,6 @@ import 'speed_button.dart';
 
 class GameUtilityButtons extends StatelessWidget {
   final double screenH;
-  final double screenW;
   final Listenable listenable;
   final bool Function() bigWinShowing;
   final bool Function() autoSpinning;
@@ -22,7 +21,6 @@ class GameUtilityButtons extends StatelessWidget {
   const GameUtilityButtons({
     super.key,
     required this.screenH,
-    required this.screenW,
     required this.listenable,
     required this.bigWinShowing,
     required this.autoSpinning,
@@ -43,38 +41,36 @@ class GameUtilityButtons extends StatelessWidget {
         Positioned(
           top: buttonTop,
           left: 0,
-          child: ListenableBuilder(
-            listenable: listenable,
-            builder: (context, _) => InfoButton(
-              betAmount: betAmount(),
-              onTap: bigWinShowing() ? null : onInfoTap,
-            ),
-          ),
-        ),
-        Positioned(
-          top: buttonTop,
           right: 0,
-          child: SettingsButton(onTap: bigWinShowing() ? null : onSettingsTap),
-        ),
-        Positioned(
-          top: buttonTop,
-          left: screenW * 0.30,
-          child: ListenableBuilder(
-            listenable: listenable,
-            builder: (context, _) => AutoSpinButton(
-              onTap: bigWinShowing() || autoSpinning() ? null : onAutoSpinTap,
-            ),
-          ),
-        ),
-        Positioned(
-          top: buttonTop,
-          left: screenW * 0.5 + 42,
-          child: ListenableBuilder(
-            listenable: listenable,
-            builder: (context, _) => SpeedButton(
-              level: speedMultiplier(),
-              onTap: bigWinShowing() ? null : onSpeedTap,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ListenableBuilder(
+                listenable: listenable,
+                builder: (context, _) => InfoButton(
+                  betAmount: betAmount(),
+                  onTap: bigWinShowing() ? null : onInfoTap,
+                ),
+              ),
+              ListenableBuilder(
+                listenable: listenable,
+                builder: (context, _) => AutoSpinButton(
+                  onTap: bigWinShowing() || autoSpinning()
+                      ? null
+                      : onAutoSpinTap,
+                ),
+              ),
+              ListenableBuilder(
+                listenable: listenable,
+                builder: (context, _) => SpeedButton(
+                  level: speedMultiplier(),
+                  onTap: bigWinShowing() ? null : onSpeedTap,
+                ),
+              ),
+              SettingsButton(
+                onTap: bigWinShowing() ? null : onSettingsTap,
+              ),
+            ],
           ),
         ),
       ],
