@@ -1,4 +1,4 @@
-package com.example.winner_spin
+package com.winnerspin.game
 
 import io.flutter.embedding.android.FlutterActivity
 

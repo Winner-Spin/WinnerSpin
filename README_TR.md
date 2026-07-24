@@ -262,6 +262,12 @@ Yalnızca güncel uygulama akışının ihtiyaç duyduğu Firebase servislerini 
 
 Kesin ayrım için [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md) belgesine bakın.
 
+### Android Release İmzalama
+
+Android release derlemeleri özel bir upload keystore gerektirir ve hiçbir zaman debug anahtarına geri dönmez. Keystore dosyasını repository dışında tutun, `android/key.properties.example` dosyasını Git tarafından dışlanan `android/key.properties` adıyla kopyalayın ve yerel dosya yolu ile kimlik bilgilerini doldurun.
+
+CI ortamları bunun yerine `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` ve `ANDROID_KEY_PASSWORD` değişkenlerini sağlayabilir. Dört değerin tamamı aynı kaynaktan gelmelidir. Keystore dosyalarını, imzalama bilgilerini, service account dosyalarını veya App Check debug tokenlarını hiçbir zaman commitlemeyin. Google Play App Signing kullanın ve upload anahtarı ile kimlik bilgilerinin şifreli yedeklerini saklayın.
+
 ### Çalıştırma ve Derleme
 
 ~~~sh

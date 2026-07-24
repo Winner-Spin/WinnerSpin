@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDHFzmUvbJMlIxrZNf0tJG7817FCjMurbA',
-    appId: '1:865362136741:android:05ae064acce56d6d03474c',
+    appId: '1:865362136741:android:d81d08331156cea603474c',
     messagingSenderId: '865362136741',
     projectId: 'winnerspin-fc03f',
     storageBucket: 'winnerspin-fc03f.firebasestorage.app',

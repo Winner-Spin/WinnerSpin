@@ -1,0 +1,5 @@
+# Copy this file to android/key.properties and keep the local copy private.
+storeFile=C:/Users/YOUR_USER/.android/winnerspin-upload-key.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=winnerspin-upload
+keyPassword=YOUR_KEY_PASSWORD

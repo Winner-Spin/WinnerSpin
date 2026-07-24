@@ -262,6 +262,12 @@ Deploy only the Firebase services required by the active application flow. Email
 
 See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) for the exact distinction.
 
+### Android Release Signing
+
+Android release builds require a private upload keystore and never fall back to the debug key. Keep the keystore outside the repository, copy `android/key.properties.example` to the ignored `android/key.properties` file, and fill in the local path and credentials.
+
+CI environments may provide `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` instead. All four values must come from the same source. Never commit keystores, signing credentials, service-account files, or App Check debug tokens. Use Google Play App Signing and retain encrypted backups of the upload key and its credentials.
+
 ### Run and Build
 
 ~~~sh

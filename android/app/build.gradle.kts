@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -8,8 +10,52 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+val signingEnvironment = mapOf(
+    "storeFile" to System.getenv("ANDROID_KEYSTORE_PATH"),
+    "storePassword" to System.getenv("ANDROID_KEYSTORE_PASSWORD"),
+    "keyAlias" to System.getenv("ANDROID_KEY_ALIAS"),
+    "keyPassword" to System.getenv("ANDROID_KEY_PASSWORD"),
+)
+val environmentSigningRequested = signingEnvironment.values.any { !it.isNullOrBlank() }
+if (!environmentSigningRequested && keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use(keystoreProperties::load)
+}
+
+val releaseSigning = if (environmentSigningRequested) {
+    signingEnvironment
+} else {
+    signingEnvironment.keys.associateWith { keystoreProperties.getProperty(it) }
+}
+val missingSigningValues = releaseSigning.filterValues { it.isNullOrBlank() }.keys
+val releaseKeystore = releaseSigning["storeFile"]
+    ?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+val releaseSigningError = when {
+    environmentSigningRequested && missingSigningValues.isNotEmpty() ->
+        "Incomplete Android release signing environment: ${missingSigningValues.joinToString()}"
+    !environmentSigningRequested && !keystorePropertiesFile.exists() ->
+        "Android release signing is not configured. Copy key.properties.example " +
+            "to android/key.properties and provide the local upload-keystore credentials."
+    missingSigningValues.isNotEmpty() ->
+        "Missing Android release signing properties: ${missingSigningValues.joinToString()}"
+    releaseKeystore?.isFile != true ->
+        "The configured Android release keystore file does not exist."
+    else -> null
+}
+val releaseSigningConfigured = releaseSigningError == null
+
+val validateReleaseSigning by tasks.registering {
+    group = "verification"
+    description = "Validates the Android release signing configuration."
+    doLast {
+        releaseSigningError?.let { throw GradleException(it) }
+    }
+}
+
 android {
-    namespace = "com.example.winner_spin"
+    namespace = "com.winnerspin.game"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -23,22 +69,36 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.winner_spin"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.winnerspin.game"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseSigning.getValue("storePassword")
+                keyAlias = releaseSigning.getValue("keyAlias")
+                keyPassword = releaseSigning.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
+    }
+}
+
+tasks.configureEach {
+    if (name == "preReleaseBuild") {
+        dependsOn(validateReleaseSigning)
     }
 }
 
