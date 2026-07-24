@@ -262,6 +262,8 @@ Yalnızca güncel uygulama akışının ihtiyaç duyduğu Firebase servislerini 
 
 Kesin ayrım için [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md) belgesine bakın.
 
+Android App Check, debug/profile derlemelerde debug provider; release derlemelerde Play Integrity kullanır. Yerel debug tokenlarını Firebase Console'a kaydedin ve hiçbir zaman commitlemeyin. Desteklenen tüm üretim istemcilerinden geçerli trafik doğrulanana kadar enforcement özelliğini kapalı tutun.
+
 ### Android Release İmzalama
 
 Android release derlemeleri özel bir upload keystore gerektirir ve hiçbir zaman debug anahtarına geri dönmez. Keystore dosyasını repository dışında tutun, `android/key.properties.example` dosyasını Git tarafından dışlanan `android/key.properties` adıyla kopyalayın ve yerel dosya yolu ile kimlik bilgilerini doldurun.

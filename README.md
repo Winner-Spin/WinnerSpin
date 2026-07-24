@@ -262,6 +262,8 @@ Deploy only the Firebase services required by the active application flow. Email
 
 See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) for the exact distinction.
 
+Android App Check uses the debug provider in debug/profile builds and Play Integrity in release builds. Register local debug tokens in Firebase Console without committing them. Keep enforcement disabled until App Check metrics confirm valid traffic from every supported production client.
+
 ### Android Release Signing
 
 Android release builds require a private upload keystore and never fall back to the debug key. Keep the keystore outside the repository, copy `android/key.properties.example` to the ignored `android/key.properties` file, and fill in the local path and credentials.

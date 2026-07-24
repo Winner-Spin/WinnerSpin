@@ -31,6 +31,7 @@ lib/
     app.dart
   core/
     audio/
+    firebase/
     format/
     network/
     widgets/
@@ -108,9 +109,10 @@ main.dart performs startup work before rendering the first screen:
 2. loads the persisted ambient-music preference;
 3. configures the shared application audio context;
 4. initializes Firebase;
-5. enables immersive system UI;
-6. starts parsing the multiplier-bomb Lottie asset without blocking runApp;
-7. launches WinnerSpinApp.
+5. activates Android App Check with the debug provider for development builds and Play Integrity for release builds;
+6. enables immersive system UI;
+7. starts parsing the multiplier-bomb Lottie asset without blocking runApp;
+8. launches WinnerSpinApp.
 
 WinnerSpinApp owns the application-wide lifecycle observer. Any state other than resumed pauses ambient music; returning to resumed requests playback only when music was requested and the persisted preference is enabled. This responsibility is intentionally at the app root so Login, Register, Email Verification, and Game screens behave consistently.
 

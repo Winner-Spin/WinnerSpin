@@ -31,6 +31,7 @@ lib/
     app.dart
   core/
     audio/
+    firebase/
     format/
     network/
     widgets/
@@ -108,9 +109,10 @@ main.dart, ilk ekran çizilmeden önce şu işlemleri yapar:
 2. kalıcı ortam müziği tercihini yükler;
 3. ortak uygulama ses bağlamını yapılandırır;
 4. Firebase'i başlatır;
-5. immersive sistem arayüzünü etkinleştirir;
-6. runApp'i engellemeden çarpan bombası Lottie varlığını parse etmeye başlar;
-7. WinnerSpinApp'i çalıştırır.
+5. Android App Check'i geliştirme derlemelerinde debug provider, release derlemelerde Play Integrity ile etkinleştirir;
+6. immersive sistem arayüzünü etkinleştirir;
+7. runApp'i engellemeden çarpan bombası Lottie varlığını parse etmeye başlar;
+8. WinnerSpinApp'i çalıştırır.
 
 WinnerSpinApp uygulama geneli yaşam döngüsü gözlemcisini içerir. resumed dışındaki her durum ortam müziğini duraklatır; resumed durumuna dönüşte yalnızca müzik daha önce istenmiş ve kalıcı tercih açık ise oynatma talep edilir. Bu sorumluluk uygulama kökünde bulunduğundan Login, Register, E-posta Doğrulama ve Oyun ekranları tutarlı davranır.
 

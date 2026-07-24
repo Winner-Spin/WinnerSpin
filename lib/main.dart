@@ -8,6 +8,7 @@ import 'package:lottie/lottie.dart';
 import 'app/app.dart';
 import 'core/audio/ambient_music_preference.dart';
 import 'core/audio/app_audio_context.dart';
+import 'core/firebase/app_check_initializer.dart';
 import 'features/slot/presentation/views/game/widgets/playfield/multiplier_bomb_animation.dart';
 import 'firebase_options.dart';
 
@@ -16,6 +17,7 @@ void main() async {
   await AmbientMusicPreference.initialize();
   await AppAudioContext.configure();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await initializeFirebaseAppCheck();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   // Pre-parse bomb Lottie to avoid first-frame delay on multiplier landing.
