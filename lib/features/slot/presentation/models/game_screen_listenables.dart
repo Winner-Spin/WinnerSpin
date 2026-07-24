@@ -17,7 +17,11 @@ class GameScreenListenables {
     required GameViewModel viewModel,
     required WinPresentationController winController,
   }) : freeSpinVisual = Listenable.merge([viewModel, viewModel.fsCtrl]),
-       gridVisual = Listenable.merge([viewModel, viewModel.gridCtrl]),
+       gridVisual = Listenable.merge([
+         viewModel,
+         viewModel.gridCtrl,
+         viewModel.gridCtrl.multiplierVisualListenable,
+       ]),
        balanceStatus = Listenable.merge([viewModel, viewModel.balanceCtrl]),
        fsInfo = Listenable.merge([
          viewModel,

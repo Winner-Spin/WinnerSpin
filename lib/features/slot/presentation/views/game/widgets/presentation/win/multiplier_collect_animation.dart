@@ -17,6 +17,7 @@ class MultiplierCollectAnimation {
     Duration settleDuration = const Duration(milliseconds: 250),
     Duration flightDuration = const Duration(milliseconds: 700),
     Duration burstDuration = const Duration(milliseconds: 850),
+    Future<void>? burstStartSignal,
     VoidCallback? onApproaching,
     VoidCallback? onSettleComplete,
   }) async {
@@ -34,6 +35,7 @@ class MultiplierCollectAnimation {
         settleDuration: settleDuration,
         flightDuration: flightDuration,
         burstDuration: burstDuration,
+        burstStartSignal: burstStartSignal,
         onApproaching: onApproaching,
         onSettleComplete: onSettleComplete,
         onArrived: () {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/repositories/first_launch_disclaimer_repository.dart';
+import '../audio/multiplier_bomb_explosion_sound.dart';
 import '../audio/ui_click_sound.dart';
 import '../navigation/game_screen_navigation.dart';
 import '../viewmodels/game_viewmodel.dart';
@@ -20,6 +21,9 @@ class GameScreenStartupService {
   }) {
     UiClickSound.enabled = viewModel.soundEffects;
     unawaited(UiClickSound.preload());
+    if (viewModel.soundEffects) {
+      unawaited(MultiplierBombExplosionSound.preload());
+    }
     viewModel.fetchUserData();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -135,6 +135,8 @@ class GameViewModel extends ChangeNotifier {
   List<ClusterWin> get activeExplosions => _gridCtrl.activeExplosions;
   Set<int> get winningPositions => _gridCtrl.winningPositions;
   Set<int> get clearedPositions => _gridCtrl.clearedPositions;
+  Set<int> get multiplierResiduePositions =>
+      _gridCtrl.multiplierResiduePositions;
 
   bool get isTumbling => _tumbleCtrl.isTumbling;
 

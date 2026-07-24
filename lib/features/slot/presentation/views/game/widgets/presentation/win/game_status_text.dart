@@ -33,6 +33,7 @@ class GameStatusText extends StatelessWidget {
   final int speedMultiplier;
   final Key? kazancAnchorKey;
   final void Function(int column, int row) onMultiplierLifted;
+  final void Function(int column, int row) onMultiplierBlastComplete;
 
   const GameStatusText({
     super.key,
@@ -59,6 +60,7 @@ class GameStatusText extends StatelessWidget {
     required this.speedMultiplier,
     required this.kazancAnchorKey,
     required this.onMultiplierLifted,
+    required this.onMultiplierBlastComplete,
   });
 
   @override
@@ -106,6 +108,7 @@ class GameStatusText extends StatelessWidget {
           vibrationEnabled: vibrationEnabled,
           speedMultiplier: speedMultiplier,
           onMultiplierLifted: onMultiplierLifted,
+          onMultiplierBlastComplete: onMultiplierBlastComplete,
         );
       }
 

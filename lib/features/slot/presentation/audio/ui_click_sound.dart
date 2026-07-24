@@ -17,7 +17,7 @@ class UiClickSound {
     minPlayers: 3,
     maxPlayers: 8,
     maxConcurrent: 8,
-    playerMode: PlayerMode.mediaPlayer,
+    playerMode: PlayerMode.lowLatency,
     audioContext: AppAudioContext.game,
   );
   static bool enabled = true;

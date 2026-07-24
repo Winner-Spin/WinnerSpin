@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-import '../../../../../../../core/audio/app_audio_context.dart';
-import '../../../../../../../core/audio/bounded_audio_pool.dart';
+import '../../../../audio/multiplier_bomb_explosion_sound.dart';
 import 'multiplier_label.dart';
 
 class MultiplierBombAnimation {
@@ -67,8 +66,8 @@ class MultiplierBombAnimation {
   }
 }
 
-class MultiplierDustResidue extends StatelessWidget {
-  const MultiplierDustResidue({super.key});
+class MultiplierBlastResidue extends StatelessWidget {
+  const MultiplierBlastResidue({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +108,7 @@ class _BombPlayerState extends State<_BombPlayer>
   @override
   void initState() {
     super.initState();
+    _DustResiduePainter.prepare();
     _ctrl = AnimationController(vsync: this);
     _ctrl.addListener(_onTick);
   }
@@ -118,7 +118,7 @@ class _BombPlayerState extends State<_BombPlayer>
     if (!_blastFired && v >= MultiplierBombAnimation._blastProgress) {
       _blastFired = true;
       if (widget.soundEnabled) {
-        unawaited(_BombExplosionSound.play());
+        unawaited(MultiplierBombExplosionSound.play());
       }
       widget.onBlast?.call();
     }
@@ -167,6 +167,13 @@ class _BombPlayerState extends State<_BombPlayer>
     return _kBombScaleKeyframes.last[1];
   }
 
+  double _blastPhaseAt(double progress) {
+    return ((progress - MultiplierBombAnimation._blastProgress) /
+            (MultiplierBombAnimation._blastEndProgress -
+                MultiplierBombAnimation._blastProgress))
+        .clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -176,11 +183,26 @@ class _BombPlayerState extends State<_BombPlayer>
         AnimatedBuilder(
           animation: _ctrl,
           builder: (context, child) {
-            final blastT =
-                ((_ctrl.value - MultiplierBombAnimation._blastProgress) /
-                        (MultiplierBombAnimation._blastEndProgress -
-                            MultiplierBombAnimation._blastProgress))
-                    .clamp(0.0, 1.0);
+            final blastPhase = _blastPhaseAt(_ctrl.value);
+            final reveal = Curves.easeOutCubic.transform(
+              (blastPhase * 5).clamp(0.0, 1.0),
+            );
+            final residueScale =
+                1.1 / MultiplierLabel.bombScaleFor(widget.multiplierValue);
+            return Opacity(
+              opacity: reveal,
+              child: Transform.scale(
+                scale: residueScale * (0.82 + 0.18 * reveal),
+                child: child,
+              ),
+            );
+          },
+          child: const MultiplierBlastResidue(),
+        ),
+        AnimatedBuilder(
+          animation: _ctrl,
+          builder: (context, child) {
+            final blastT = _blastPhaseAt(_ctrl.value);
             final scale = 1.0 + Curves.easeOutCubic.transform(blastT) * 0.55;
             return Transform.scale(scale: scale, child: child);
           },
@@ -188,7 +210,6 @@ class _BombPlayerState extends State<_BombPlayer>
             MultiplierBombAnimation.assetPath,
             controller: _ctrl,
             fit: BoxFit.contain,
-            renderCache: RenderCache.drawingCommands,
             onLoaded: (composition) {
               final speed = widget.speedMultiplier.clamp(1, 3).toInt();
               final speedFactor = switch (speed) {
@@ -206,7 +227,7 @@ class _BombPlayerState extends State<_BombPlayer>
                   if (!_blastFired) {
                     _blastFired = true;
                     if (widget.soundEnabled) {
-                      unawaited(_BombExplosionSound.play());
+                      unawaited(MultiplierBombExplosionSound.play());
                     }
                     widget.onBlast?.call();
                   }
@@ -246,27 +267,13 @@ class _BombPlayerState extends State<_BombPlayer>
   }
 }
 
-class _BombExplosionSound {
-  static const _assetPath = 'audio/Items/Bomb_Explosion.wav';
-  static const _volume = 0.72;
-  static const _playbackDuration = Duration(milliseconds: 200);
-
-  static final BoundedAudioPool _pool = BoundedAudioPool(
-    debugLabel: 'bomb explosion',
-    source: AssetSource(_assetPath),
-    releaseAfter: _playbackDuration,
-    minPlayers: 3,
-    maxPlayers: 8,
-    maxConcurrent: 8,
-    playerMode: PlayerMode.mediaPlayer,
-    audioContext: AppAudioContext.game,
-  );
-
-  static Future<void> play() => _pool.play(volume: _volume);
-}
-
 class _DustResiduePainter extends CustomPainter {
   const _DustResiduePainter();
+
+  static const double _pictureExtent = 256;
+
+  // Reuses the same static residue when presentation moves into the grid.
+  static ui.Picture? _cachedPicture;
 
   static const _coreColor = Color(0xFFFFF6C8);
   static const _palette = <Color>[
@@ -281,8 +288,33 @@ class _DustResiduePainter extends CustomPainter {
   double _h(int seed, int i) =>
       (math.sin(seed * 12.9898 + i * 78.233) * 43758.5453) % 1.0;
 
+  static void prepare() {
+    _cachedPicture ??= _recordPicture();
+  }
+
+  static ui.Picture _recordPicture() {
+    final recorder = ui.PictureRecorder();
+    const _DustResiduePainter()._paintContents(
+      Canvas(recorder),
+      const Size.square(_pictureExtent),
+    );
+    return recorder.endRecording();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    prepare();
+    final shortest = math.min(size.width, size.height);
+    final scale = shortest / _pictureExtent;
+    canvas
+      ..save()
+      ..translate((size.width - shortest) / 2, (size.height - shortest) / 2)
+      ..scale(scale)
+      ..drawPicture(_cachedPicture!)
+      ..restore();
+  }
+
+  void _paintContents(Canvas canvas, Size size) {
     final shortest = math.min(size.width, size.height);
     final center = Offset(size.width / 2, size.height / 2);
     final radius = shortest * 0.42;

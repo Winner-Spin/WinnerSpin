@@ -27,6 +27,7 @@ class GameTumbleWinSlot extends StatelessWidget {
     required this.gridLeft,
     required this.gridRight,
     required this.onMultiplierLifted,
+    required this.onMultiplierBlastComplete,
   });
 
   final Listenable listenable;
@@ -47,6 +48,7 @@ class GameTumbleWinSlot extends StatelessWidget {
   final double gridLeft;
   final double gridRight;
   final void Function(int column, int row) onMultiplierLifted;
+  final void Function(int column, int row) onMultiplierBlastComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +95,7 @@ class GameTumbleWinSlot extends StatelessWidget {
                 soundEnabled: soundEnabled(),
                 speedMultiplier: speedMultiplier(),
                 onMultiplierLifted: onMultiplierLifted,
+                onMultiplierBlastComplete: onMultiplierBlastComplete,
               ),
           ],
         );

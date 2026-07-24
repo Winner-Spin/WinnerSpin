@@ -23,6 +23,7 @@ class SlotReel extends StatefulWidget {
   final Set<String> fadingPaths;
 
   final Set<int> clearedPositions;
+  final Set<int> multiplierResiduePositions;
 
   final Duration delay;
 
@@ -48,6 +49,7 @@ class SlotReel extends StatefulWidget {
     required this.spinning,
     this.fadingPaths = const {},
     this.clearedPositions = const {},
+    this.multiplierResiduePositions = const {},
     this.controller,
     this.speedMultiplier = 1,
     this.delay = Duration.zero,
@@ -197,11 +199,11 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     widget.onComplete?.call();
   }
 
-  Widget _buildDustResidue(double itemH) {
+  Widget _buildMultiplierResidue(double itemH) {
     return SizedBox(
       width: itemH * 1.1,
       height: itemH * 1.1,
-      child: const MultiplierDustResidue(),
+      child: const MultiplierBlastResidue(),
     );
   }
 
@@ -210,6 +212,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     required double itemH,
     required bool isDropOut,
     required bool cleared,
+    required bool showMultiplierResidue,
     required bool isScatter,
     required bool isMultiplier,
     required int multiplierValue,
@@ -217,7 +220,9 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     required Animation<double> animation,
   }) {
     if (isDropOut && cleared) {
-      return _buildDustResidue(itemH);
+      return showMultiplierResidue
+          ? _buildMultiplierResidue(itemH)
+          : const SizedBox.shrink();
     }
 
     final Widget symbolChild;
@@ -304,6 +309,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final bool cleared = widget.clearedPositions.contains(
       widget.columnIndex * 100 + index,
     );
+    final bool showMultiplierResidue = widget.multiplierResiduePositions
+        .contains(widget.columnIndex * 100 + index);
     final int multiplierValue = symbolDef?.multiplierValue ?? 5;
 
     return AnimatedBuilder(
@@ -336,6 +343,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
             itemH: itemH,
             isDropOut: isDropOut,
             cleared: cleared,
+            showMultiplierResidue: showMultiplierResidue,
             isScatter: isScatter,
             isMultiplier: isMultiplier,
             multiplierValue: multiplierValue,
@@ -384,12 +392,19 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
                   widget.columnIndex * 100 + i,
                 );
                 if (cleared) {
+                  final showMultiplierResidue = widget
+                      .multiplierResiduePositions
+                      .contains(widget.columnIndex * 100 + i);
                   return Positioned(
                     top: i * itemH,
                     left: 0,
                     right: 0,
                     height: itemH,
-                    child: Center(child: _buildDustResidue(itemH)),
+                    child: Center(
+                      child: showMultiplierResidue
+                          ? _buildMultiplierResidue(itemH)
+                          : const SizedBox.shrink(),
+                    ),
                   );
                 }
                 return Positioned(

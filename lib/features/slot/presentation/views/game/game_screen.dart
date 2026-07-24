@@ -692,6 +692,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       isSpinning: _viewModel.isSpinning,
       fadingPaths: _viewModel.fadingPaths,
       clearedPositions: _viewModel.clearedPositions,
+      multiplierResiduePositions: _viewModel.multiplierResiduePositions,
       speedMultiplier: _viewModel.speedMultiplier,
       soundEffectsEnabled: _viewModel.soundEffects,
       pulseScattersOnLanding: _viewModel.shouldPulseLandingScatters,
@@ -731,6 +732,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       speedMultiplier: _viewModel.speedMultiplier,
       kazancAnchorKey: _kazancAnchorKey,
       onMultiplierLifted: _viewModel.gridCtrl.clearMultiplierPosition,
+      onMultiplierBlastComplete: _viewModel.gridCtrl.revealMultiplierResidue,
     );
   }
 
@@ -759,6 +761,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       gridLeft: gridLeft,
       gridRight: gridRight,
       onMultiplierLifted: _viewModel.gridCtrl.clearMultiplierPosition,
+      onMultiplierBlastComplete: _viewModel.gridCtrl.revealMultiplierResidue,
     );
   }
 }

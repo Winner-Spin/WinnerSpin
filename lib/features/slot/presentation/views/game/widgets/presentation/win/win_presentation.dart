@@ -23,6 +23,7 @@ class WinPresentation extends StatefulWidget {
   final int rows;
 
   final void Function(int column, int row)? onMultiplierLifted;
+  final void Function(int column, int row)? onMultiplierBlastComplete;
 
   final WinPresentationController? controller;
 
@@ -45,6 +46,7 @@ class WinPresentation extends StatefulWidget {
     this.columns = 6,
     this.rows = 5,
     this.onMultiplierLifted,
+    this.onMultiplierBlastComplete,
     this.controller,
     this.formulaOnly = false,
     this.soundEnabled = true,
@@ -198,14 +200,18 @@ class _WinPresentationState extends State<WinPresentation> {
       },
     );
     unawaited(
-      bombFuture.then((_) async {
-        await Future.delayed(WinPresentationController.interMultiplierGap);
-        if (mounted) _controller.onBombBlastComplete();
-      }),
+      _completeBombPresentation(
+        result: result,
+        landedIndex: landedIdx,
+        column: landing.column,
+        row: landing.row,
+        speedMultiplier: widget.speedMultiplier,
+        bombFuture: bombFuture,
+      ),
     );
 
     await blastCompleter.future;
-    if (!mounted) return;
+    if (!mounted || !identical(widget.spinResult, result)) return;
 
     await MultiplierCollectAnimation.play(
       context: context,
@@ -216,11 +222,49 @@ class _WinPresentationState extends State<WinPresentation> {
       endSize: 30,
       settleDuration: WinPresentationController.multiplierSettleDuration,
       flightDuration: WinPresentationController.multiplierFlightDuration,
+      burstStartSignal: bombFuture,
       onApproaching: () {
-        if (!mounted) return;
+        if (!mounted || !identical(widget.spinResult, result)) return;
         _controller.onMultiplierLanded(landedIdx);
       },
     );
+  }
+
+  Future<void> _completeBombPresentation({
+    required SpinResult result,
+    required int landedIndex,
+    required int column,
+    required int row,
+    required int speedMultiplier,
+    required Future<void> bombFuture,
+  }) async {
+    await bombFuture;
+    if (!mounted || !identical(widget.spinResult, result)) return;
+
+    widget.onMultiplierBlastComplete?.call(column, row);
+    unawaited(
+      _scheduleNextMultiplier(
+        result: result,
+        landedIndex: landedIndex,
+        speedMultiplier: speedMultiplier,
+      ),
+    );
+  }
+
+  Future<void> _scheduleNextMultiplier({
+    required SpinResult result,
+    required int landedIndex,
+    required int speedMultiplier,
+  }) async {
+    await Future.delayed(
+      WinPresentationController.interMultiplierGapFor(speedMultiplier),
+    );
+    if (!mounted ||
+        !identical(widget.spinResult, result) ||
+        _controller.activeIndex != landedIndex) {
+      return;
+    }
+    _controller.onBombBlastComplete();
   }
 
   @override

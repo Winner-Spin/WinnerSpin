@@ -11,6 +11,7 @@ class SlotGridView extends StatelessWidget {
   final bool isSpinning;
   final Set<String> fadingPaths;
   final Set<int> clearedPositions;
+  final Set<int> multiplierResiduePositions;
   final int speedMultiplier;
   final bool soundEffectsEnabled;
   final bool pulseScattersOnLanding;
@@ -27,6 +28,7 @@ class SlotGridView extends StatelessWidget {
     required this.isSpinning,
     required this.fadingPaths,
     required this.clearedPositions,
+    required this.multiplierResiduePositions,
     required this.speedMultiplier,
     required this.soundEffectsEnabled,
     required this.pulseScattersOnLanding,
@@ -51,6 +53,7 @@ class SlotGridView extends StatelessWidget {
                 spinning: isSpinning,
                 fadingPaths: fadingPaths,
                 clearedPositions: clearedPositions,
+                multiplierResiduePositions: multiplierResiduePositions,
                 speedMultiplier: speedMultiplier,
                 soundEffectsEnabled: soundEffectsEnabled,
                 pulseScattersOnLanding: pulseScattersOnLanding,

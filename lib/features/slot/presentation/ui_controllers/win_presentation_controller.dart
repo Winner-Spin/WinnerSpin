@@ -41,7 +41,16 @@ class WinPresentationController extends ChangeNotifier {
   static const Duration multiplierSettleDuration = Duration(milliseconds: 250);
   static const Duration multiplierFlightDuration = Duration(milliseconds: 700);
   static const Duration postLandPulse = Duration(milliseconds: 220);
-  static const Duration interMultiplierGap = Duration(milliseconds: 220);
+
+  /// Keeps consecutive blast and collect effects outside the same frame window.
+  static Duration interMultiplierGapFor(int speedMultiplier) {
+    return switch (speedMultiplier.clamp(1, 3)) {
+      2 => const Duration(milliseconds: 625),
+      3 => const Duration(milliseconds: 725),
+      _ => const Duration(milliseconds: 450),
+    };
+  }
+
   static const Duration formulaToFinalGap = Duration(milliseconds: 350);
   static const Duration finalCountUpDuration = Duration(milliseconds: 800);
 

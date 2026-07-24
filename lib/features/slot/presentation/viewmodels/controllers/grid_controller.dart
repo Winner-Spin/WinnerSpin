@@ -13,6 +13,8 @@ class GridController extends ChangeNotifier {
   List<ClusterWin> _activeExplosions = const [];
   Set<int> _winningPositions = {};
   Set<int> _clearedPositions = const {};
+  Set<int> _multiplierResiduePositions = const {};
+  final ValueNotifier<int> _multiplierVisualRevision = ValueNotifier<int>(0);
 
   GridController(List<List<String>> initialGrid) {
     _grid = initialGrid;
@@ -26,6 +28,9 @@ class GridController extends ChangeNotifier {
   Set<int> get winningPositions => _winningPositions;
 
   Set<int> get clearedPositions => _clearedPositions;
+  Set<int> get multiplierResiduePositions => _multiplierResiduePositions;
+  ValueListenable<int> get multiplierVisualListenable =>
+      _multiplierVisualRevision;
 
   void capturePreviousGrid() {
     _previousGrid = List.generate(columns, (col) => List.from(_grid[col]));
@@ -42,13 +47,30 @@ class GridController extends ChangeNotifier {
     final key = column * 100 + row;
     if (_clearedPositions.contains(key)) return;
     _clearedPositions = {..._clearedPositions, key};
-    notifyListeners();
+    _notifyMultiplierVisualChanged();
+  }
+
+  void revealMultiplierResidue(int column, int row) {
+    final key = column * 100 + row;
+    if (!_clearedPositions.contains(key) ||
+        _multiplierResiduePositions.contains(key)) {
+      return;
+    }
+    _multiplierResiduePositions = {..._multiplierResiduePositions, key};
+    _notifyMultiplierVisualChanged();
   }
 
   void clearMultiplierResidues() {
-    if (_clearedPositions.isEmpty) return;
+    if (_clearedPositions.isEmpty && _multiplierResiduePositions.isEmpty) {
+      return;
+    }
     _clearedPositions = const {};
-    notifyListeners();
+    _multiplierResiduePositions = const {};
+    _notifyMultiplierVisualChanged();
+  }
+
+  void _notifyMultiplierVisualChanged() {
+    _multiplierVisualRevision.value++;
   }
 
   void setGrid(List<List<String>> grid) {
@@ -75,5 +97,11 @@ class GridController extends ChangeNotifier {
   void setWinningPositions(Set<int> positions) {
     _winningPositions = positions;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _multiplierVisualRevision.dispose();
+    super.dispose();
   }
 }

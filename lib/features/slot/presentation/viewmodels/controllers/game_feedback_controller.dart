@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../../../../core/audio/ambient_music_preference.dart';
 import '../../audio/game_music_service.dart';
+import '../../audio/multiplier_bomb_explosion_sound.dart';
 import '../../audio/ui_click_sound.dart';
 
 class GameFeedbackController {
@@ -39,7 +40,10 @@ class GameFeedbackController {
   void setSoundEffects(bool value) {
     _soundEffects = value;
     UiClickSound.enabled = value;
-    if (value) unawaited(UiClickSound.preload());
+    if (value) {
+      unawaited(UiClickSound.preload());
+      unawaited(MultiplierBombExplosionSound.preload());
+    }
   }
 
   void dispose() {
