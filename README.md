@@ -2,9 +2,9 @@
 
 EN English | [TR Türkçe](README_TR.md)
 
-Winner Spin is a Flutter-based mobile slot game project with Firebase-backed user accounts, a custom RTP-aware slot engine, cascading reels, free spins, multiplier collection, animated win presentation, audio feedback, and simulation-focused testing.
+Winner Spin is a mobile-focused Flutter slot game with Firebase-backed accounts, a custom RTP-aware engine, cascading wins, Free Spins, multiplier collection, animated presentation, and simulation-driven math validation.
 
-The project is structured as a real mobile application rather than a single demo screen. Gameplay logic lives in a domain engine, Firebase persistence is abstracted behind repository contracts, presentation behavior is split into controllers and ViewModels, and the slot math is covered by diagnostic simulation tests.
+The current implementation combines a feature-first layered MVVM structure with Clean Architecture-inspired boundaries. Slot calculations remain in the domain layer, persistence is exposed through repository contracts, and presentation behavior is divided among ViewModels, focused controllers, and widgets.
 
 ---
 
@@ -12,7 +12,7 @@ The project is structured as a real mobile application rather than a single demo
 
 <p align="center">
   <img src="docs/screenshots/winner-spin-base-game.jpeg" width="240" alt="Winner Spin base game screen" />
-  <img src="docs/screenshots/winner-spin-free-spins.jpeg" width="240" alt="Winner Spin free spins screen" />
+  <img src="docs/screenshots/winner-spin-free-spins.jpeg" width="240" alt="Winner Spin Free Spins screen" />
   <img src="docs/screenshots/winner-spin-big-win.jpeg" width="240" alt="Winner Spin big win screen" />
 </p>
 
@@ -20,40 +20,55 @@ The project is structured as a real mobile application rather than a single demo
 
 <p align="center">
   <img src="docs/screenshots/winner-spin-login.jpeg" width="180" alt="Winner Spin login screen" />
-  <img src="docs/screenshots/winner-spin-register.jpeg" width="180" alt="Winner Spin register screen" />
-  <img src="docs/screenshots/winner-spin-buy-feature.jpeg" width="180" alt="Winner Spin buy feature screen" />
+  <img src="docs/screenshots/winner-spin-register.jpeg" width="180" alt="Winner Spin registration screen" />
+  <img src="docs/screenshots/winner-spin-buy-feature.jpeg" width="180" alt="Winner Spin Buy Feature screen" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-auto-play.jpeg" width="180" alt="Winner Spin auto play screen" />
+  <img src="docs/screenshots/winner-spin-auto-play.jpeg" width="180" alt="Winner Spin Auto Spin screen" />
   <img src="docs/screenshots/winner-spin-settings.jpeg" width="180" alt="Winner Spin settings screen" />
   <img src="docs/screenshots/winner-spin-game-rules.jpeg" width="180" alt="Winner Spin game rules screen" />
   <img src="docs/screenshots/winner-spin-game-history.jpeg" width="180" alt="Winner Spin game history screen" />
-  <img src="docs/screenshots/winner-spin-free-spin-summary.jpeg" width="180" alt="Winner Spin free spin summary screen" />
+  <img src="docs/screenshots/winner-spin-free-spin-summary.jpeg" width="180" alt="Winner Spin Free Spins summary screen" />
 </p>
 
 ---
 
-## Highlights
+## Current Features
 
-- Flutter-based mobile slot game project
-- Firebase Authentication for sign in and registration
-- Cloud Firestore persistence for player state and pool state
-- Feature-first layered MVVM architecture
-- Clean Architecture-inspired dependency boundaries
-- Custom slot engine written in Dart
-- 6x5 cascading slot grid with cluster win detection
-- Tumble / cascade sequence simulation
-- Scatter symbols and Free Spins trigger system with retrigger logic
-- Multiplier collection system
-- Buy Feature flow and Ante Bet mode
-- Auto Spin controls with Quick Stop interaction
-- Animated reel transitions and Big Win / Super Win presentation
-- Audio feedback and ambient sound handling
-- Game rules, game history, and system settings screens
-- RTP-aware pool balancing with mode-based behavior
-- Monte Carlo and stress tests for slot math behavior
-- Jira-style development workflow with WSPIN task identifiers
+### Accounts and Player State
+
+- Email/password registration and sign-in with Firebase Authentication
+- Firebase verification-link flow with a 60-second resend cooldown
+- Authentication gate that keeps unverified accounts outside the game
+- Profile avatar selection, sign-out, password reset, and account deletion
+- Password-reset requests limited to once every 24 hours per account
+- Firestore persistence for profile, balance, Free Spins, and per-player pool state
+
+### Gameplay
+
+- 6 × 5 pay-anywhere grid with tumble/cascade sequences
+- Wins for 8 or more matching regular symbols anywhere on the grid
+- Payout tiers at 8, 10, and 12+ matching symbols
+- 10 Free Spins from 4+ base-game scatters
+- 5 additional Free Spins from 3+ scatters during a Free Spins round
+- 2×, 3×, 5×, 10×, 25×, 50×, and 100× multipliers
+- Buy Feature priced at 100× the selected bet
+- Ante Bet priced at 1.25× the base bet and doubling the configured base Free Spins trigger probability
+- Auto Spin, Quick Stop, Big Win presentation, game history, rules, and settings
+- Virtual in-game CREDIT top-up screen; it does not process real-money deposits
+- Free Spins autoplay that starts only after the award popup is acknowledged
+
+### Reliability and Performance
+
+- Slot calculation runs through Flutter compute to keep engine work off the UI isolate
+- Calculated but interrupted standard normal and active Free Spin results preserve their exact payout and resulting state
+- Recovery records use a unique spin ID so history and settlement can be retried safely
+- Ambient music pauses at application lifecycle level and respects the persisted preference
+- Short sound effects use bounded, low-latency pools to prevent unbounded player growth
+- Bomb and UI effects are preloaded to reduce first-use frame pressure
+- Heavy images are precached in stages and decoded according to device width
+- Local history, recovery, disclaimer, and music-preference writes use file-backed persistence
 
 ---
 
@@ -61,44 +76,46 @@ The project is structured as a real mobile application rather than a single demo
 
 | Category | Technologies |
 | --- | --- |
-| Mobile Development | Flutter, Dart |
-| Backend / Cloud | Firebase Core, Firebase Auth, Cloud Firestore |
-| UI & Presentation | Flutter Widgets, Lottie, Google Fonts |
+| Mobile | Flutter, Dart |
+| Backend | Firebase Authentication, Cloud Firestore, Cloud Functions |
+| Presentation | Flutter widgets, Lottie, Google Fonts |
 | Audio | audioplayers |
-| Architecture | Feature-First Layered MVVM, Clean Architecture boundaries |
-| Testing | Flutter Test, RTP simulations, stress tests |
-| Workflow | GitHub, Jira-style WSPIN task tracking |
+| Local persistence | dart:io, path_provider, atomic temporary-file replacement |
+| Architecture | Feature-first layered MVVM with Clean Architecture-inspired boundaries |
+| Testing | Flutter Test, RTP simulations, stress and regression tests |
+| Workflow | GitHub and Jira-style WSPIN task tracking |
 
-The project currently uses Dart SDK `^3.10.8`.
+- Dart SDK constraint: **^3.10.8**
+- Cloud Functions runtime: **Node.js 22**
+- Intended targets: **Android and iOS**
+
+The current client imports dart:io for local persistence, so web is not an advertised build target.
 
 ---
 
 ## Architecture
 
-Winner Spin follows a **Feature-First Layered MVVM architecture with Clean Architecture boundaries**.
-
-```text
+~~~text
 lib/
   app/
-    app.dart
   core/
     audio/
     format/
+    network/
     widgets/
   features/
     auth/
-      data/repositories/
-      domain/repositories/
+      data/
+      domain/
       presentation/
-        viewmodels/
-        views/
     slot/
-      data/repositories/
+      data/
       domain/
         engine/
         enums/
         models/
         repositories/
+        services/
       presentation/
         audio/
         models/
@@ -107,98 +124,98 @@ lib/
         ui_controllers/
         viewmodels/
         views/
-  images/
   main.dart
-```
+~~~
 
-- `domain/` contains the slot math, game rules, models, and repository contracts.
-- `data/` contains concrete persistence implementations such as Firestore-backed and local repositories.
-- `presentation/` contains screens, widgets, ViewModels, UI controllers, and services.
-- The domain layer does not depend on Flutter UI or Firebase implementation details.
+- **Domain** owns slot rules, engine modules, models, services, and repository contracts.
+- **Data** implements Firebase and local-file repositories.
+- **Presentation** owns screens, widgets, ViewModels, UI controllers, navigation, audio adapters, and presentation services.
+- **Core** contains application-wide audio, formatting, connectivity, and reusable UI utilities.
 
-For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The architecture is intentionally pragmatic rather than a strict dependency-injection implementation: domain code is independent of Flutter UI and Firebase, while presentation composition points create some concrete repositories.
 
----
-
-## Slot Engine
-
-The slot engine is a custom Dart-based game engine responsible for grid generation, cluster win detection, tumble/cascade simulation, multiplier collection, scatter evaluation, Free Spins triggering, and RTP-aware pool management.
-
-The engine is split into focused modules:
-
-| File | Responsibility |
-| --- | --- |
-| `slot_engine.dart` | Main spin orchestration and gameplay result generation |
-| `grid_generator.dart` | Safe grid and winning grid generation |
-| `tumble_simulator.dart` | Cascade/tumble simulation and cluster win evaluation |
-| `multiplier_collector.dart` | Multiplier symbol collection |
-| `pool_guard.dart` | Pool safety checks and payout protection |
-| `chain_forcer.dart` | Controlled chain/cascade forcing behavior |
-| `weighted_random.dart` | Weighted random selection utilities |
-| `spin_task.dart` | Spin task modeling |
-| `rtp_config.dart` | RTP-related configuration |
-| `ante_config.dart` | Ante Bet configuration |
-| `buy_config.dart` | Buy Feature configuration |
-| `engine_runtime.dart` | Runtime engine state and execution support |
-
-For detailed game mechanics documentation, see [docs/GAME_MECHANICS.md](docs/GAME_MECHANICS.md).
+See [Architecture](docs/ARCHITECTURE.md) for the full flow.
 
 ---
 
-## Testing & Simulation
+## Persistence and Interrupted-Spin Recovery
 
-Winner Spin includes both standard Flutter tests and slot-specific diagnostic simulations covering RTP behavior, tumble distribution, multiplier collection, and stress scenarios.
+| Data | Storage | Behavior |
+| --- | --- | --- |
+| Authentication identity | Firebase Authentication | Email/password identity and verified-email claim |
+| Profile and player state | Cloud Firestore | Username, avatar, balance, last win, and Free Spins state |
+| Pool state | Cloud Firestore | Per-player bet, payout, and spin counters |
+| Game history | Local application file | Most recent 30 entries |
+| Pending spin recovery | Local application file | Exact calculated payout, balance, Free Spins state, pool snapshot, and history ID for standard normal/active Free Spin paths |
+| Disclaimer state | Local application file | First-launch acknowledgement |
+| Music preference | Local application file | Ambient-music enabled/disabled state |
 
-Run the full test suite:
+For standard normal and active Free Spin paths, a recovery record is written after calculation and before normal presentation settlement completes. If the process is terminated during the animation, the same totalWin and resulting state are restored on the next launch. A result is not randomly recalculated during recovery. The paid Buy Feature trigger currently follows a dedicated path outside this recovery journal.
 
-```bash
+---
+
+## Slot Math and RTP Model
+
+The visible payout calculation is:
+
+~~~text
+totalWin = baseWin × max(1, sumOfFinalMultipliers) + scatterPayout
+~~~
+
+The engine pays the calculated result directly; it does not substitute a separate random payout amount after the symbols are shown.
+
+The pool model retains five operating modes:
+
+| Mode | Configured profile target | Role |
+| --- | ---: | --- |
+| recovery | 89.0% | Protects the pool after material overpayment |
+| tight | 92.0% | Reduces payout pressure |
+| normal | 96.5% | Default balanced profile |
+| generous | 98.0% | Raises payout potential while underpaying |
+| jackpot | 108.0% | Allows short high-payout periods under specific conditions |
+
+The guarded long-run target and the Normal profile target are **96.5%**. Protective modes intentionally have different profile targets; their distribution and pool feedback are designed to converge around the guarded long-run target rather than make every mode independently return 96.5%.
+
+These figures are configuration and simulation targets, not an independently certified gambling-math result.
+
+See [Game Mechanics](docs/GAME_MECHANICS.md) for implementation-level rules.
+
+---
+
+## Testing and Simulation
+
+The repository currently contains 45 test files, including widget, controller, persistence, lifecycle, audio, recovery, RTP, and stress coverage. Eleven root-level tests are math diagnostics or simulations and may process a large number of spins.
+
+Run fast targeted checks during normal development:
+
+~~~sh
+dart analyze
+flutter test test/app/app_lifecycle_test.dart
+flutter test test/core/audio
+flutter test test/features/slot/presentation/viewmodels/game_viewmodel_recovery_test.dart
+~~~
+
+Run the complete suite when full verification is required:
+
+~~~sh
 flutter test
-```
+~~~
 
-Run targeted tests:
+Run math diagnostics explicitly:
 
-```bash
+~~~sh
 flutter test test/rtp_simulation_test.dart
 flutter test test/per_mode_rtp_test.dart
+flutter test test/mode_weight_calibration_test.dart
 flutter test test/ante_bet_rtp_test.dart
 flutter test test/buy_bonus_rtp_test.dart
-flutter test test/buy_force_trigger_test.dart
-flutter test test/buy_scatter_payout_test.dart
 flutter test test/mixed_farm_ante_rtp_test.dart
 flutter test test/realistic_player_rtp_test.dart
 flutter test test/tumble_distribution_test.dart
-flutter test test/multiplier_collector_test.dart
 flutter test test/whale_clustering_stress_test.dart
-```
+~~~
 
-Some diagnostic tests run millions of simulated spins to inspect long-term RTP behavior, hit rate, Free Spins trigger frequency, mode distribution, and pool trajectory.
-
----
-
-## Development Workflow
-
-Winner Spin was developed with a Jira-based task tracking workflow. Commit messages use **WSPIN** task identifiers:
-
-```text
-WSPIN-299 Adjusted game screen bottom control spacing
-WSPIN-297 Organized slot presentation folders by UI responsibility
-WSPIN-296 Refactored slot presentation files into feature folders
-WSPIN-295 Extracted Buy Free Spins confirmation screen presentation widgets
-WSPIN-285 Extracted Big Win and lingering cluster presentation controllers
-WSPIN-284 Extracted free spin award sequence controller
-WSPIN-283 Extracted slot spin flow controllers and stage control overlay
-WSPIN-282 Extracted GameViewModel controllers and slot state orchestration
-```
-
----
-
-## Contributions
-
-This project was developed as a team-based mobile game project.
-
-Main contribution areas include slot game screen development, game presentation refactors, Free Spins flow, multiplier behavior, Buy Feature UI, Auto Play settings, Game Rules / Game History / System Settings screens, GameViewModel controller extraction, state orchestration, pool and player state persistence fixes, and Jira-based task tracking with WSPIN commit naming.
-
-This project demonstrates experience with Flutter mobile development, Firebase integration, state management, game UI development, custom game logic, simulation-based testing, and team-based software development workflow.
+Some simulation tests are intentionally long-running and are not required for every presentation-only change.
 
 ---
 
@@ -206,75 +223,80 @@ This project demonstrates experience with Flutter mobile development, Firebase i
 
 ### Prerequisites
 
-```bash
-flutter doctor
+- Flutter SDK compatible with Dart ^3.10.8
+- Android Studio/Xcode and a configured mobile target
+- A Firebase project
+- Firebase CLI and FlutterFire CLI for Firebase reconfiguration
+
+~~~sh
 git clone https://github.com/Winner-Spin/WinnerSpin.git
 cd WinnerSpin
 flutter pub get
-```
+flutter doctor
+~~~
 
-### Firebase Setup
+### Firebase Configuration
 
-This project uses Firebase Authentication and Cloud Firestore.
+1. Configure the project if the checked-in Firebase options do not match your Firebase project:
 
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
+   ~~~sh
+   dart pub global activate flutterfire_cli
+   flutterfire configure
+   ~~~
 
-Then enable Firebase Authentication (Email/Password) and Cloud Firestore. The app expects user documents under the `users` collection.
+2. Enable **Authentication > Email/Password** and create Cloud Firestore.
 
-### Running the App
+3. Deploy the Firestore rules:
 
-```bash
+   ~~~sh
+   firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID
+   ~~~
+
+Firebase's built-in verification link does not require Cloud Functions. Full account deletion does require the callable deleteAccount function and Cloud Functions billing eligibility:
+
+~~~sh
+firebase deploy --only functions:deleteAccount --project=YOUR_PROJECT_ID
+~~~
+
+Deploy only the Firebase services required by the active application flow. Email verification itself does not require a Cloud Function.
+
+See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) for the exact distinction.
+
+### Run and Build
+
+~~~sh
 flutter run
 flutter run -d android
 flutter run -d ios
-```
 
-### Build
-
-```bash
 flutter build apk
-flutter build web
-```
-
-### Useful Commands
-
-```bash
-flutter pub get
-dart format .
-dart analyze
-flutter test
-```
+flutter build appbundle
+flutter build ios
+~~~
 
 ---
 
 ## Documentation
 
-| Document | Description |
-| --- | --- |
-| [Architecture](docs/ARCHITECTURE.md) | Detailed architecture, application flow, authentication, and layer responsibilities |
-| [Game Mechanics](docs/GAME_MECHANICS.md) | Slot engine, cascade mechanics, free spins, multipliers, RTP, pool system |
+| English | Türkçe | Scope |
+| --- | --- | --- |
+| [README](README.md) | [README_TR](README_TR.md) | Project overview and setup |
+| [Architecture](docs/ARCHITECTURE.md) | [Mimari](docs/ARCHITECTURE_TR.md) | Layers, runtime flow, persistence, and performance boundaries |
+| [Game Mechanics](docs/GAME_MECHANICS.md) | [Oyun Mekanikleri](docs/GAME_MECHANICS_TR.md) | Slot rules, Free Spins, multipliers, RTP, and controls |
+| [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) | [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md) | Verification link, rules, and account-deletion deployment |
 
 ---
 
-## Project Status
+## Project Status and Disclaimer
 
-Winner Spin is a portfolio project designed to demonstrate Flutter mobile development, Firebase integration, feature-first MVVM architecture, custom slot game logic, RTP-aware pool behavior, animated game presentation, simulation-based testing, and Jira-based team workflow.
-
----
-
-## Important Note
-
-Winner Spin is a software and gameplay project. The slot math, RTP behavior, balances, and persistence model should not be treated as audited, regulated, or production-ready gambling infrastructure without formal mathematical review, compliance work, security hardening, and independent certification. Firebase configuration and platform files should also be reviewed before publishing a public build.
+Winner Spin is an actively developed portfolio/gameplay project. Its math, pool behavior, balances, recovery model, and Firebase configuration must not be treated as audited, regulated, secure, or production-ready gambling infrastructure without formal mathematical review, security hardening, compliance work, and independent certification.
 
 ---
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+Licensed under the Apache License 2.0.
 
 Copyright © 2026, Hakan Güneş and Enes Eken.
 
-See `LICENSE` for details.
+See [LICENSE](LICENSE) for details.

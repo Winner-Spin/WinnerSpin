@@ -2,248 +2,317 @@
 
 TR Türkçe | [EN English](GAME_MECHANICS.md)
 
-Bu döküman, Winner Spin'de kullanılan slot oyun motorunu, alt sistemlerini ve oyun mekaniklerini açıklar.
+Bu belge Winner Spin'in güncel slot kurallarını, ödeme hesabını, Ücretsiz Dönüş akışını, havuz modlarını ve oyuncu kontrollerini açıklar.
 
 ---
 
-## Slot Oyun Motoru
+## 1. Motor Özeti
 
-Temel oyun mantığı özel bir slot motorundan başlar.
+Winner Spin özel bir Dart slot motoru kullanır. Bir dönüş, makara ve kazanç animasyonları sunulmadan önce eksiksiz bir SpinResult olarak hesaplanır.
 
-Slot motoru şunlardan sorumludur:
+Motor şunlardan sorumludur:
 
-- slot grid'ini oluşturma,
-- bir dönüşün kazanıp kazanmayacağına karar verme,
-- güvenli grid'ler üretme,
-- kazançlı grid'ler üretme,
-- küme kazançlarını tespit etme,
-- tumble/cascade dizilerini çalıştırma,
-- toplam kazancı hesaplama,
-- çarpan değerlerini uygulama,
-- scatter ödemelerini kontrol etme,
-- Ücretsiz Dönüşleri tetikleme,
-- Ücretsiz Dönüş yeniden tetiklemelerini yönetme,
-- havuz güvenlik limitlerini uygulama,
-- mevcut oyun moduna göre davranışı uyarlama.
+- mevcut havuz modunu seçmek;
+- moda duyarlı sembol ağırlıklarını oluşturmak;
+- güvenli veya kazançlı grid üretmek;
+- pay-anywhere kazançlarını ve tumble'ları çözmek;
+- son grid'deki çarpanları toplamak;
+- scatter ödemesini ve Ücretsiz Dönüşleri değerlendirmek;
+- havuz karşılanabilirlik ve azami kazanç korumalarını uygulamak;
+- ekranda görünen kesin ödemeyi döndürmek.
 
-Oyun **6 sütun x 5 satır** slot grid'i kullanır:
-
-```text
-Sütunlar: 6
-Satırlar: 5
-Toplam:   30 sembol
-```
+SpinExecutionController motoru Flutter compute üzerinden çağırır. Motor matematiği geçici arka plan isolate'ında çalışır; animasyonlar ve oyuncu etkileşimi arayüz isolate'ında kalır.
 
 ---
 
-## Motor Modülleri
+## 2. Grid ve Pay-Anywhere Kazançları
 
-Slot motoru, her sorumluluğu tek bir dosyada tutmak yerine daha küçük motor modüllerine ayrılmıştır.
+Grid 6 sütun ve 5 satır içerir:
 
-Önemli motor dosyaları:
+~~~text
+6 × 5 = 30 sembol konumu
+~~~
 
-| Dosya | Sorumluluk |
-| --- | --- |
-| `slot_engine.dart` | Ana dönüş orkestrasyonu ve oyun sonucu üretimi |
-| `grid_generator.dart` | Güvenli grid ve kazançlı grid üretimi |
-| `tumble_simulator.dart` | Cascade/tumble simülasyonu ve küme kazanç değerlendirmesi |
-| `multiplier_collector.dart` | Çarpan sembolü toplama |
-| `pool_guard.dart` | Havuz güvenlik kontrolleri ve ödeme koruması |
-| `chain_forcer.dart` | Kontrollü zincir/cascade zorlama davranışı |
-| `weighted_random.dart` | Ağırlıklı rastgele seçim yardımcıları |
-| `spin_task.dart` | Dönüş görevi modelleme |
-| `rtp_config.dart` | RTP ile ilgili yapılandırma |
-| `ante_config.dart` | Ante Bet yapılandırması |
-| `buy_config.dart` | Özellik Satın Alma yapılandırması |
-| `engine_runtime.dart` | Çalışma zamanı motor durumu ve yürütme desteği |
+Normal sembol kazançları **pay-anywhere sayım mekaniğini** kullanır. Konumların bitişik olması gerekmez. Grid'in tamamındaki aynı normal sembolün bütün örnekleri sayılır:
 
-Bu ayrım, slot motorunun hata ayıklamasını, test edilmesini ve genişletilmesini kolaylaştırır.
+- 8'den az: normal sembol ödemesi yok;
+- 8–9: 8 sembol ödeme kademesi;
+- 10–11: 10 sembol ödeme kademesi;
+- 12 veya daha fazla: 12+ ödeme kademesi.
+
+Bazı iç model adlarında ClusterWin terimi korunmuştur ancak güncel motor bağlantılı/konumsal küme tespiti yapmaz.
+
+### Normal Sembol Ödemeleri
+
+Bütün değerler seçili temel bahsin çarpanıdır.
+
+| Sembol kimliği | 8–9 | 10–11 | 12+ |
+| --- | ---: | ---: | ---: |
+| banana | 0,25× | 0,75× | 2× |
+| grapes | 0,40× | 0,90× | 4× |
+| watermelon | 0,50× | 1× | 5× |
+| peach | 0,80× | 1,20× | 8× |
+| apple | 1× | 1,50× | 10× |
+| strawberry | 1,50× | 2× | 12× |
+| pink_bear | 2× | 5× | 15× |
+| green_bear | 5× | 10× | 25× |
+| heart | 10× | 25× | 50× |
 
 ---
 
-## Cascade / Tumble Mekanikleri
+## 3. Tumble / Cascade Çözümlemesi
 
-Winner Spin, cascade tarzı bir slot mekaniği kullanır.
+Motor kazançlı bir grid'i şu şekilde çözümler:
 
-Tumble akışı şu şekilde çalışır:
-
-```text
-1. Başlangıç grid'ini oluştur
-2. Normal sembolleri say
-3. Kazanan kümeleri tespit et
-4. Kazanan sembolleri kaldır
+~~~text
+1. Grid genelindeki bütün normal sembolleri say
+2. 8+ örneğe sahip bütün sembol türlerini bul
+3. Her eşleşen sembol ödemesini hesapla
+4. Kazanan bütün normal sembolleri kaldır
 5. Yerçekimini uygula
-6. Boş hücreleri doldur
-7. Kazanan küme kalmayana kadar tekrarla
-8. Çarpanları topla
-9. Scatter'ları değerlendir
-10. Nihai dönüş sonucunu döndür
-```
+6. Boş konumları doldur
+7. Normal sembol kazancı kalmayana kadar tekrarla
+8. Son çözümlenen grid'den çarpanları ve scatter'ları oku
+9. Eksiksiz SpinResult'ı döndür
+~~~
 
-Bir normal sembol, grid üzerinde en az **8 kez** göründüğünde küme kazancı oluşturur.
+Her TumbleStep şunları saklar:
 
-Her tumble adımı şunları depolar:
+- kazanan varlık yolları;
+- yeniden doldurma sonrası grid;
+- tumble kazanç tutarı;
+- kazanan konumlarıyla sembol başına kazanç kayıtları.
 
-- kazanan sembol yolları,
-- tumble sonrası grid durumu,
-- kazanç miktarı,
-- küme kazanç verisi,
-- kazanan pozisyonlar.
-
-Bu, oyunu basit bir tek dönüşlük sembol değiştirme sisteminden daha dinamik hale getirir.
+Motor, sembol ağırlıklarına ve yeni bir kazanç sayımı oluşturma kararına mevcut mod ile Ücretsiz Dönüş profillerini uygulayabilir. Gösterilen ödeme yine gerçekten döndürülen sembollerden gelir.
 
 ---
 
-## Ücretsiz Dönüşler
+## 4. Scatter Ödemeleri ve Ücretsiz Dönüşler
 
-Ücretsiz Dönüşler scatter sembolleri tarafından tetiklenir.
+Cupcake scatter sembolüdür. Scatter ödemesi son çözümlenen grid'e göre ve seçili temel bahsin çarpanı olarak hesaplanır:
 
-Ana oyun tetikleme kuralı:
+| Scatter sayısı | Ödeme |
+| --- | ---: |
+| 0–3 | 0× |
+| 4 | 3× |
+| 5 | 5× |
+| 6+ | 100× |
 
-```text
-4+ scatter -> Ücretsiz Dönüşler
-```
+Ücretsiz Dönüş ödülleri:
 
-Ücretsiz Dönüş yeniden tetikleme kuralı:
+~~~text
+Ana oyun:          4+ scatter → 10 Ücretsiz Dönüş
+Ücretsiz Dönüşler: 3+ scatter → 5 ek Ücretsiz Dönüş
+~~~
 
-```text
-Ücretsiz Dönüşler sırasında 3+ scatter -> Yeniden Tetikleme
-```
+Motor, iki ödül türünü de SpinResult içinde bildirir. Ana oyundaki tetikleme 10 Ücretsiz Dönüş veren ilk ödül, aktif Ücretsiz Dönüş turundaki tetikleme ise 5 ek dönüş veren yeniden tetikleme olarak işaretlenir. Sunum katmanı bu ayrımı kullanarak doğru 10 dönüş veya +5 popup'ını gösterir, kalan dönüş sayısını belirlenen anda günceller ve oyuncu ödülü onaylayana kadar otomatik oynatımı bekletir.
 
-Ücretsiz Dönüşler aynı slot motoru akışına entegre edilmiştir, ancak motor, dönüşün ana oyun dönüşü mü yoksa ücretsiz dönüş mü olduğuna bağlı olarak isabet oranını, zincir olasılığını, çarpan davranışını ve scatter tetikleme davranışını ayarlayabilir.
+### Ücretsiz Dönüş Sunumu ve Otomatik Oynatım
 
----
+1. Geçiş ve ödül popup'ı gösterilir.
+2. Oyuncu popup'ı onaylayana kadar Ücretsiz Dönüş otomatik oynatımı bekler.
+3. Sonraki Ücretsiz Dönüşler makara, tumble, çarpan ve kazanç sunumu korumaları bittikten sonra otomatik başlar.
+4. Yeniden tetiklenen +5, +5 ödül popup'ı gösterildiği anda sayaca yansır.
+5. Son sunumdan sonra birikmiş tur özeti gösterilir.
 
-## Çarpan Toplama
-
-Proje, nihai ödeme potansiyelini artıran çarpan sembolleri içerir.
-
-Örnek çarpan değerleri:
-
-```text
-2x
-3x
-5x
-10x
-25x
-50x
-100x
-```
-
-Çarpan toplama, tumble simülasyonundan ayrı olarak yönetilir. Bu, çarpan davranışını izole tutar ve motorun bakımını kolaylaştırır.
-
-Nihai kazanç hesaplaması şu genel fikri takip eder:
-
-```text
-finalWin = baseWin * finalMultiplier + scatterPayout
-(nihaiKazanç = temelKazanç * nihaiÇarpan + scatterÖdemesi)
-```
+Ortadaki eksi/artı kontrolleri Ücretsiz Dönüşler sırasında gizlenir. Spin kontrolü giriş olarak devre dışıdır ancak görünür kalır ve kalan Ücretsiz Dönüş sayısını gösterir.
 
 ---
 
-## RTP ve Havuz Sistemi
+## 5. Çarpan Toplama ve Nihai Ödeme
 
-Winner Spin, RTP-duyarlı bir havuz sistemi içerir.
+Desteklenen çarpan sembolleri:
 
-Havuz durumu, motorun kullandığı temel sayaçları saklar:
+~~~text
+2×, 3×, 5×, 10×, 25×, 50×, 100×
+~~~
 
-```text
-totalBetsPlaced    (toplam yapılan bahisler)
-totalPaidOut       (toplam ödenen miktar)
-totalSpins         (toplam dönüş sayısı)
-```
+Son çözümlenen grid'deki çarpan sembolleri toplanır. Birbirleriyle çarpılmazlar. Çarpan yoksa temel kazanç 1 katsayısını kullanır.
 
-Motor, bu sayaçlardan çalışma zamanı değerlerini türetir:
+Kesin hesap:
 
-```text
-poolBalance        (havuz bakiyesi)
-expectedPool       (beklenen havuz)
-currentMode        (mevcut mod)
-```
+~~~text
+baseWin = bütün tumble normal sembol kazançlarının toplamı
+finalMultiplier = son grid'de görünen çarpan değerlerinin toplamı
+totalWin = baseWin × max(1, finalMultiplier) + scatterPayout
+~~~
 
-Hedef RTP şu değer etrafında tasarlanmıştır:
+Scatter ödemesi, normal sembol çarpımından sonra eklenir ve toplanan çarpanla çarpılmaz.
 
-```text
-%96.5
-```
-
-Motor, mevcut oyun modunu belirlemek ve davranışı ayarlamak için saklanan sayaçları ve türetilmiş havuz değerlerini kullanır.
-
-Mevcut oyun modları:
-
-| Mod | Amaç |
-| --- | --- |
-| `normal` | Varsayılan dengeli oyun modu |
-| `generous` | Oyun düşük ödeme yaparken ödeme potansiyelini artırır |
-| `tight` | Gerektiğinde ödeme baskısını azaltır |
-| `jackpot` | Belirli havuz koşullarında daha agresif ödeme potansiyeline izin verir |
-| `recovery` | Fazla ödeme sonrası havuzu korur |
-
-Bu, oyun mantığını tamamen rastgele bir sembol üreticisinden daha gelişmiş hale getirir.
+Motorun totalWin değeri bakiyeye eklenecek ve kesinti kurtarmasında saklanacak tutardır. Ekranda görünen sembol sonucunun yerine ikinci bir rastgele ödeme kullanılmaz.
 
 ---
 
-## Havuz Koruyucusu (Pool Guard)
+## 6. Sonuç Üretimi ve Havuz Koruması
 
-Havuz Koruyucusu, belirli sonuçların karşılanabilir olup olmadığını kontrol ederek oyun ekonomisini korur.
+Motor her dönüşte:
 
-Kullanım alanları:
+1. PoolState'ten güncel GameMode'u türetir;
+2. mod ve Ücretsiz Dönüş durumuna göre sembol ağırlıklarını ayarlar;
+3. yapılandırılmış kazanç/Ücretsiz Dönüş tetikleme yolunu değerlendirir;
+4. aday grid'leri üretir ve çözümler;
+5. yalnızca ilgili ödeme tavanına uyan sonucu kabul eder;
+6. geçerli aday üretilemezse güvenli grid'e döner.
 
-- maksimum kazanç hesaplaması,
-- Ücretsiz Dönüş karşılanabilirliği,
-- ödeme güvenliği,
-- kurtarma davranışı,
-- havuz taban koruması.
+PoolGuard şunları sağlar:
 
-Ayrıca tanısal testler ve stres senaryoları için bir Özellik Satın Alma karşılanabilirlik yardımcısı da sunar. Mevcut oyun içi akışta ise Özellik Satın Alma işlemi oyuncunun görünen bakiyesiyle sınırlandırılır ve ödeme tamamlandıktan sonra doğrudan bonus erişimini garanti etmek için ilk Ücretsiz Dönüş tetiklemesi motora zorlanmış olarak gönderilir.
+- moda özel ana oyun ve Ücretsiz Dönüş ödeme tavanları;
+- Ücretsiz Dönüş karşılanabilirlik tahmini;
+- Ante ve Özellik Satın Alma tanıları için ek güvenlik katsayıları;
+- ısınma sonrasında kullanılabilir havuz payına dayalı ödeme tavanı.
 
-Bu, normal dönüş sonuçlarının mevcut havuz durumunu kontrol etmeden sınırsız veya güvensiz ödemeler üretmesini engeller.
+Kaydedilen ilk 50 ücretli dönüş, mod seçimi ve Ücretsiz Dönüş karşılanabilirliği için ısınma olarak değerlendirilir. Mod ödeme tavanları ısınma sırasında da vardır.
 
----
-
-## Özellik Satın Alma (Buy Feature)
-
-Winner Spin, bir Özellik Satın Alma akışı içerir.
-
-Özellik Satın Alma, oyuncunun seçili bahis miktarının sabit bir çarpanını ödeyerek doğrudan bir Ücretsiz Dönüş turuna erişim satın almasına olanak tanır.
-
-Mevcut oyun akışı, oyuncunun ekranda gösterilen Özellik Satın Alma fiyatını karşılayıp karşılayamadığını kontrol eder. Ödeme yapıldıktan sonra dönüş, motora zorlanmış Ücretsiz Dönüş tetiklemesi olarak gönderilir; ayrı havuz karşılanabilirlik yardımcısı ise tanısal testler ve stres senaryoları için kullanılabilir durumda kalır.
-
-Bu özellik, oyuncu deneyimini normal dönüşler ile doğrudan bonus erişimi arasında seçim yapabileceği modern slot oyun mekaniklerine yaklaştırır.
+Özellik Satın Alma'nın ücretli zorunlu tetiklemesi, ödeme yapıldıktan sonra satın alınan bonus erişiminin gerçekleşmesi için özel bir fallback'e sahiptir.
 
 ---
 
-## Ante Bet
+## 7. RTP ve Havuz Modları
 
-Proje bir Ante Bet modu içerir.
+PoolState yalnızca üç sayacı kalıcı olarak saklar:
 
-Ante Bet, dönüşün maliyet/risk profilini etkileyerek Ücretsiz Dönüş tetikleme potansiyelini artıran şekilde dönüş davranışını değiştirir.
+~~~text
+totalBetsPlaced
+totalPaidOut
+totalSpins
+~~~
 
-Bu özellik, oyuncunun normal dönüşler ile daha yüksek riskli, özellik güçlendirilmiş bir dönüş modu arasında seçim yapmasına olanak tanır.
+Şu değerleri türetir:
+
+~~~text
+poolBalance = totalBetsPlaced - totalPaidOut
+expectedPool = totalBetsPlaced × (1 - 0,965)
+actualRTP = totalPaidOut / totalBetsPlaced
+~~~
+
+Korumalı uzun dönem hedefi %96,5'tir. Yapılandırılmış mod profilleri:
+
+| Mod | Kalibrasyon hedefi | Amaç |
+| --- | ---: | --- |
+| recovery | %89,0 | Önemli fazla ödeme sonrasında havuzu korumak |
+| tight | %92,0 | Ödeme baskısını azaltmak |
+| normal | %96,5 | Varsayılan dengeli davranış |
+| generous | %98,0 | Düşük ödeme döneminde ödeme potansiyelini yükseltmek |
+| jackpot | %108,0 | Belirli koşullarda kısa yüksek ödeme dönemlerine izin vermek |
+
+Bu mod hedefleri kalibrasyon referanslarıdır; her kısa oturum için garantili ödeme yüzdesi olarak okunmaz.
+
+### Mod Seçimi
+
+- 0–49. dönüşler normal modu kullanır.
+- Gerçek RTP hedeften 10 yüzde puanından fazla aşağıdaysa jackpot modu seçilir.
+- Gerçek RTP hedeften 10 yüzde puanından fazla yukarıdaysa recovery modu seçilir.
+- Diğer durumlarda 50–250 dönüş sürecek oturum modu seçilir:
+
+| Mod | Oturum seçim ağırlığı |
+| --- | ---: |
+| normal | %65 |
+| generous | %17 |
+| tight | %13 |
+| jackpot | %3 |
+| recovery | %2 |
+
+Firestore geçici oturum modu seçimini değil sayaçları saklar. Süreç yeniden başladığında sonraki mod, geri yüklenen sayaçlardan tekrar türetilir.
+
+Kısa çalışmalar ve tekil modlar %96,5'ten önemli ölçüde farklı olabilir. Bu oran uzun dönem korumalı kalibrasyon hedefidir ve bağımsız olarak sertifikalandırılmamıştır.
 
 ---
 
-## Otomatik Dönüş (Auto Spin)
+## 8. Özellik Satın Alma
 
-Winner Spin, Otomatik Dönüş kontrolleri içerir.
+Özellik Satın Alma maliyeti:
 
-Otomatik Dönüş, sunum ve ViewModel durumu aracılığıyla yönetilir, böylece tekrarlayan dönüşler aşağıdaki oyun koşullarına saygı gösterirken devam edebilir:
+~~~text
+fiyat = seçili temel bahis × 100
+~~~
 
-- bakiye,
-- ücretsiz dönüş durumu,
-- dönüş tamamlanması,
-- kazanç sunumu,
-- hızlı durdurma,
-- otomatik dönüş devam korumaları.
+Canlı arayüz oyuncunun görünen bakiyesini kontrol eder. Ödemeden sonra:
 
-Bu, otomatik dönüşlerin mevcut oyun durumunu dikkate almadan çalışmasını engeller.
+- ücret bakiyeden düşülür;
+- ana oyun hesabı zorunlu Ücretsiz Dönüş tetiklemesi açık olarak gönderilir;
+- 4+ scatter sonucu üretilir;
+- ödül sunumu onaylandıktan sonra 10 Ücretsiz Dönüş başlar.
+
+PoolGuard.canAffordBuyFs tanı ve stres testleri için kullanılabilir durumda kalır ancak canlı Özellik Satın Alma arayüz koruması değildir.
 
 ---
 
-## Hızlı Durdurma (Quick Stop)
+## 9. Ante Bet
 
-Oyun, Hızlı Durdurma etkileşimini destekler.
+Ante Bet maliyeti ve tetikleme olasılığını değiştirir:
 
-Oyuncu makara animasyonu sırasında dokunduğunda, animasyon akışı kısaltılabilir ve sonuç daha hızlı sunulabilir.
+~~~text
+dönüş maliyeti = seçili temel bahis × 1,25
+ana Ücretsiz Dönüş tetikleme olasılığı = yapılandırılmış oran × 2
+~~~
 
-Bu, oyun hissini iyileştirir ve oyuncuya dönüş hızı üzerinde daha fazla kontrol verir.
+Ante üzerinden girilmiş turdaki Ücretsiz Dönüş isabet sıklığına ek bir kalibrasyon katsayısı uygulanır. Bu katsayı görünen sembol ödeme tablosunu değiştirmez veya totalWin yerine başka bir tutar koymaz.
+
+Ante yalnızca ana oyun girişine uygulanır. Bu dönüş bir Ücretsiz Dönüş turu başlatırsa tur, bitene kadar Ante kaynak işaretini korur.
+
+---
+
+## 10. Otomatik Dönüş ve Hızlı Durdurma
+
+### Normal Otomatik Dönüş
+
+Normal Otomatik Dönüş şunları izler:
+
+- istenen ve kalan dönüş sayısı;
+- 1×–3× sunum hızı;
+- bakiye yeterliliği;
+- aktif dönüş/tumble durumu;
+- manuel durdurma;
+- tamamlanma ve devam korumaları.
+
+Normal otomatik dönüş sayacı, ilgili ücretli dönüş başladığında bir azalır.
+
+### Ücretsiz Dönüş Otomatik Oynatımı
+
+Ücretsiz Dönüşler ayrı bir sunum controller'ı kullanır. Normal Otomatik Dönüş sayacını tüketmez ve bir ödül onayı veya başka sunum aşaması beklerken başlayamaz.
+
+### Hızlı Durdurma
+
+Makara hareketi sırasında dokunmak mevcut görsel sıralamayı kısaltır ve önceden hesaplanan sonucu daha erken sunar. Sembolleri, ödemeyi, çarpanı, havuz durumunu veya kurtarma anlık görüntüsünü değiştirmez.
+
+### Sanal CREDIT
+
+Ayarlar akışında sanal bir CREDIT yükleme ekranı bulunur. Bu ekran yalnızca Firestore destekli oyun içi bakiyeyi artırır; gerçek para satın alımı işlemez veya gerçek dünyada değeri olan bir varlık oluşturmaz.
+
+---
+
+## 11. Sonuçlandırma ve Kesinti Kurtarması
+
+Normal sunumda kazanç, dönüş tamamlama sırası sonucu kesinleştirdiğinde görünen/uzak bakiyeye ulaşır. Bu zamanlama bilinçli olarak tumble ve çarpan sunumundan sonra korunur.
+
+Standart normal ve aktif Ücretsiz Dönüş yollarında hesaplamadan sonra, sunum tamamlanmadan önce kesin kurtarma anlık görüntüsü yazılır. Süreç sonlandırılırsa:
+
+- saklanan totalWin kullanılır;
+- sonuç bakiyesi, Ücretsiz Dönüşler ve havuz sayaçları geri yüklenir;
+- geçmiş spinId ile yalnızca bir kez kaydedilir;
+- tamamlanmış dönüş için yeni motor sonucu üretilmez.
+
+Ücretli Özellik Satın Alma tetikleme dönüşü şu anda kendi zorunlu tetikleme yolunu izler ve kurtarma günlüğü hazırlama yolunun dışındadır.
+
+---
+
+## 12. Testler ve Kalibrasyon
+
+Hızlı regresyon kapsamı:
+
+- çarpan toplama ve ödeme davranışı;
+- zorunlu Özellik Satın Alma scatter sonuçları;
+- Ücretsiz Dönüş ödül/otomatik oynatım durumu;
+- sonuçlandırma ve kesin kesintili dönüş kurtarması;
+- controller ve widget davranışı.
+
+Uzun süren tanılar:
+
+- genel ve mod başına RTP simülasyonları;
+- mod ağırlığı kalibrasyonu;
+- Ante ve satın alınmış bonus RTP'si;
+- gerçekçi oyuncu karışımları;
+- tumble dağılımı;
+- whale/clustering stres senaryoları.
+
+Uzun simülasyonlar motor ağırlıkları, ödeme tabloları, havuz mantığı, Ante veya Özellik Satın Alma değiştiğinde açıkça çalıştırılmalıdır. Yalnızca sunum değişiklikleri için hızlı smoke paketi olarak tasarlanmamıştır.

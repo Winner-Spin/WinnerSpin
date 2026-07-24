@@ -2,247 +2,317 @@
 
 EN English | [TR Türkçe](GAME_MECHANICS_TR.md)
 
-This document describes the slot game engine, its subsystems, and the gameplay mechanics used in Winner Spin.
+This document describes Winner Spin's current slot rules, payout calculation, Free Spins flow, pool modes, and player controls.
 
 ---
 
-## Slot Game Engine
+## 1. Engine Overview
 
-The core gameplay logic starts from a custom slot engine.
+Winner Spin uses a custom Dart slot engine. A spin is calculated as a complete SpinResult before reel and win animations present it.
 
-The slot engine is responsible for:
+The engine is responsible for:
 
-- generating the slot grid,
-- deciding whether a spin should win,
-- producing safe grids,
-- producing winning grids,
-- detecting cluster wins,
-- running tumble/cascade sequences,
-- calculating total win,
-- applying multiplier values,
-- checking scatter payouts,
-- triggering Free Spins,
-- handling Free Spins retriggers,
-- applying pool safety limits,
-- adapting behavior according to the current game mode.
+- selecting the current pool mode;
+- building mode-aware symbol weights;
+- generating safe or winning grids;
+- resolving pay-anywhere wins and tumbles;
+- collecting final-grid multipliers;
+- evaluating scatter payout and Free Spins;
+- applying pool affordability and maximum-win guards;
+- returning the exact visible payout.
 
-The game uses a **6-column x 5-row** slot grid:
-
-```text
-Columns: 6
-Rows:    5
-Total:   30 symbols
-```
+SpinExecutionController calls the engine through Flutter compute. Engine math runs on a temporary background isolate; animations and player interaction remain on the UI isolate.
 
 ---
 
-## Engine Modules
+## 2. Grid and Pay-Anywhere Wins
 
-The slot engine is split into smaller engine modules instead of keeping every responsibility inside a single file.
+The grid contains 6 columns and 5 rows:
 
-Important engine files include:
+~~~text
+6 × 5 = 30 symbol positions
+~~~
 
-| File | Responsibility |
-| --- | --- |
-| `slot_engine.dart` | Main spin orchestration and gameplay result generation |
-| `grid_generator.dart` | Safe grid and winning grid generation |
-| `tumble_simulator.dart` | Cascade/tumble simulation and cluster win evaluation |
-| `multiplier_collector.dart` | Multiplier symbol collection |
-| `pool_guard.dart` | Pool safety checks and payout protection |
-| `chain_forcer.dart` | Controlled chain/cascade forcing behavior |
-| `weighted_random.dart` | Weighted random selection utilities |
-| `spin_task.dart` | Spin task modeling |
-| `rtp_config.dart` | RTP-related configuration |
-| `ante_config.dart` | Ante Bet configuration |
-| `buy_config.dart` | Buy Feature configuration |
-| `engine_runtime.dart` | Runtime engine state and execution support |
+Regular-symbol wins use a **pay-anywhere count mechanic**. Position adjacency is not required. Every occurrence of the same regular symbol across the entire grid is counted:
 
-This separation makes the slot engine easier to debug, test, and extend.
+- fewer than 8: no regular-symbol payout;
+- 8–9: 8-symbol payout tier;
+- 10–11: 10-symbol payout tier;
+- 12 or more: 12+ payout tier.
+
+Some internal model names retain the term ClusterWin, but the current engine does not perform connected/spatial cluster detection.
+
+### Regular-Symbol Payouts
+
+All values are multipliers of the selected base bet.
+
+| Symbol ID | 8–9 | 10–11 | 12+ |
+| --- | ---: | ---: | ---: |
+| banana | 0.25× | 0.75× | 2× |
+| grapes | 0.40× | 0.90× | 4× |
+| watermelon | 0.50× | 1× | 5× |
+| peach | 0.80× | 1.20× | 8× |
+| apple | 1× | 1.50× | 10× |
+| strawberry | 1.50× | 2× | 12× |
+| pink_bear | 2× | 5× | 15× |
+| green_bear | 5× | 10× | 25× |
+| heart | 10× | 25× | 50× |
 
 ---
 
-## Cascade / Tumble Mechanics
+## 3. Tumble / Cascade Resolution
 
-Winner Spin uses a cascade-style slot mechanic.
+The engine resolves a winning grid as follows:
 
-The tumble flow works like this:
-
-```text
-1. Generate the initial grid
-2. Count regular symbols
-3. Detect winning clusters
-4. Remove winning symbols
+~~~text
+1. Count every regular symbol across the grid
+2. Find all symbol types with 8+ occurrences
+3. Calculate each matching-symbol payout
+4. Remove all winning regular symbols
 5. Apply gravity
-6. Fill empty cells
-7. Repeat until no more winning cluster exists
-8. Collect multipliers
-9. Evaluate scatters
-10. Return final spin result
-```
+6. Fill empty positions
+7. Repeat until no regular-symbol win remains
+8. Read multipliers and scatters from the final resolved grid
+9. Return the complete SpinResult
+~~~
 
-A regular symbol creates a cluster win when it appears at least **8 times** on the grid.
+Each TumbleStep stores:
 
-Each tumble step stores:
+- the winning asset paths;
+- the post-refill grid;
+- the tumble win amount;
+- per-symbol win records with their winning positions.
 
-- winning symbol paths,
-- grid state after the tumble,
-- win amount,
-- cluster win data,
-- winning positions.
-
-This makes the gameplay more dynamic than a simple one-spin symbol replacement system.
+The engine may use mode and Free Spins profiles when deciding symbol weights and whether to seed another winning count. The shown payout still comes from the symbols that are actually returned.
 
 ---
 
-## Free Spins
+## 4. Scatter Payouts and Free Spins
 
-Free Spins are triggered by scatter symbols.
+The cupcake is the scatter symbol. Scatter payout is based on the final resolved grid and is a multiplier of the selected base bet:
 
-Base game trigger rule:
+| Scatter count | Payout |
+| --- | ---: |
+| 0–3 | 0× |
+| 4 | 3× |
+| 5 | 5× |
+| 6+ | 100× |
 
-```text
-4+ scatters -> Free Spins
-```
+Free Spins awards:
 
-Free Spins retrigger rule:
+~~~text
+Base game:    4+ scatters → 10 Free Spins
+Free Spins:   3+ scatters → 5 additional Free Spins
+~~~
 
-```text
-3+ scatters during Free Spins -> Retrigger
-```
+The engine reports both award types in SpinResult. A base-game trigger is marked as an initial award of 10 Free Spins, while a trigger during an active Free Spins round is marked as a retrigger worth 5 additional spins. The presentation layer reads this distinction to show the correct 10-spin or +5 popup, update the remaining count at the intended time, and pause autoplay until the player acknowledges the award.
 
-Free Spins are integrated into the same slot engine flow, but the engine can adjust hit rate, chain probability, multiplier behavior, and scatter trigger behavior depending on whether the spin is a base spin or a free spin.
+### Free Spins Presentation and Autoplay
 
----
+1. The transition and award popup are shown.
+2. Free Spins autoplay remains paused until the player acknowledges the popup.
+3. Subsequent Free Spins start automatically after reel, tumble, multiplier, and win presentation guards finish.
+4. A retrigger's +5 is reflected when the +5 award popup is shown.
+5. After the final presentation, the accumulated round summary is displayed.
 
-## Multiplier Collection
-
-The project includes multiplier symbols that increase the final payout potential.
-
-Example multiplier values:
-
-```text
-2x
-3x
-5x
-10x
-25x
-50x
-100x
-```
-
-Multiplier collection is handled separately from the tumble simulation. This keeps multiplier behavior isolated and makes the engine easier to maintain.
-
-The final win calculation follows this general idea:
-
-```text
-finalWin = baseWin * finalMultiplier + scatterPayout
-```
+The center minus/plus controls are hidden during Free Spins. The spin control is disabled as an input but remains visible and displays the remaining Free Spins count.
 
 ---
 
-## RTP & Pool System
+## 5. Multiplier Collection and Final Payout
 
-Winner Spin includes an RTP-aware pool system.
+Supported multiplier symbols:
 
-The pool state stores the core counters used by the engine:
+~~~text
+2×, 3×, 5×, 10×, 25×, 50×, 100×
+~~~
 
-```text
+Multiplier symbols on the final resolved grid are summed. They are not multiplied by one another. When no multiplier is present, the base win uses a factor of 1.
+
+The exact calculation is:
+
+~~~text
+baseWin = sum of every tumble's regular-symbol wins
+finalMultiplier = sum of visible final-grid multiplier values
+totalWin = baseWin × max(1, finalMultiplier) + scatterPayout
+~~~
+
+Scatter payout is added after the regular-symbol multiplication and is not multiplied by the collected multiplier.
+
+The engine's totalWin is the amount credited and the amount stored for interruption recovery. No second random payout replaces the visible symbol result.
+
+---
+
+## 6. Result Generation and Pool Guard
+
+For each spin, the engine:
+
+1. derives the current GameMode from PoolState;
+2. adjusts symbol weights for the mode and Free Spins state;
+3. evaluates a configured win/Free Spins trigger path;
+4. generates and resolves candidate grids;
+5. accepts a result only when it fits the applicable payout ceiling;
+6. falls back to a safe grid if a valid candidate cannot be produced.
+
+PoolGuard provides:
+
+- mode-specific base-game and Free Spins payout ceilings;
+- Free Spins affordability estimates;
+- extra safety factors for Ante and Buy Feature diagnostics;
+- a post-warmup payout ceiling based on available pool headroom.
+
+The first 50 recorded paid spins are treated as warmup for mode selection and Free Spins affordability. Mode payout ceilings still exist during warmup.
+
+The Buy Feature's paid forced trigger has a dedicated fallback so the purchased bonus access is honored after payment.
+
+---
+
+## 7. RTP and Pool Modes
+
+PoolState persists only three counters:
+
+~~~text
 totalBetsPlaced
 totalPaidOut
 totalSpins
-```
+~~~
 
-From those counters, the engine derives runtime values such as:
+It derives:
 
-```text
-poolBalance
-expectedPool
-currentMode
-```
+~~~text
+poolBalance = totalBetsPlaced - totalPaidOut
+expectedPool = totalBetsPlaced × (1 - 0.965)
+actualRTP = totalPaidOut / totalBetsPlaced
+~~~
 
-The target RTP is designed around:
+The guarded long-run target is 96.5%. The configured mode profiles are:
 
-```text
-96.5%
-```
+| Mode | Calibration target | Purpose |
+| --- | ---: | --- |
+| recovery | 89.0% | Protect the pool after substantial overpayment |
+| tight | 92.0% | Reduce payout pressure |
+| normal | 96.5% | Default balanced behavior |
+| generous | 98.0% | Raise payout potential while underpaying |
+| jackpot | 108.0% | Permit short high-payout periods under specific conditions |
 
-The engine uses the stored counters and derived pool values to determine the current game mode and adjust behavior.
+These mode targets are calibration references; they are not read as a guaranteed payout percentage for each short session.
 
-Available game modes:
+### Mode Selection
 
-| Mode | Purpose |
-| --- | --- |
-| `normal` | Default balanced gameplay mode |
-| `generous` | Increases payout potential when the game is underpaying |
-| `tight` | Reduces payout pressure when needed |
-| `jackpot` | Allows more aggressive payout potential under specific pool conditions |
-| `recovery` | Protects the pool after overpaying |
+- Spins 0–49 use normal mode.
+- If actual RTP is more than 10 percentage points below target, jackpot mode is selected.
+- If actual RTP is more than 10 percentage points above target, recovery mode is selected.
+- Otherwise a session mode is selected for 50–250 spins:
 
-This makes the game logic more advanced than a purely random symbol generator.
+| Mode | Session selection weight |
+| --- | ---: |
+| normal | 65% |
+| generous | 17% |
+| tight | 13% |
+| jackpot | 3% |
+| recovery | 2% |
 
----
+Firestore stores the counters, not the temporary session-mode choice. After a process restart, the next mode is derived again from the restored counters.
 
-## Pool Guard
-
-The Pool Guard protects the game economy by checking whether certain outcomes are affordable.
-
-It is used for:
-
-- maximum win calculation,
-- Free Spins affordability,
-- payout safety,
-- recovery behavior,
-- pool floor protection.
-
-It also exposes a Buy Feature affordability helper for diagnostics and stress scenarios. In the current in-game flow, the Buy Feature purchase is gated by the player's displayed balance, and the paid feature then forces the initial Free Spins trigger so direct bonus access is honored.
-
-This prevents regular spin outcomes from producing unlimited or unsafe payouts without checking the current pool state.
+Short runs and individual modes may differ materially from 96.5%. The percentage is a long-run guarded calibration target and is not independently certified.
 
 ---
 
-## Buy Feature
+## 8. Buy Feature
 
-Winner Spin includes a Buy Feature flow.
+Buy Feature costs:
 
-The Buy Feature allows the player to directly buy access to a Free Spins round by paying a fixed multiplier of the selected bet amount.
+~~~text
+price = selected base bet × 100
+~~~
 
-The current game flow checks whether the player can afford the displayed Buy Feature price. Once the purchase is paid, the spin is sent to the engine as a forced Free Spins trigger, while the separate pool affordability helper remains available for diagnostics and stress-test scenarios.
+The live UI checks the player's displayed balance. After payment:
 
-This feature makes the gameplay closer to modern slot game mechanics where players can choose between normal spins and direct bonus access.
+- the paid amount is charged;
+- a base-game calculation is sent with forced Free Spins trigger enabled;
+- a 4+ scatter result is produced;
+- 10 Free Spins begin after the award presentation is acknowledged.
 
----
-
-## Ante Bet
-
-The project includes an Ante Bet mode.
-
-Ante Bet changes the spin behavior by increasing the Free Spins trigger potential while affecting the cost/risk profile of the spin.
-
-This feature allows the player to choose between normal spins and a higher-risk feature-enhanced spin mode.
+PoolGuard.canAffordBuyFs remains available for diagnostics and stress tests, but it is not the live Buy Feature UI gate.
 
 ---
 
-## Auto Spin
+## 9. Ante Bet
 
-Winner Spin includes Auto Spin controls.
+Ante Bet changes cost and trigger probability:
 
-Auto Spin is handled through presentation and ViewModel state so that repeated spins can continue while still respecting game conditions such as:
+~~~text
+spin cost = selected base bet × 1.25
+base Free Spins trigger probability = configured rate × 2
+~~~
 
-- balance,
-- free spin state,
-- spin completion,
-- win presentation,
-- quick stop,
-- auto spin continuation guards.
+An additional calibration scale is applied to Free Spins hit frequency for a round entered through Ante. It does not alter the visible symbol payout table or replace totalWin.
 
-This prevents automatic spins from running without considering the current gameplay state.
+Ante applies only to a base-game entry. If that spin starts a Free Spins round, the round retains its Ante origin flag until it ends.
 
 ---
 
-## Quick Stop
+## 10. Auto Spin and Quick Stop
 
-The game supports Quick Stop interaction.
+### Normal Auto Spin
 
-When the player taps during reel animation, the animation flow can be shortened and the result can be presented faster.
+Normal Auto Spin tracks:
 
-This improves the game feel and gives the player more control over spin pacing.
+- requested and remaining spin count;
+- 1×–3× presentation speed;
+- balance availability;
+- active spin/tumble state;
+- manual stop;
+- completion and continuation guards.
+
+A normal auto-spin count is consumed when its paid spin starts.
+
+### Free Spins Autoplay
+
+Free Spins use a separate presentation controller. It does not consume the normal Auto Spin counter and cannot start while an award acknowledgement or another presentation stage is pending.
+
+### Quick Stop
+
+A tap during reel movement shortens the current visual sequence and presents the already calculated result sooner. It does not change the symbols, payout, multiplier, pool state, or recovery snapshot.
+
+### Virtual CREDIT
+
+The settings flow includes a virtual CREDIT top-up screen. It only increases the Firestore-backed in-game balance and does not process a real-money purchase or create real-world value.
+
+---
+
+## 11. Settlement and Interruption Recovery
+
+In normal presentation, the win reaches the displayed/remote balance when the spin completion sequence settles the result. That timing is intentionally kept after the tumble and multiplier presentation.
+
+For standard normal and active Free Spin paths, an exact recovery snapshot is written after calculation and before presentation completes. If the process is terminated:
+
+- the stored totalWin is used;
+- resulting balance, Free Spins, and pool counters are restored;
+- history is recorded once using spinId;
+- no new engine result is generated for that completed spin.
+
+The paid Buy Feature trigger spin currently follows its dedicated forced-trigger path and is outside the recovery-journal preparation path.
+
+---
+
+## 12. Tests and Calibration
+
+Fast regression coverage includes:
+
+- multiplier collection and payout behavior;
+- forced Buy Feature scatter results;
+- Free Spins award/autoplay state;
+- settlement and exact interrupted-spin recovery;
+- controller and widget behavior.
+
+Long-running diagnostics include:
+
+- general and per-mode RTP simulations;
+- mode-weight calibration;
+- Ante and bought-bonus RTP;
+- realistic player mixes;
+- tumble distribution;
+- whale/clustering stress scenarios.
+
+Run long simulations explicitly when engine weights, payout tables, pool logic, Ante, or Buy Feature changes. They are not intended as a fast smoke suite for presentation-only work.

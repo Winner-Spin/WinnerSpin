@@ -2,48 +2,57 @@
 
 EN English | [TR Türkçe](ARCHITECTURE_TR.md)
 
-This document describes the architecture, application flow, and technical design decisions used in Winner Spin.
+This document describes Winner Spin's current application structure, runtime flow, persistence boundaries, and performance-oriented services.
 
 ---
 
-## Overview
+## 1. Architectural Style
 
-Winner Spin follows a **Feature-First Layered MVVM architecture with Clean Architecture boundaries**.
+Winner Spin uses a **feature-first layered MVVM architecture with Clean Architecture-inspired boundaries**.
 
-The project is organized around features instead of placing every file into only global technical folders. This makes the authentication flow, slot game logic, presentation layer, and persistence logic easier to understand, maintain, test, and extend.
+The main goals are:
+
+- keep slot math independent of Flutter widgets and Firebase;
+- expose external storage through repository contracts;
+- keep screens focused on layout and interaction;
+- move state orchestration into a ViewModel and focused controllers;
+- isolate animation sequencing from deterministic game results;
+- make authentication, recovery, audio, and engine behavior testable.
+
+This is a pragmatic architecture, not a strict dependency-injection framework. The domain layer remains independent, while some presentation composition points select default concrete adapters. GameViewModel and SlotPersistenceController accept injected dependencies for tests but construct local/Firebase implementations when none are supplied.
 
 ---
 
-## Project Structure
+## 2. Repository Structure
 
-```text
+~~~text
 lib/
   app/
     app.dart
-
   core/
     audio/
     format/
+    network/
     widgets/
-
   features/
     auth/
-      data/
-        repositories/
+      data/repositories/
       domain/
+        models/
         repositories/
+        services/
       presentation/
+        models/
         viewmodels/
         views/
-
     slot/
-      data/
-        repositories/
+      data/repositories/
       domain/
         engine/
         enums/
         models/
         repositories/
+        services/
       presentation/
         audio/
         models/
@@ -51,163 +60,272 @@ lib/
         services/
         ui_controllers/
         viewmodels/
+          controllers/
         views/
-
-  images/
-    login_screen/
-    register_screen/
-    slot_main_screen/
-
+  firebase_options.dart
   main.dart
-```
+
+functions/
+  index.js
+
+test/
+  app/
+  core/
+  features/
+  *_test.dart
+~~~
+
+### Layer Responsibilities
+
+| Layer | Responsibility |
+| --- | --- |
+| app | Application root, authentication gate, and global lifecycle observation |
+| core | Cross-feature audio, connectivity, formatting, and reusable widgets |
+| auth/domain | Authentication contract, auth models, and password-reset policy |
+| auth/data | Firebase Authentication, Firestore profile, and callable-function adapter |
+| slot/domain | Slot rules, engine, pool model, result models, and persistence contracts |
+| slot/data | Firestore pool and local-file repository implementations |
+| presentation | Screens, ViewModels, state controllers, animation controllers, and asset/audio services |
+| functions | Callable account-deletion backend |
+
+Dependency direction is strongest around the domain layer:
+
+~~~text
+Presentation ──> Domain contracts/models <── Data implementations
+                         │
+                         └── Slot engine
+~~~
+
+Data and presentation may depend on Flutter/Firebase packages. Slot domain code does not depend on UI widgets or Firebase implementations.
 
 ---
 
-## Layer Responsibilities
+## 3. Application Startup and Global Lifecycle
 
-The architecture follows these principles:
+main.dart performs startup work before rendering the first screen:
 
-- `domain/` contains the slot math, game rules, models, enums, and repository contracts.
-- `data/` contains concrete persistence implementations such as Firestore-backed and local repositories.
-- `presentation/` contains screens, widgets, ViewModels, UI controllers, audio helpers, navigation helpers, and presentation services.
-- The domain layer does not depend on Flutter UI or Firebase implementation details.
-- Presentation depends on domain contracts instead of directly owning backend implementation logic.
-- Game logic and animated UI behavior are separated as much as possible.
+1. initializes Flutter bindings;
+2. loads the persisted ambient-music preference;
+3. configures the shared application audio context;
+4. initializes Firebase;
+5. enables immersive system UI;
+6. starts parsing the multiplier-bomb Lottie asset without blocking runApp;
+7. launches WinnerSpinApp.
 
-This structure helps keep the game engine testable while allowing the presentation layer to evolve independently.
-
----
-
-## Application Flow
-
-The app starts by initializing Flutter and Firebase, then launches the root application widget.
-
-The root app checks the current authentication state:
-
-```text
-User signed in      -> GameScreen
-User not signed in  -> LoginScreen
-```
-
-This creates a real application flow instead of opening the slot screen directly.
+WinnerSpinApp owns the application-wide lifecycle observer. Any state other than resumed pauses ambient music; returning to resumed requests playback only when music was requested and the persisted preference is enabled. This responsibility is intentionally at the app root so Login, Register, Email Verification, and Game screens behave consistently.
 
 ---
 
-## Authentication
+## 4. Authentication and Navigation
 
-Winner Spin includes Firebase Authentication based login and registration.
+The root authentication gate resolves one of three destinations:
 
-The authentication layer uses an abstract `AuthRepository` contract. This keeps authentication behavior separated from the UI and allows the Firebase implementation to stay inside the data layer.
+~~~text
+No authenticated user
+  └── LoginScreen
 
-Supported authentication behavior includes:
+Authenticated, email not verified
+  └── EmailVerificationScreen
 
-- User registration
-- User login
-- User logout
-- Current user id access
-- User data fetching
-- User data watching
-- Player state saving
-- Firebase auth error mapping
+Authenticated, email verified
+  └── GameScreen
+~~~
 
-When a new user is created, Firestore stores initial player data such as:
+### Registration
 
-```text
-uid
-username
-email
-createdAt
-balance
-userBalance
-freeSpinsRemaining
-```
+1. The presentation ViewModel validates user input.
+2. Firebase Authentication creates the email/password account.
+3. A users/{uid} Firestore profile is created with initial player state.
+4. Firebase sends its built-in email verification link.
+5. The user remains on EmailVerificationScreen until the verified claim is observed.
 
-This gives the project a real backend-connected player profile flow instead of making the game a local-only demo.
+The verification screen reloads the Firebase user when the application resumes and enforces a 60-second resend cooldown.
 
----
+### Sign-In and Profile Operations
 
-## GameViewModel
-
-`GameViewModel` acts as the main state orchestration layer for the slot screen.
-
-It coordinates smaller controllers responsible for:
-
-- balance state,
-- bet changes,
-- ante bet state,
-- free spin state,
-- auto spin state,
-- player session,
-- pool state,
-- persistence,
-- game feedback,
-- spin lifecycle,
-- tumble sequencing,
-- result settlement.
-
-This structure keeps the ViewModel focused on coordination instead of placing every gameplay and UI detail into a single large class.
+- Unverified users are redirected to verification instead of entering the game.
+- Profile data is observed from users/{uid}.
+- Avatar changes are validated against the symbol registry before being saved.
+- Password-reset requests are reserved in Firestore and limited to once every 24 hours.
+- Full account deletion calls the deleteAccount callable Cloud Function.
 
 ---
 
-## Presentation Layer
+## 5. Game Components and State Management
 
-The presentation layer includes more than a basic slot grid.
+GameScreen hosts the game screen's UI components and connects them to GameViewModel. GameViewModel coordinates gameplay state and process flows, delegating each responsibility to focused controllers instead of collecting all behavior in one class.
 
-It manages:
+### Responsibility Groups
 
-- main game screen,
-- animated reels,
-- bottom control panel,
-- bet controls,
-- balance display,
-- Free Spins overlay,
-- Free Spins award sequence,
-- Big Win / Super Win overlay,
-- flying win text,
-- scatter pulse effects,
-- multiplier visuals,
-- Buy Feature screen,
-- Auto Play settings,
-- Game Rules screen,
-- Game History screen,
-- System Settings screen,
-- audio and vibration controls.
+| Responsibility | Main components |
+| --- | --- |
+| Player state | BalanceController, PlayerSessionController, AnteController, FreeSpinsController |
+| Spin lifecycle | SpinRoundController, SlotSpinStartController, SpinLifecycleController |
+| Engine execution | SpinExecutionController, SlotSpinFlowController |
+| Result processing | TumbleSequenceController, SpinResultSettlementController, SlotSpinCompletionController |
+| Persistence | SlotPersistenceController, SlotSessionHydrationController, SlotSessionLifecycleController |
+| Automated play | AutoSpinController, SlotAutoSpinFlowController, FreeSpinAutoPlayController |
+| Visual presentation | GridController and UI controllers for wins, overlays, Free Spins, and multipliers |
+| Audio and haptics | GameFeedbackController and focused feedback helpers |
 
-The UI is separated into screens, widgets, UI controllers, models, services, audio helpers, and navigation helpers so that the main game screen does not own every detail directly.
+Presentation controllers sequence animations and overlays but do not recalculate the engine result. The calculated SpinResult remains the single source of truth.
 
 ---
 
-## Firebase & Persistence
+## 6. Spin Execution Flow
 
-The project uses Cloud Firestore for backend-backed player and pool persistence, while lightweight client-only records are handled locally where that keeps the flow simpler.
+The standard normal/Free Spin path is:
 
-Firestore is used for:
+~~~text
+Player or autoplay requests a spin
+  → availability and balance guards
+  → bet/Free Spin start state is reserved
+  → SpinExecutionController calls compute
+  → SlotEngine runs on a temporary background isolate
+  → PoolState and SpinResult return to the UI isolate
+  → exact recovery snapshot is written
+  → reels, tumbles, multipliers, and win presentation run
+  → result is settled into balance/history/pool
+  → remote state is persisted
+  → recovery snapshot is cleared when safe
+~~~
 
-- player profile data,
-- player balance,
-- free spins remaining,
-- pool state.
+The compute boundary moves grid generation and tumble simulation away from the UI isolate. Flutter animation, audio, and widget state stay on the main isolate.
 
-Game history is stored through a local file-backed repository, allowing recent play records to remain available to the UI without introducing an additional Firestore collection.
-
-Player state can be saved without forcing the UI to directly communicate with Firebase implementation details.
+Quick Stop changes presentation timing only. It does not reroll or replace the already calculated result.
 
 ---
 
-## Assets
+## 7. Persistence Model
 
-The project uses both `assets/` and `lib/images/` for visual and audio resources.
+### Firebase
 
-```text
-assets/
-  audio/
-  audio/Items/
-  animations/
+| Location | Stored data |
+| --- | --- |
+| Firebase Authentication | User identity and verified-email claim |
+| users/{uid} | Username, email, avatar, balance, last win, and Free Spins state |
+| users/{uid}.pool | totalBetsPlaced, totalPaidOut, and totalSpins |
 
-lib/images/
-  login_screen/
-  register_screen/
-  slot_main_screen/
-```
+Pool runtime values such as balance, expected pool, and current mode are derived from the stored counters. Pool counters are normally saved after 10 recorded paid spins and are also flushed by relevant session/lifecycle operations.
 
-These assets are used for login/register visuals, slot screen symbols, win presentation assets, audio feedback, and Lottie animations.
+### Local Application Files
+
+| Repository/store | Purpose |
+| --- | --- |
+| LocalGameHistoryRepository | Most recent 30 entries per user |
+| LocalSpinRecoveryRepository | Pending calculated spin snapshot per user |
+| LocalFirstLaunchDisclaimerRepository | First-launch disclaimer acknowledgement |
+| AmbientMusicPreferenceStore | Ambient-music enabled/disabled preference |
+
+History, spin recovery, and music preference use a temporary file followed by replacement/rename. Repository-side operation queues serialize writes where ordering matters. These are local atomic-write protections; they do not make separate Firestore operations a distributed transaction.
+
+---
+
+## 8. Interrupted-Spin Recovery
+
+For standard normal and Free Spin paths, a recovery snapshot is prepared after compute returns and before the result presentation completes.
+
+The snapshot contains:
+
+- a unique spinId and timestamp;
+- the exact calculated win amount;
+- the resulting player balance;
+- remaining and accumulated Free Spins state;
+- a pending +10 initial award or +5 retrigger when applicable;
+- Ante/Buy round flags;
+- the resulting pool counters;
+- the history bet and history identity.
+
+If the operating system terminates the process during presentation, startup loads this snapshot before normal play continues. The application restores the absolute resulting values, persists them, and records history once using spinId. It does not recalculate the symbols or win.
+
+In the normal completion path, the snapshot is finalized after settlement. When a Free Spins award popup is pending, the snapshot remains until the award is acknowledged so the next launch can restore the correct popup and state.
+
+Current scope: the recovery journal protects standard normal spins and active Free Spins. The paid Buy Feature trigger spin follows its dedicated forced-trigger flow and is not currently prepared through the recovery journal.
+
+---
+
+## 9. Free Spins Presentation Flow
+
+Free Spins use engine state and a separate presentation sequence:
+
+1. a base result awards 10 spins or an active round retriggers 5;
+2. the award transition and popup are presented;
+3. autoplay remains paused until the user acknowledges the popup;
+4. subsequent spins start automatically after all current presentation guards clear;
+5. a retrigger becomes visible when its +5 popup is shown;
+6. the summary is shown after the final spin presentation completes.
+
+The disabled spin control remains a display surface for the remaining count during this mode; Free Spins do not depend on manual spin-button input.
+
+---
+
+## 10. Audio Architecture
+
+### Ambient Music
+
+AmbientMusicService is an application-scope singleton with serialized synchronization:
+
+- playback requests, lifecycle changes, preference changes, and recovery requests are coalesced;
+- only one ambient player is maintained;
+- background states pause playback;
+- resumed playback respects the saved preference;
+- failures are log-throttled and use one delayed recovery path;
+- a replacement player is created only when recovery requires it.
+
+### Sound Effects
+
+Short effects use BoundedAudioPool:
+
+- low-latency playback mode where appropriate;
+- explicit maximum concurrent playback;
+- timed stop/release;
+- bounded idle players;
+- preload support;
+- safe disposal and throttled debug logging.
+
+UI click and multiplier-bomb effects are preloaded during startup/game initialization. This avoids repeatedly constructing unbounded media players during long sessions.
+
+---
+
+## 11. Image and Animation Lifecycle
+
+The asset pipeline avoids decoding every source image at full size immediately:
+
+- normal and Free Spins backgrounds decode to the device's physical width without exceeding source width;
+- opening-grid symbols are precached first;
+- remaining symbols are loaded in batches of three after a delay;
+- symbol images use a 256-pixel decode width;
+- multiplier labels use a 384-pixel decode width;
+- critical popup and multiplier assets are loaded early;
+- the Free Spins summary image is loaded for the relevant flow and explicitly evicted afterward;
+- the Free Spins background is prepared during game startup;
+- expensive playfield regions are isolated with repaint boundaries where appropriate.
+
+The bomb Lottie composition is parsed early, while its visual sequencing and pooled sound playback remain presentation concerns.
+
+---
+
+## 12. Testing Strategy
+
+The repository currently contains 45 Dart test files covering:
+
+- authentication ViewModels and verification UI;
+- password-reset limits;
+- application audio lifecycle and persisted preference;
+- bounded audio pools;
+- image-provider decode decisions;
+- slot controllers and Free Spins presentation;
+- exact interrupted-spin recovery and settlement;
+- symbol registry and multiplier assets;
+- RTP, mode calibration, Ante, Buy Feature, tumble distribution, and stress simulations.
+
+Run focused unit/widget tests for normal development. Root-level math simulations can execute millions of spins and should be selected explicitly when engine weights, payout rules, pool logic, Ante, or Buy Feature behavior changes.
+
+---
+
+## 13. Known Architectural Boundaries
+
+- The application is mobile-focused because local persistence directly uses dart:io.
+- Some concrete repositories are selected in presentation composition points; the project is not a strict pure-Clean-Architecture implementation.
+- Firestore player, pool, and local recovery writes are coordinated but are not one distributed atomic transaction.
+- Mode calibration targets are simulation references, not runtime guarantees for a short session.
