@@ -29,8 +29,6 @@ linter:
     - avoid_print
     - prefer_const_constructors
     - unnecessary_const
-    - unused_import
-    - unused_local_variable
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

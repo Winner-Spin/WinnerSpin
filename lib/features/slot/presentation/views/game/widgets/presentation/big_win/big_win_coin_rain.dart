@@ -29,7 +29,6 @@ class BigWinCoinsPainter extends CustomPainter {
   final double progress;
 
   static const _rimDark = Color(0xFF8B5A00);
-  static const _faceTop = Color(0xFFFFEB99);
   static const _faceBottom = Color(0xFFFFB627);
   static const _innerRing = Color(0xFFC8902B);
   static const _shineColor = Color(0xFFFFFDF0);

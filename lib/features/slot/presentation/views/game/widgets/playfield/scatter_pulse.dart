@@ -114,7 +114,6 @@ class _ScatterPulseState extends State<ScatterPulse>
           final burst = _burstExpand.value;
           final burstAlpha = _burstOpacity.value;
           final sparkle = _sparkleProgress.value;
-          final haloOpacity = math.max(glow, burstAlpha * 0.65);
 
           return Stack(
             alignment: Alignment.center,
