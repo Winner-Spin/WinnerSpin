@@ -44,6 +44,8 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 - Profil avatarı seçimi, çıkış, parola sıfırlama ve hesap silme
 - Parola sıfırlama isteklerinin hesap başına 24 saatte bir ile sınırlandırılması
 - Profil, bakiye, Ücretsiz Dönüşler ve oyuncuya özel havuz durumu için Firestore kalıcılığı
+- Profilleri kimliği doğrulanmış UID'ye göre izole eden, zorunlu başlangıç profil şemasını ve varsayılanlarını doğrulayan, kimliksiz veya hesaplar arası erişimi reddeden Firestore Güvenlik Kuralları
+- Sunucuya ait koleksiyonlara istemci erişimini reddeden ve emülatör testleriyle doğrulanan güvenlik sınırları
 
 ### Oynanış
 
@@ -100,6 +102,7 @@ lib/
   app/
   core/
     audio/
+    firebase/
     format/
     network/
     widgets/
@@ -125,12 +128,18 @@ lib/
         viewmodels/
         views/
   main.dart
+test/
+  app/
+  core/
+  features/
+  firebase/
+package.json
 ~~~
 
 - **Domain** slot kurallarını, motor modüllerini, modelleri, servisleri ve repository sözleşmelerini içerir.
 - **Data** Firebase ve yerel dosya repository uygulamalarını içerir.
 - **Presentation** ekranları, widget'ları, ViewModel'leri, UI controller'larını, navigasyonu, ses adaptörlerini ve sunum servislerini içerir.
-- **Core** uygulama geneli ses, biçimlendirme, bağlantı ve tekrar kullanılabilir arayüz araçlarını içerir.
+- **Core** uygulama geneli ses, Firebase başlatma, biçimlendirme, bağlantı ve tekrar kullanılabilir arayüz araçlarını içerir.
 
 Mimari, katı bir dependency-injection uygulaması yerine bilinçli olarak pragmatiktir: domain kodu Flutter arayüzünden ve Firebase'den bağımsızdır; bazı somut repository'ler ise presentation katmanındaki composition noktalarında oluşturulur.
 
@@ -231,6 +240,7 @@ Bazı simülasyon testleri bilinçli olarak uzun sürer ve yalnızca sunum deği
 ### Ön Koşullar
 
 - Dart ^3.10.8 ile uyumlu Flutter SDK
+- Firestore Güvenlik Kuralları testleri için Node.js 20 veya üzeri ve npm
 - Android Studio/Xcode ve yapılandırılmış bir mobil hedef
 - Bir Firebase projesi
 - Firebase'i yeniden yapılandırmak için Firebase CLI ve FlutterFire CLI
@@ -269,7 +279,9 @@ Yalnızca güncel uygulama akışının ihtiyaç duyduğu Firebase servislerini 
 
 Kesin ayrım için [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md) belgesine bakın.
 
-Android App Check, debug/profile derlemelerde debug provider; release derlemelerde Play Integrity kullanır. Yerel debug tokenlarını Firebase Console'a kaydedin ve hiçbir zaman commitlemeyin. Desteklenen tüm üretim istemcilerinden geçerli trafik doğrulanana kadar enforcement özelliğini kapalı tutun.
+Üretim Android uygulama kimliği `com.winnerspin.game`'dir. Firebase'e bu kimliği eksiksiz olarak kaydedin ve release sertifikasının SHA-1 ile SHA-256 parmak izlerini ekleyin. Google Play App Signing etkinleştirildikten sonra Play uygulama imzalama sertifikasının parmak izleri upload sertifikasından farklıysa onları da kaydedin.
+
+Android App Check, debug/profile derlemelerde debug provider; release derlemelerde Play Integrity kullanır. Yerel debug tokenlarını Firebase Console'a kaydedin ve hiçbir zaman commitlemeyin. Gerçek Play Integrity doğrulaması, Google Play Internal Testing kanalı üzerinden dağıtılan bir release derlemesi gerektirir; yerel olarak kurulan release derlemesi bu üretim kontrolünü tamamlamaz. App Check henüz iOS için etkinleştirilmediğinden, iOS üretim sağlayıcısı yapılandırılıp desteklenen tüm üretim istemcilerinden geçerli trafik metriklerde doğrulanana kadar enforcement özelliğini kapalı tutun.
 
 ### Android Release İmzalama
 

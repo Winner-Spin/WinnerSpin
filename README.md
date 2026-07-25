@@ -44,6 +44,8 @@ The current implementation combines a feature-first layered MVVM structure with 
 - Profile avatar selection, sign-out, password reset, and account deletion
 - Password-reset requests limited to once every 24 hours per account
 - Firestore persistence for profile, balance, Free Spins, and per-player pool state
+- Firestore Security Rules that isolate profiles by authenticated UID, validate the required initial profile schema and defaults, and reject unauthenticated or cross-account access
+- Emulator-tested security boundaries that deny client access to server-owned collections
 
 ### Gameplay
 
@@ -100,6 +102,7 @@ lib/
   app/
   core/
     audio/
+    firebase/
     format/
     network/
     widgets/
@@ -125,12 +128,18 @@ lib/
         viewmodels/
         views/
   main.dart
+test/
+  app/
+  core/
+  features/
+  firebase/
+package.json
 ~~~
 
 - **Domain** owns slot rules, engine modules, models, services, and repository contracts.
 - **Data** implements Firebase and local-file repositories.
 - **Presentation** owns screens, widgets, ViewModels, UI controllers, navigation, audio adapters, and presentation services.
-- **Core** contains application-wide audio, formatting, connectivity, and reusable UI utilities.
+- **Core** contains application-wide audio, Firebase initialization, formatting, connectivity, and reusable UI utilities.
 
 The architecture is intentionally pragmatic rather than a strict dependency-injection implementation: domain code is independent of Flutter UI and Firebase, while presentation composition points create some concrete repositories.
 
@@ -231,6 +240,7 @@ Some simulation tests are intentionally long-running and are not required for ev
 ### Prerequisites
 
 - Flutter SDK compatible with Dart ^3.10.8
+- Node.js 20 or newer with npm for the Firestore Security Rules tests
 - Android Studio/Xcode and a configured mobile target
 - A Firebase project
 - Firebase CLI and FlutterFire CLI for Firebase reconfiguration
@@ -269,7 +279,9 @@ Deploy only the Firebase services required by the active application flow. Email
 
 See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) for the exact distinction.
 
-Android App Check uses the debug provider in debug/profile builds and Play Integrity in release builds. Register local debug tokens in Firebase Console without committing them. Keep enforcement disabled until App Check metrics confirm valid traffic from every supported production client.
+The production Android application ID is `com.winnerspin.game`. Register this exact ID in Firebase and add the release certificate SHA-1 and SHA-256 fingerprints. After enabling Google Play App Signing, also register the Play app-signing certificate fingerprints when they differ from the upload certificate.
+
+Android App Check uses the debug provider in debug/profile builds and Play Integrity in release builds. Register local debug tokens in Firebase Console without committing them. Real Play Integrity validation requires a release build distributed through a Google Play Internal Testing track; a locally installed release build does not complete that production check. App Check is not currently activated for iOS, so keep enforcement disabled until an iOS production provider is configured and metrics confirm valid traffic from every supported production client.
 
 ### Android Release Signing
 
