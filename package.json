@@ -1,0 +1,15 @@
+{
+  "name": "winner-spin-security-tests",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "npm run test:firestore",
+    "test:firestore": "firebase emulators:exec --only firestore --project demo-winner-spin-rules \"node --test test/firebase/firestore.rules.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.16.0"
+  }
+}

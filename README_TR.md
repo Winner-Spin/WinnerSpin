@@ -82,7 +82,7 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 | Ses | audioplayers |
 | Yerel kalıcılık | dart:io, path_provider, atomik geçici dosya değiştirme |
 | Mimari | Clean Architecture'dan esinlenen sınırlarla feature-first katmanlı MVVM |
-| Test | Flutter Test, RTP simülasyonları, stres ve regresyon testleri |
+| Test | Flutter Test, Firebase Emulator Suite, RTP simülasyonları, stres ve regresyon testleri |
 | İş akışı | GitHub ve Jira tarzı WSPIN görev takibi |
 
 - Dart SDK kısıtı: **^3.10.8**
@@ -184,7 +184,7 @@ Uygulama seviyesindeki kurallar için [Oyun Mekanikleri](docs/GAME_MECHANICS_TR.
 
 ## Test ve Simülasyon
 
-Repository şu anda widget, controller, kalıcılık, yaşam döngüsü, ses, kurtarma, RTP ve stres kapsamı içeren 45 test dosyasına sahiptir. Kök dizindeki 11 test matematik tanısı veya simülasyon niteliğindedir ve çok sayıda dönüş işleyebilir.
+Repository şu anda 45 Dart test dosyasına ve bir Firestore Güvenlik Kuralları emülatör test paketine sahiptir. Kapsam; widget, controller, kalıcılık, yaşam döngüsü, ses, kurtarma, hesap izolasyonu, RTP ve stres davranışlarını içerir. Kök dizindeki 11 Dart testi matematik tanısı veya simülasyon niteliğindedir ve çok sayıda dönüş işleyebilir.
 
 Normal geliştirmede hızlı hedefli kontrolleri çalıştırın:
 
@@ -193,6 +193,13 @@ dart analyze
 flutter test test/app/app_lifecycle_test.dart
 flutter test test/core/audio
 flutter test test/features/slot/presentation/viewmodels/game_viewmodel_recovery_test.dart
+~~~
+
+Kök Node test bağımlılıklarını bir kez kurduktan sonra Firestore hesap izolasyonunu ve sunucuya ait koleksiyonları doğrulayın:
+
+~~~sh
+npm install
+npm run test:firestore
 ~~~
 
 Tam doğrulama gerektiğinde tüm paketi çalıştırın:

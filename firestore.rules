@@ -2,13 +2,43 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function hasValidInitialProfile(userId) {
+      return request.resource.data.keys().hasOnly([
+        'uid',
+        'username',
+        'email',
+        'emailVerified',
+        'profileAvatarId',
+        'createdAt',
+        'balance',
+        'userBalance',
+        'lastWin',
+        'freeSpinsRemaining',
+        'freeSpinAccumulatedWin',
+        'freeSpinsAwardedThisRound'
+      ])
+        && request.resource.data.uid == userId
+        && request.resource.data.username is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.emailVerified == false
+        && request.resource.data.profileAvatarId == 'pink_bear'
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.balance == 10000
+        && request.resource.data.userBalance == 10000
+        && request.resource.data.lastWin == 0
+        && request.resource.data.freeSpinsRemaining == 0
+        && request.resource.data.freeSpinAccumulatedWin == 0
+        && request.resource.data.freeSpinsAwardedThisRound == 0;
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.email == request.auth.token.email;
-      allow update: if request.auth != null
-        && request.auth.uid == userId
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidInitialProfile(userId);
+      allow update: if isOwner(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'userBalance',
           'lastWin',

@@ -82,7 +82,7 @@ The current implementation combines a feature-first layered MVVM structure with 
 | Audio | audioplayers |
 | Local persistence | dart:io, path_provider, atomic temporary-file replacement |
 | Architecture | Feature-first layered MVVM with Clean Architecture-inspired boundaries |
-| Testing | Flutter Test, RTP simulations, stress and regression tests |
+| Testing | Flutter Test, Firebase Emulator Suite, RTP simulations, stress and regression tests |
 | Workflow | GitHub and Jira-style WSPIN task tracking |
 
 - Dart SDK constraint: **^3.10.8**
@@ -184,7 +184,7 @@ See [Game Mechanics](docs/GAME_MECHANICS.md) for implementation-level rules.
 
 ## Testing and Simulation
 
-The repository currently contains 45 test files, including widget, controller, persistence, lifecycle, audio, recovery, RTP, and stress coverage. Eleven root-level tests are math diagnostics or simulations and may process a large number of spins.
+The repository currently contains 45 Dart test files plus a Firestore Security Rules emulator suite. Coverage includes widgets, controllers, persistence, lifecycle, audio, recovery, account isolation, RTP, and stress behavior. Eleven root-level Dart tests are math diagnostics or simulations and may process a large number of spins.
 
 Run fast targeted checks during normal development:
 
@@ -193,6 +193,13 @@ dart analyze
 flutter test test/app/app_lifecycle_test.dart
 flutter test test/core/audio
 flutter test test/features/slot/presentation/viewmodels/game_viewmodel_recovery_test.dart
+~~~
+
+Install the root Node test dependencies once, then validate Firestore account isolation and server-owned collections:
+
+~~~sh
+npm install
+npm run test:firestore
 ~~~
 
 Run the complete suite when full verification is required:

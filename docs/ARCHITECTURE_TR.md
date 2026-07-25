@@ -69,9 +69,12 @@ lib/
 functions/
   index.js
 
+package.json
+
 test/
   app/
   core/
+  firebase/
   features/
   *_test.dart
 ~~~
@@ -309,7 +312,7 @@ Bomba Lottie animasyon verisi önceden ayrıştırılır; görsel sıralaması v
 
 ## 12. Test Stratejisi
 
-Repository şu anda aşağıdaki alanları kapsayan 45 Dart test dosyası içerir:
+Repository şu anda aşağıdaki alanları kapsayan 45 Dart test dosyası ve bir Firestore Güvenlik Kuralları emülatör test paketi içerir:
 
 - kimlik doğrulama ViewModel'leri ve doğrulama arayüzü;
 - parola sıfırlama sınırı;
@@ -318,10 +321,11 @@ Repository şu anda aşağıdaki alanları kapsayan 45 Dart test dosyası içeri
 - image-provider decode kararları;
 - slot controller'ları ve Ücretsiz Dönüş sunumu;
 - kesin kesintili dönüş kurtarması ve sonuçlandırma;
+- Firestore hesap izolasyonu, başlangıç profili bütünlüğü ve sunucuya ait koleksiyonlar;
 - sembol registry'si ve çarpan varlıkları;
 - RTP, mod kalibrasyonu, Ante, Özellik Satın Alma, tumble dağılımı ve stres simülasyonları.
 
-Normal geliştirmede hedefli unit/widget testleri çalıştırılmalıdır. Kök seviyedeki matematik simülasyonları milyonlarca dönüş çalıştırabilir ve motor ağırlıkları, ödeme kuralları, havuz mantığı, Ante veya Özellik Satın Alma davranışı değiştiğinde açıkça seçilmelidir.
+Normal geliştirmede hedefli unit/widget testleri çalıştırılmalıdır. Firestore kuralları, kimlik doğrulama kalıcılığı veya Firebase veri yolları değiştiğinde `npm run test:firestore` çalıştırılmalıdır. Kök seviyedeki matematik simülasyonları milyonlarca dönüş çalıştırabilir ve motor ağırlıkları, ödeme kuralları, havuz mantığı, Ante veya Özellik Satın Alma davranışı değiştiğinde açıkça seçilmelidir.
 
 ---
 

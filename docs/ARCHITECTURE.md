@@ -69,9 +69,12 @@ lib/
 functions/
   index.js
 
+package.json
+
 test/
   app/
   core/
+  firebase/
   features/
   *_test.dart
 ~~~
@@ -309,7 +312,7 @@ The bomb Lottie composition is parsed early, while its visual sequencing and poo
 
 ## 12. Testing Strategy
 
-The repository currently contains 45 Dart test files covering:
+The repository currently contains 45 Dart test files and a Firestore Security Rules emulator suite covering:
 
 - authentication ViewModels and verification UI;
 - password-reset limits;
@@ -318,10 +321,11 @@ The repository currently contains 45 Dart test files covering:
 - image-provider decode decisions;
 - slot controllers and Free Spins presentation;
 - exact interrupted-spin recovery and settlement;
+- Firestore account isolation, initial-profile integrity, and server-owned collections;
 - symbol registry and multiplier assets;
 - RTP, mode calibration, Ante, Buy Feature, tumble distribution, and stress simulations.
 
-Run focused unit/widget tests for normal development. Root-level math simulations can execute millions of spins and should be selected explicitly when engine weights, payout rules, pool logic, Ante, or Buy Feature behavior changes.
+Run focused unit/widget tests for normal development. Run `npm run test:firestore` when Firestore rules, authentication persistence, or Firebase data paths change. Root-level math simulations can execute millions of spins and should be selected explicitly when engine weights, payout rules, pool logic, Ante, or Buy Feature behavior changes.
 
 ---
 
