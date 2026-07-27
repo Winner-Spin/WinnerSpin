@@ -11,25 +11,32 @@ The current implementation combines a feature-first layered MVVM structure with 
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-base-game.jpeg" width="240" alt="Winner Spin base game screen" />
-  <img src="docs/screenshots/winner-spin-free-spins.jpeg" width="240" alt="Winner Spin Free Spins screen" />
-  <img src="docs/screenshots/winner-spin-big-win.jpeg" width="240" alt="Winner Spin big win screen" />
+  <img src="docs/screenshots/home.png" width="240" alt="Winner Spin base game screen" />
+  <img src="docs/screenshots/free_spin.png" width="240" alt="Winner Spin Free Spins screen" />
+  <img src="docs/screenshots/sensational.png" width="240" alt="Winner Spin big win screen" />
 </p>
 
 ### Application Screens
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-login.jpeg" width="180" alt="Winner Spin login screen" />
-  <img src="docs/screenshots/winner-spin-register.jpeg" width="180" alt="Winner Spin registration screen" />
-  <img src="docs/screenshots/winner-spin-buy-feature.jpeg" width="180" alt="Winner Spin Buy Feature screen" />
+  <img src="docs/screenshots/register.png" width="180" alt="Winner Spin registration screen" />
+  <img src="docs/screenshots/buy_feature.png" width="180" alt="Winner Spin Buy Feature screen" />
+  <img src="docs/screenshots/auto_spin.png" width="180" alt="Winner Spin Auto Spin screen" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-auto-play.jpeg" width="180" alt="Winner Spin Auto Spin screen" />
-  <img src="docs/screenshots/winner-spin-settings.jpeg" width="180" alt="Winner Spin settings screen" />
-  <img src="docs/screenshots/winner-spin-game-rules.jpeg" width="180" alt="Winner Spin game rules screen" />
-  <img src="docs/screenshots/winner-spin-game-history.jpeg" width="180" alt="Winner Spin game history screen" />
-  <img src="docs/screenshots/winner-spin-free-spin-summary.jpeg" width="180" alt="Winner Spin Free Spins summary screen" />
+  <img src="docs/screenshots/settings.png" width="180" alt="Winner Spin settings screen" />
+  <img src="docs/screenshots/game_rules.png" width="180" alt="Winner Spin game rules screen" />
+  <img src="docs/screenshots/game_history.png" width="180" alt="Winner Spin game history screen" />
+  <img src="docs/screenshots/won.png" width="180" alt="Winner Spin Free Spins win screen" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/profile.png" width="180" alt="Winner Spin profile screen" />
+  <img src="docs/screenshots/avatar.png" width="180" alt="Winner Spin avatar selection screen" />
+  <img src="docs/screenshots/reset_email.png" width="180" alt="Winner Spin password reset screen" />
+  <img src="docs/screenshots/delete_account.png" width="180" alt="Winner Spin delete account screen" />
+  <img src="docs/screenshots/buy_game_money.png" width="180" alt="Winner Spin credit top-up screen" />
 </p>
 
 ---

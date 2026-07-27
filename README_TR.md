@@ -11,25 +11,32 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 ## Ekran Görüntüleri
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-base-game.jpeg" width="240" alt="Winner Spin ana oyun ekranı" />
-  <img src="docs/screenshots/winner-spin-free-spins.jpeg" width="240" alt="Winner Spin Ücretsiz Dönüşler ekranı" />
-  <img src="docs/screenshots/winner-spin-big-win.jpeg" width="240" alt="Winner Spin büyük kazanç ekranı" />
+  <img src="docs/screenshots/home.png" width="240" alt="Winner Spin ana oyun ekranı" />
+  <img src="docs/screenshots/free_spin.png" width="240" alt="Winner Spin Ücretsiz Dönüşler ekranı" />
+  <img src="docs/screenshots/sensational.png" width="240" alt="Winner Spin büyük kazanç ekranı" />
 </p>
 
 ### Uygulama Ekranları
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-login.jpeg" width="180" alt="Winner Spin giriş ekranı" />
-  <img src="docs/screenshots/winner-spin-register.jpeg" width="180" alt="Winner Spin kayıt ekranı" />
-  <img src="docs/screenshots/winner-spin-buy-feature.jpeg" width="180" alt="Winner Spin Özellik Satın Alma ekranı" />
+  <img src="docs/screenshots/register.png" width="180" alt="Winner Spin kayıt ekranı" />
+  <img src="docs/screenshots/buy_feature.png" width="180" alt="Winner Spin Özellik Satın Alma ekranı" />
+  <img src="docs/screenshots/auto_spin.png" width="180" alt="Winner Spin Otomatik Dönüş ekranı" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/winner-spin-auto-play.jpeg" width="180" alt="Winner Spin Otomatik Dönüş ekranı" />
-  <img src="docs/screenshots/winner-spin-settings.jpeg" width="180" alt="Winner Spin ayarlar ekranı" />
-  <img src="docs/screenshots/winner-spin-game-rules.jpeg" width="180" alt="Winner Spin oyun kuralları ekranı" />
-  <img src="docs/screenshots/winner-spin-game-history.jpeg" width="180" alt="Winner Spin oyun geçmişi ekranı" />
-  <img src="docs/screenshots/winner-spin-free-spin-summary.jpeg" width="180" alt="Winner Spin Ücretsiz Dönüş özeti ekranı" />
+  <img src="docs/screenshots/settings.png" width="180" alt="Winner Spin ayarlar ekranı" />
+  <img src="docs/screenshots/game_rules.png" width="180" alt="Winner Spin oyun kuralları ekranı" />
+  <img src="docs/screenshots/game_history.png" width="180" alt="Winner Spin oyun geçmişi ekranı" />
+  <img src="docs/screenshots/won.png" width="180" alt="Winner Spin Ücretsiz Dönüş kazanma ekranı" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/profile.png" width="180" alt="Winner Spin profil ekranı" />
+  <img src="docs/screenshots/avatar.png" width="180" alt="Winner Spin avatar seçim ekranı" />
+  <img src="docs/screenshots/reset_email.png" width="180" alt="Winner Spin şifre sıfırlama ekranı" />
+  <img src="docs/screenshots/delete_account.png" width="180" alt="Winner Spin hesap silme ekranı" />
+  <img src="docs/screenshots/buy_game_money.png" width="180" alt="Winner Spin kredi yükleme ekranı" />
 </p>
 
 ---
