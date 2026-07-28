@@ -292,13 +292,19 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> sendPasswordResetEmail(String uid, String email) async {}
 
   @override
+  Future<void> sendPasswordResetEmailForAddress(String email) async {}
+
+  @override
   Future<void> reloadCurrentUser() async {}
 
   @override
   Future<void> signOut() async {}
 
   @override
-  Future<void> deleteAccount() async {}
+  Future<void> deleteAccount(
+    String password, {
+    Future<void> Function()? onReauthenticated,
+  }) async {}
 
   @override
   Future<void> sendEmailVerificationLink() async {}

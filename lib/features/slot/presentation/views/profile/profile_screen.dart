@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/typography/app_fonts.dart';
 
 import '../../../../auth/domain/repositories/auth_repository.dart';
 import '../../../domain/models/slot_symbol.dart';
@@ -27,6 +27,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color _headerColor = Color(0xFFF6D7EB);
   static const Color _textColor = Color(0xFF2C2530);
   static const Color _goldColor = Color(0xFFE5A800);
+  static const Color _resetPasswordColor = Color(0xFF6750A4);
+  static const Color _deleteAccountColor = Color(0xFFC2185B);
 
   String? _savingAvatarId;
   bool _showAvatarOptions = false;
@@ -132,7 +134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           Text(
             _showAvatarOptions ? 'SELECT AVATAR' : 'MY PROFILE',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: _textColor,
@@ -238,20 +240,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           widget.viewModel.username,
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 24,
             fontWeight: FontWeight.w900,
             color: _textColor,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          widget.viewModel.email,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: _textColor.withValues(alpha: 0.62),
           ),
         ),
       ],
@@ -261,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _sectionTitle(String title) {
     return Text(
       title,
-      style: GoogleFonts.barlowCondensed(
+      style: AppFonts.barlowCondensed(
         fontSize: 19,
         fontWeight: FontWeight.w900,
         color: _textColor,
@@ -347,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
+              style: AppFonts.barlowCondensed(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 color: _textColor,
@@ -374,8 +366,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'FIRESTORE EMAIL',
-            style: GoogleFonts.barlowCondensed(
+            'EMAIL',
+            style: AppFonts.barlowCondensed(
               fontSize: 12,
               fontWeight: FontWeight.w800,
               color: _textColor.withValues(alpha: 0.52),
@@ -385,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           SelectableText(
             widget.viewModel.email,
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 17,
               fontWeight: FontWeight.w800,
               color: _textColor,
@@ -393,13 +385,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
+            key: const ValueKey('reset-password-button'),
             onPressed: _isSendingReset || _resetSentInCurrentSession
                 ? null
                 : _sendPasswordReset,
             style: FilledButton.styleFrom(
-              backgroundColor: _textColor,
+              backgroundColor: _resetPasswordColor,
               foregroundColor: Colors.white,
-              disabledBackgroundColor: _textColor.withValues(alpha: 0.45),
+              disabledBackgroundColor: _resetPasswordColor.withValues(
+                alpha: 0.45,
+              ),
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -425,36 +420,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   : _resetSentInCurrentSession
                   ? 'RESET EMAIL SENT'
                   : 'RESET PASSWORD',
-              style: GoogleFonts.barlowCondensed(
+              style: AppFonts.barlowCondensed(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.7,
               ),
             ),
           ),
-          if (_statusMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _statusMessage!,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: _statusIsError
-                    ? const Color(0xFFB3261E)
-                    : const Color(0xFF247A3D),
-              ),
-            ),
-          ],
-          const SizedBox(height: 18),
-          const Divider(color: Color(0x332C2530), height: 1),
-          const SizedBox(height: 18),
-          OutlinedButton.icon(
+          const SizedBox(height: 10),
+          FilledButton.icon(
             key: const ValueKey('delete-account-button'),
             onPressed: _accountActionInProgress ? null : _confirmDeleteAccount,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFB3261E),
-              side: const BorderSide(color: Color(0xFFB3261E), width: 1.5),
+            style: FilledButton.styleFrom(
+              backgroundColor: _deleteAccountColor,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _deleteAccountColor.withValues(
+                alpha: 0.45,
+              ),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.78),
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -466,20 +449,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Color(0xFFB3261E),
+                      color: Colors.white,
                     ),
                   )
                 : const Icon(Icons.delete_forever_rounded),
             label: Text(
               _isDeletingAccount ? 'DELETING ACCOUNT...' : 'DELETE ACCOUNT',
-              style: GoogleFonts.barlowCondensed(
+              style: AppFonts.barlowCondensed(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.7,
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _statusMessage!,
+              textAlign: TextAlign.center,
+              style: AppFonts.barlowCondensed(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _statusIsError
+                    ? const Color(0xFFB3261E)
+                    : const Color(0xFF247A3D),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          const Divider(color: Color(0x332C2530), height: 1),
+          const SizedBox(height: 18),
           FilledButton.icon(
             key: const ValueKey('log-out-button'),
             onPressed: _accountActionInProgress ? null : _signOut,
@@ -504,7 +503,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : const Icon(Icons.logout_rounded),
             label: Text(
               _isSigningOut ? 'LOGGING OUT...' : 'LOG OUT',
-              style: GoogleFonts.barlowCondensed(
+              style: AppFonts.barlowCondensed(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.7,
@@ -548,9 +547,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _statusIsError = false;
         _resetSentInCurrentSession = true;
         _statusMessage =
-            'Password reset email sent. After changing your password, return '
-            'to the app and sign in with your new password. You can request '
-            'it once every 24 hours.';
+            'Password reset email sent. Check your spam folder if you do not '
+            'see it. After changing your password, return to the app and sign '
+            'in with your new password. You can request it once every 24 '
+            'hours.';
       });
     } on PasswordResetLimitException catch (error) {
       if (!mounted) return;
@@ -573,50 +573,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _confirmDeleteAccount() async {
     UiClickSound.play();
-    final confirmed = await showDialog<bool>(
+    final password = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _headerColor,
-        title: Text(
-          'DELETE ACCOUNT?',
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w900,
-            color: _textColor,
-          ),
-        ),
-        content: Text(
-          'This permanently deletes your account and game data. '
-          'This action cannot be undone.',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _textColor,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('CANCEL'),
-          ),
-          FilledButton(
-            key: const ValueKey('confirm-delete-account-button'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFB3261E),
-            ),
-            child: const Text('DELETE'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) => const _DeleteAccountDialog(),
     );
-    if (confirmed != true || !mounted) return;
+    if (password == null || !mounted) return;
 
     setState(() {
       _isDeletingAccount = true;
       _statusMessage = null;
     });
     try {
-      await widget.viewModel.deleteAccount();
+      await widget.viewModel.deleteAccount(password);
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statusIsError = true;
+        // A wrong password is worth naming: the generic message would send the
+        // player looking for a fault that is not there.
+        _statusMessage =
+            error.code == AuthErrorCode.wrongPassword ||
+                error.code == AuthErrorCode.invalidCredential
+            ? 'Incorrect password. The account was not deleted.'
+            : 'Account could not be deleted. Please try again.';
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -669,5 +649,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month $hour:$minute';
+  }
+}
+
+/// Confirms account deletion and collects the password in one step.
+///
+/// Returns the password, or null when the player backs out. Asking for it here
+/// keeps the destructive action behind something only the account holder knows
+/// — an unlocked phone left on a table should not be enough.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  static const Color _headerColor = Color(0xFFF6D7EB);
+  static const Color _textColor = Color(0xFF2C2530);
+
+  final TextEditingController _password = TextEditingController();
+  bool _canDelete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _password.addListener(() {
+      final canDelete = _password.text.isNotEmpty;
+      if (canDelete != _canDelete) setState(() => _canDelete = canDelete);
+    });
+  }
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: _headerColor,
+      title: Text(
+        'DELETE ACCOUNT?',
+        style: AppFonts.barlowCondensed(
+          fontWeight: FontWeight.w900,
+          color: _textColor,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'This permanently deletes your account and game data. '
+            'This action cannot be undone. Enter your password to confirm.',
+            style: AppFonts.barlowCondensed(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: _textColor,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const ValueKey('delete-account-password'),
+            controller: _password,
+            obscureText: true,
+            autofocus: true,
+            style: AppFonts.barlowCondensed(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _textColor,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              labelStyle: AppFonts.barlowCondensed(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: _textColor.withValues(alpha: 0.7),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.7),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          key: const ValueKey('confirm-delete-account-button'),
+          // Disabled while empty: an accidental tap on a red button should not
+          // be one confirmation away from wiping the account.
+          onPressed: _canDelete
+              ? () => Navigator.of(context).pop(_password.text)
+              : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFB3261E),
+            disabledBackgroundColor: const Color(0xFFB3261E).withValues(
+              alpha: 0.4,
+            ),
+          ),
+          child: const Text('DELETE'),
+        ),
+      ],
+    );
   }
 }

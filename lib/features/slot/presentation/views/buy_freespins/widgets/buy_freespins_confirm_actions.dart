@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class BuyFreeSpinsConfirmActions extends StatelessWidget {
   const BuyFreeSpinsConfirmActions({
@@ -66,7 +66,7 @@ class _BuyFreeSpinsConfirmActionButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 23,
             fontWeight: FontWeight.w900,
             color: Colors.white,

@@ -5,6 +5,7 @@ import 'package:winner_spin/features/auth/presentation/views/email_verification_
 import 'package:winner_spin/features/slot/presentation/views/game/game_screen.dart';
 
 import 'features/auth/support/fake_auth_repository.dart';
+import 'core/network/support/fake_internet_connection_monitor.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,12 @@ void main() {
   ) async {
     final repository = FakeAuthRepository()..currentUserId = null;
 
-    await tester.pumpWidget(WinnerSpinApp(authRepository: repository));
+    await tester.pumpWidget(
+      WinnerSpinApp(
+        authRepository: repository,
+        internetConnectionMonitor: FakeInternetConnectionMonitor(),
+      ),
+    );
     await tester.pump();
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -29,7 +35,12 @@ void main() {
       ..currentUserEmail = 'player@example.com'
       ..currentUserEmailVerified = false;
 
-    await tester.pumpWidget(WinnerSpinApp(authRepository: repository));
+    await tester.pumpWidget(
+      WinnerSpinApp(
+        authRepository: repository,
+        internetConnectionMonitor: FakeInternetConnectionMonitor(),
+      ),
+    );
     await tester.pump();
     await tester.pump();
 

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/typography/app_fonts.dart';
 
-import '../../../slot/presentation/views/game/game_screen.dart';
+import '../../../slot/presentation/views/game/disclaimer_gate.dart';
 import '../../../slot/presentation/views/shared/widgets/spring_popup_card.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../viewmodels/email_verification_viewmodel.dart';
@@ -90,7 +90,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         return;
       }
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const GameScreen()),
+        MaterialPageRoute(builder: (_) => const DisclaimerGate()),
         (_) => false,
       );
     });
@@ -177,7 +177,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         children: [
           Text(
             'VERIFY EMAIL',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: _textColor,
@@ -237,7 +237,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         Text(
           'CHECK YOUR EMAIL',
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 22,
             fontWeight: FontWeight.w900,
             color: _textColor,
@@ -248,7 +248,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         Text(
           'We sent a verification link to',
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: _textColor.withValues(alpha: 0.64),
@@ -258,7 +258,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         Text(
           widget.email,
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 17,
             fontWeight: FontWeight.w900,
             color: _textColor,
@@ -280,7 +280,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
               Expanded(
                 child: Text(
                   'Open the email and tap VERIFY EMAIL. Then return to Winner Spin.',
-                  style: GoogleFonts.barlowCondensed(
+                  style: AppFonts.barlowCondensed(
                     fontSize: 15,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
@@ -296,7 +296,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           Text(
             _viewModel.message!,
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: _viewModel.messageIsError
@@ -332,7 +332,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
               : const Icon(Icons.verified_rounded),
           label: Text(
             _viewModel.isChecking ? 'CHECKING...' : "I'VE VERIFIED MY EMAIL",
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 17,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.7,
@@ -349,7 +349,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
             _viewModel.resendSecondsRemaining > 0
                 ? 'RESEND EMAIL (${_viewModel.resendSecondsRemaining}s)'
                 : 'RESEND EMAIL',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 15,
               fontWeight: FontWeight.w900,
               color: _viewModel.canResend
@@ -362,7 +362,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           onPressed: _isCancelling ? null : _cancel,
           child: Text(
             'USE A DIFFERENT ACCOUNT',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: _textColor.withValues(alpha: 0.64),

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/network/internet_connection_probe.dart';
@@ -14,24 +13,21 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
     InternetConnectionCheck? internetConnectionCheck,
     DateTime Function()? now,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions =
-           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1'),
        _internetConnectionCheck =
            internetConnectionCheck ?? hasInternetConnection,
        _now = now ?? DateTime.now;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
   final InternetConnectionCheck _internetConnectionCheck;
   final DateTime Function() _now;
 
   static const String _usersCollection = 'users';
+  static const String _emailVerificationsCollection = 'emailVerifications';
   static const String _passwordResetRequestedAtField =
       'passwordResetRequestedAt';
   static const String _passwordResetRequestIdField = 'passwordResetRequestId';
@@ -114,13 +110,44 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   @override
-  Future<void> deleteAccount() async {
-    try {
-      await _functions.httpsCallable('deleteAccount').call<void>();
-      await _auth.signOut();
-    } on FirebaseFunctionsException catch (error) {
-      throw AuthException(AuthErrorCode.unknown, error.message);
+  Future<void> deleteAccount(
+    String password, {
+    Future<void> Function()? onReauthenticated,
+  }) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) {
+      throw const AuthException(AuthErrorCode.userNotFound);
     }
+
+    try {
+      // Re-proving identity comes first, on purpose. Firebase rejects the
+      // delete outright on a stale sign-in, and doing it up front means a
+      // wrong password costs nothing — the data is still there to try again.
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: email, password: password),
+      );
+
+      // Anything that has to outlive the account is written here, in the gap
+      // between a proven password and the first deletion.
+      if (onReauthenticated != null) await onReauthenticated();
+
+      // Then the documents, while the account still exists: the rules key
+      // every one of them off `request.auth.uid`, so nothing here is reachable
+      // once the Auth user is gone.
+      await _deleteUserDocuments(user.uid);
+
+      await user.delete();
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(_mapFirebaseCode(error.code), error.message);
+    }
+  }
+
+  Future<void> _deleteUserDocuments(String uid) async {
+    final batch = _firestore.batch();
+    batch.delete(_firestore.collection(_usersCollection).doc(uid));
+    batch.delete(_firestore.collection(_emailVerificationsCollection).doc(uid));
+    await batch.commit();
   }
 
   @override
@@ -217,7 +244,6 @@ class FirebaseAuthRepository implements AuthRepository {
     final requestId = '$uid-${requestedAt.microsecondsSinceEpoch}';
     final userRef = _firestore.collection(_usersCollection).doc(uid);
     DateTime? previousRequestAt;
-    Object? previousRequestId;
 
     try {
       await _firestore.runTransaction((transaction) async {
@@ -226,61 +252,51 @@ class FirebaseAuthRepository implements AuthRepository {
         previousRequestAt = _readFirestoreDate(
           data?[_passwordResetRequestedAtField],
         );
-        previousRequestId = data?[_passwordResetRequestIdField];
+        // Checked here only to produce a friendly message with a retry time.
+        // The rule that actually holds is in firestore.rules, evaluated
+        // against the server clock — this one runs on a clock the player can
+        // set to whatever they like.
         PasswordResetRateLimiter.ensureAllowed(
           lastRequestAt: previousRequestAt,
           now: requestedAt,
         );
         transaction.set(userRef, {
-          _passwordResetRequestedAtField: Timestamp.fromDate(requestedAt),
+          // Server time, not the device's. The rules require exactly this, so
+          // a shifted clock cannot backdate the record and unlock an early
+          // retry.
+          _passwordResetRequestedAtField: FieldValue.serverTimestamp(),
           _passwordResetRequestIdField: requestId,
         }, SetOptions(merge: true));
       });
 
       await _auth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (e) {
-      await _rollbackPasswordResetReservation(
-        userRef: userRef,
-        requestId: requestId,
-        previousRequestAt: previousRequestAt,
-        previousRequestId: previousRequestId,
-      );
       throw AuthException(_mapFirebaseCode(e.code), e.message);
     } on PasswordResetLimitException {
       rethrow;
-    } catch (_) {
-      await _rollbackPasswordResetReservation(
-        userRef: userRef,
-        requestId: requestId,
-        previousRequestAt: previousRequestAt,
-        previousRequestId: previousRequestId,
-      );
+    } on FirebaseException catch (error) {
+      // The write is refused when the server says the day is not up, which is
+      // the case a tampered clock walks into.
+      if (error.code == 'permission-denied' && previousRequestAt != null) {
+        throw PasswordResetLimitException(
+          previousRequestAt!.add(PasswordResetRateLimiter.cooldown).toLocal(),
+        );
+      }
       rethrow;
     }
   }
 
-  Future<void> _rollbackPasswordResetReservation({
-    required DocumentReference<Map<String, dynamic>> userRef,
-    required String requestId,
-    required DateTime? previousRequestAt,
-    required Object? previousRequestId,
-  }) async {
+  @override
+  Future<void> sendPasswordResetEmailForAddress(String email) async {
+    // No Firestore reservation here, unlike the in-app flow. The caller is not
+    // signed in, so it knows no uid and the rules keep it away from
+    // `users/{uid}` — the 24-hour record simply cannot be written or read from
+    // this side. Enforcing it would need a server, so what is left is
+    // Firebase's own abuse protection on the endpoint.
     try {
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(userRef);
-        final data = snapshot.data();
-        if (data?[_passwordResetRequestIdField] != requestId) return;
-
-        transaction.set(userRef, {
-          _passwordResetRequestedAtField: previousRequestAt == null
-              ? FieldValue.delete()
-              : Timestamp.fromDate(previousRequestAt),
-          _passwordResetRequestIdField:
-              previousRequestId ?? FieldValue.delete(),
-        }, SetOptions(merge: true));
-      });
-    } catch (_) {
-      // Preserve the original password-reset error.
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(_mapFirebaseCode(error.code), error.message);
     }
   }
 

@@ -87,7 +87,7 @@ The current implementation combines a feature-first layered MVVM structure with 
 | --- | --- |
 | Mobile | Flutter, Dart |
 | Backend | Firebase Authentication, Cloud Firestore, Cloud Functions |
-| Presentation | Flutter widgets, Lottie, Google Fonts |
+| Presentation | Flutter widgets, Lottie, bundled fonts |
 | Audio | audioplayers |
 | Local persistence | dart:io, path_provider, atomic temporary-file replacement |
 | Architecture | Feature-first layered MVVM with Clean Architecture-inspired boundaries |
@@ -161,7 +161,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the full flow.
 | Authentication identity | Firebase Authentication | Email/password identity and verified-email claim |
 | Profile and player state | Cloud Firestore | Username, avatar, balance, last win, and Free Spins state |
 | Pool state | Cloud Firestore | Per-player bet, payout, and spin counters |
-| Game history | Local application file | Most recent 30 entries |
+| Game history | Local application file + Firestore (`users/{uid}.gameHistory`) | The device keeps every round; the newest 10 are mirrored to Firestore on app close and restore the list after a reinstall |
 | Pending spin recovery | Local application file | Exact calculated payout, balance, Free Spins state, pool snapshot, and history ID for standard normal/active Free Spin paths |
 | Disclaimer state | Local application file | First-launch acknowledgement |
 | Music preference | Local application file | Ambient-music enabled/disabled state |

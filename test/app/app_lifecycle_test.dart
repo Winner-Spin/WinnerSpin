@@ -4,6 +4,7 @@ import 'package:winner_spin/app/app.dart';
 import 'package:winner_spin/core/audio/ambient_music_service.dart';
 
 import '../features/auth/support/fake_auth_repository.dart';
+import '../core/network/support/fake_internet_connection_monitor.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,11 +15,13 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     final lifecycle = _RecordingAmbientMusicLifecycle();
     final repository = FakeAuthRepository()..currentUserId = null;
+    final internetMonitor = FakeInternetConnectionMonitor();
 
     await tester.pumpWidget(
       WinnerSpinApp(
         authRepository: repository,
         ambientMusicLifecycle: lifecycle,
+        internetConnectionMonitor: internetMonitor,
       ),
     );
     await tester.pump();
@@ -30,6 +33,7 @@ void main() {
 
     expect(lifecycle.pauseCalls, 1);
     expect(lifecycle.resumeCalls, 0);
+    expect(internetMonitor.pauseCalls, 1);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -38,6 +42,7 @@ void main() {
 
     expect(lifecycle.pauseCalls, 1);
     expect(lifecycle.resumeCalls, 1);
+    expect(internetMonitor.refreshCalls, 2);
 
     await tester.pumpWidget(const SizedBox());
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);

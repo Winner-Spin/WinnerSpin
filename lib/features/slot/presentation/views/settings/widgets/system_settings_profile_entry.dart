@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class SystemSettingsProfileEntry extends StatelessWidget {
   const SystemSettingsProfileEntry({
@@ -46,7 +46,7 @@ class SystemSettingsProfileEntry extends StatelessWidget {
                   children: [
                     Text(
                       'MY PROFILE',
-                      style: GoogleFonts.barlowCondensed(
+                      style: AppFonts.barlowCondensed(
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
                         color: textColor,
@@ -56,7 +56,7 @@ class SystemSettingsProfileEntry extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'AVATAR AND ACCOUNT SECURITY',
-                      style: GoogleFonts.barlowCondensed(
+                      style: AppFonts.barlowCondensed(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: textColor.withValues(alpha: 0.56),

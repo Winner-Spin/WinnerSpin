@@ -1,14 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/audio/ambient_music_service.dart';
+import '../core/network/internet_connection_monitor.dart';
+import '../core/update/app_build_info.dart';
+import '../core/update/firestore_required_version_source.dart';
+import '../core/update/app_update_monitor.dart';
+import '../core/widgets/internet_required_guard.dart';
+import '../core/widgets/update_required_guard.dart';
 import '../features/auth/data/repositories/firebase_auth_repository.dart';
 import '../features/auth/domain/repositories/auth_repository.dart';
 import '../features/auth/presentation/viewmodels/login_viewmodel.dart';
 import '../features/auth/presentation/views/email_verification_screen.dart';
 import '../features/auth/presentation/views/login_screen.dart';
-import '../features/slot/presentation/views/game/game_screen.dart';
+import '../features/slot/presentation/views/game/disclaimer_gate.dart';
 
 /// Root application widget.
 class WinnerSpinApp extends StatefulWidget {
@@ -16,10 +23,19 @@ class WinnerSpinApp extends StatefulWidget {
     super.key,
     this.authRepository,
     this.ambientMusicLifecycle,
+    this.internetConnectionMonitor,
+    this.appUpdateMonitor,
   });
+
+  /// Where the update prompt sends the player when the Firestore config
+  /// document carries no `storeUrl` of its own.
+  static const appStoreId = '6795310235';
+  static const appStoreUrl = 'https://apps.apple.com/app/id$appStoreId';
 
   final AuthRepository? authRepository;
   final AmbientMusicLifecycle? ambientMusicLifecycle;
+  final InternetConnectionMonitor? internetConnectionMonitor;
+  final AppUpdateMonitor? appUpdateMonitor;
 
   @override
   State<WinnerSpinApp> createState() => _WinnerSpinAppState();
@@ -28,6 +44,10 @@ class WinnerSpinApp extends StatefulWidget {
 class _WinnerSpinAppState extends State<WinnerSpinApp>
     with WidgetsBindingObserver {
   late final AmbientMusicLifecycle _ambientMusicLifecycle;
+  late final InternetConnectionMonitor _internetConnectionMonitor;
+  late final AppUpdateMonitor _appUpdateMonitor;
+  late final bool _ownsInternetConnectionMonitor;
+  late final bool _ownsAppUpdateMonitor;
   bool? _isForeground;
 
   @override
@@ -35,6 +55,17 @@ class _WinnerSpinAppState extends State<WinnerSpinApp>
     super.initState();
     _ambientMusicLifecycle =
         widget.ambientMusicLifecycle ?? AmbientMusicService.instance;
+    _ownsInternetConnectionMonitor = widget.internetConnectionMonitor == null;
+    _internetConnectionMonitor =
+        widget.internetConnectionMonitor ?? AppInternetConnectionMonitor();
+    _ownsAppUpdateMonitor = widget.appUpdateMonitor == null;
+    _appUpdateMonitor = widget.appUpdateMonitor ?? _createAppUpdateMonitor();
+    unawaited(_appUpdateMonitor.refresh());
+    unawaited(
+      _internetConnectionMonitor.start().then(
+        (_) => _internetConnectionMonitor.refresh(),
+      ),
+    );
     final lifecycleState = WidgetsBinding.instance.lifecycleState;
     _isForeground = lifecycleState == null
         ? null
@@ -42,6 +73,7 @@ class _WinnerSpinAppState extends State<WinnerSpinApp>
     WidgetsBinding.instance.addObserver(this);
     if (_isForeground == false) {
       unawaited(_ambientMusicLifecycle.pauseForLifecycle());
+      unawaited(_internetConnectionMonitor.pause());
     }
   }
 
@@ -56,11 +88,37 @@ class _WinnerSpinAppState extends State<WinnerSpinApp>
           ? _ambientMusicLifecycle.resumeAfterLifecycle()
           : _ambientMusicLifecycle.pauseForLifecycle(),
     );
+    if (isForeground) {
+      // Re-checked on resume so the block clears right after the user returns
+      // from the App Store, without needing a cold start.
+      unawaited(_appUpdateMonitor.refresh());
+      unawaited(
+        _internetConnectionMonitor.start().then(
+          (_) => _internetConnectionMonitor.refresh(),
+        ),
+      );
+    } else {
+      unawaited(_internetConnectionMonitor.pause());
+    }
+  }
+
+  AppUpdateMonitor _createAppUpdateMonitor() {
+    return StoreAppUpdateMonitor(
+      source: FirestoreRequiredVersionSource(),
+      installedVersion: () async => kAppVersion,
+      fallbackStoreUrl: WinnerSpinApp.appStoreUrl,
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (_ownsInternetConnectionMonitor) {
+      _internetConnectionMonitor.dispose();
+    }
+    if (_ownsAppUpdateMonitor) {
+      _appUpdateMonitor.dispose();
+    }
     super.dispose();
   }
 
@@ -72,6 +130,16 @@ class _WinnerSpinAppState extends State<WinnerSpinApp>
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+      ),
+      // Offline wins over the update prompt: with no connection the update
+      // check cannot conclude anything, so the connection warning is the
+      // actionable one.
+      builder: (context, child) => InternetRequiredGuard(
+        monitor: _internetConnectionMonitor,
+        child: UpdateRequiredGuard(
+          monitor: _appUpdateMonitor,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       home: _AuthGate(authRepository: widget.authRepository),
     );
@@ -108,7 +176,7 @@ class _AuthGateState extends State<_AuthGate> {
     }
 
     if (_authRepository.currentUserId == null) return _loginScreen();
-    if (_authRepository.currentUserEmailVerified) return const GameScreen();
+    if (_authRepository.currentUserEmailVerified) return const DisclaimerGate();
 
     final email = _authRepository.currentUserEmail;
     if (email == null || email.isEmpty) {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 import 'custom_switch.dart';
 
@@ -30,7 +30,7 @@ class SystemSettingsRow extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.barlowCondensed(
+                style: AppFonts.barlowCondensed(
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
                   color: textColor,
@@ -39,7 +39,7 @@ class SystemSettingsRow extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 description,
-                style: GoogleFonts.barlowCondensed(
+                style: AppFonts.barlowCondensed(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: textColor.withValues(alpha: 0.58),

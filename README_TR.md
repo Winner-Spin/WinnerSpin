@@ -87,7 +87,7 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 | --- | --- |
 | Mobil | Flutter, Dart |
 | Backend | Firebase Authentication, Cloud Firestore, Cloud Functions |
-| Sunum | Flutter widget'ları, Lottie, Google Fonts |
+| Sunum | Flutter widget'ları, Lottie, gömülü fontlar |
 | Ses | audioplayers |
 | Yerel kalıcılık | dart:io, path_provider, atomik geçici dosya değiştirme |
 | Mimari | Clean Architecture'dan esinlenen sınırlarla feature-first katmanlı MVVM |
@@ -161,7 +161,7 @@ Akışın tamamı için [Mimari](docs/ARCHITECTURE_TR.md) belgesine bakın.
 | Kimlik doğrulama kimliği | Firebase Authentication | E-posta/parola kimliği ve doğrulanmış e-posta claim'i |
 | Profil ve oyuncu durumu | Cloud Firestore | Kullanıcı adı, avatar, bakiye, son kazanç ve Ücretsiz Dönüş durumu |
 | Havuz durumu | Cloud Firestore | Oyuncuya özel bahis, ödeme ve dönüş sayaçları |
-| Oyun geçmişi | Yerel uygulama dosyası | En son 30 kayıt |
+| Oyun geçmişi | Yerel uygulama dosyası + Firestore (`users/{uid}.gameHistory`) | Cihazda tüm kayıtlar tutulur; en son 10 kayıt uygulama kapanınca Firestore'a yazılır ve yeniden kurulumda geçmişi geri getirir |
 | Bekleyen dönüş kurtarması | Yerel uygulama dosyası | Standart normal/aktif Ücretsiz Dönüş yolları için kesin hesaplanan ödeme, bakiye, Ücretsiz Dönüş durumu, havuz anlık görüntüsü ve geçmiş kimliği |
 | Bilgilendirme durumu | Yerel uygulama dosyası | İlk açılış onayı |
 | Müzik tercihi | Yerel uygulama dosyası | Ortam müziğinin açık/kapalı durumu |

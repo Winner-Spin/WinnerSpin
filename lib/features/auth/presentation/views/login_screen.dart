@@ -1,14 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/typography/app_fonts.dart';
 
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
 import 'email_verification_screen.dart';
+import 'forgot_password_dialog.dart';
 import 'register_screen.dart';
-import '../../../slot/presentation/views/game/game_screen.dart';
+import '../../../slot/presentation/views/game/disclaimer_gate.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.viewModel});
@@ -130,6 +131,13 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
 
                   Positioned(
+                    top: screenH * 0.655,
+                    left: screenW * 0.15,
+                    right: screenW * 0.15,
+                    child: Center(child: _buildForgotPasswordLink(context)),
+                  ),
+
+                  Positioned(
                     top: screenH * 0.70,
                     left: screenW * 0.25,
                     right: screenW * 0.25,
@@ -208,13 +216,60 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Widget _buildForgotPasswordLink(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('forgot-password-link'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _openForgotPassword(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Text(
+            'FORGOT PASSWORD?',
+            textAlign: TextAlign.center,
+            style: AppFonts.barlowCondensed(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.6,
+              decoration: TextDecoration.underline,
+              decorationColor: Colors.white,
+              shadows: const [
+                Shadow(
+                  color: Colors.black54,
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openForgotPassword(BuildContext context) {
+    // Any message left from a previous attempt would otherwise greet the
+    // player before they have asked for anything.
+    _viewModel.clearPasswordResetMessage();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ForgotPasswordDialog(
+        viewModel: _viewModel,
+        initialEmail: _viewModel.emailController.text,
+      ),
+    );
+  }
+
   void _handleLoginSuccess(BuildContext context) {
     if (!mounted) return;
     if (_viewModel.loginSuccess) {
       _viewModel.resetLoginSuccess();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const GameScreen()),
+        MaterialPageRoute(builder: (context) => const DisclaimerGate()),
       );
     }
   }
@@ -301,14 +356,14 @@ class _LoginScreenState extends State<LoginScreen>
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 color: Colors.white.withValues(alpha: 0.95),
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: GoogleFonts.nunito(
+                hintStyle: AppFonts.nunito(
                   color: const Color(0xFFFFF0C2).withValues(alpha: 0.74),
                   fontSize: 18,
                   fontWeight: FontWeight.w800,

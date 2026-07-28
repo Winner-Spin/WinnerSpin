@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../../core/typography/app_fonts.dart';
 
 import '../win/win_amount_counter.dart';
 
@@ -21,7 +21,7 @@ class BigWinAmountBanner extends StatelessWidget {
   final bool skipCountUp;
   final bool vibrationEnabled;
 
-  static final TextStyle _amountStyle = GoogleFonts.outfit(
+  static final TextStyle _amountStyle = AppFonts.outfit(
     color: Colors.white,
     fontSize: 38,
     fontWeight: FontWeight.w900,

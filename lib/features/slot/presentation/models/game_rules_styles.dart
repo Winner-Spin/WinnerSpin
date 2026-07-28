@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/typography/app_fonts.dart';
 
 class GameRulesStyles {
   const GameRulesStyles._();
@@ -9,7 +9,7 @@ class GameRulesStyles {
   static const Color textColor = Color(0xFF2C2530);
 
   static TextStyle headerTitle() {
-    return GoogleFonts.barlowCondensed(
+    return AppFonts.barlowCondensed(
       fontSize: 27,
       fontWeight: FontWeight.w900,
       color: textColor,
@@ -18,7 +18,7 @@ class GameRulesStyles {
   }
 
   static TextStyle sectionTitle() {
-    return GoogleFonts.barlowCondensed(
+    return AppFonts.barlowCondensed(
       fontSize: 17,
       fontWeight: FontWeight.w800,
       color: textColor,
@@ -27,7 +27,7 @@ class GameRulesStyles {
   }
 
   static TextStyle bodyText() {
-    return GoogleFonts.nunito(
+    return AppFonts.nunito(
       fontSize: 12.5,
       fontWeight: FontWeight.w600,
       color: textColor.withValues(alpha: 0.88),
@@ -36,7 +36,7 @@ class GameRulesStyles {
   }
 
   static TextStyle varianceLabel() {
-    return GoogleFonts.barlowCondensed(
+    return AppFonts.barlowCondensed(
       fontSize: 14,
       fontWeight: FontWeight.w800,
       color: textColor,
@@ -45,7 +45,7 @@ class GameRulesStyles {
   }
 
   static TextStyle payoutText() {
-    return GoogleFonts.barlowCondensed(
+    return AppFonts.barlowCondensed(
       fontSize: 13.5,
       fontWeight: FontWeight.w700,
       color: textColor.withValues(alpha: 0.90),

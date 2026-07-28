@@ -1,5 +1,6 @@
 import 'balance_controller.dart';
 import 'free_spins_controller.dart';
+import 'game_history_controller.dart';
 import 'player_session_controller.dart';
 import 'slot_persistence_controller.dart';
 import 'slot_pool_controller.dart';
@@ -75,14 +76,22 @@ class SlotSessionLifecycleController {
     required SlotPersistenceController persistenceController,
     required BalanceController balanceController,
     required FreeSpinsController freeSpinsController,
+    required GameHistoryController historyController,
   }) {
+    // Capture the id before sign-out clears it.
+    final userId = persistenceController.currentUserId;
     return sessionController.signOut(
-      forceSave: () => forceSavePool(
-        poolController: poolController,
-        persistenceController: persistenceController,
-        balanceController: balanceController,
-        freeSpinsController: freeSpinsController,
-      ),
+      forceSave: () async {
+        await Future.wait<void>([
+          forceSavePool(
+            poolController: poolController,
+            persistenceController: persistenceController,
+            balanceController: balanceController,
+            freeSpinsController: freeSpinsController,
+          ),
+          historyController.flushRemote(userId),
+        ]);
+      },
       signOut: persistenceController.signOut,
     );
   }
@@ -90,24 +99,31 @@ class SlotSessionLifecycleController {
   Future<void> deleteAccount({
     required PlayerSessionController sessionController,
     required SlotPersistenceController persistenceController,
+    required String password,
   }) {
     return sessionController.deleteAccount(
-      deleteAccount: persistenceController.deleteAccount,
+      deleteAccount: () => persistenceController.deleteAccount(password),
     );
   }
 
+  /// Runs when the app leaves the foreground (inactive/paused/hidden/detached).
+  /// This is the only place the game history is mirrored to Firestore.
   Future<void> onAppLifecycleEvent({
     required SlotPoolController poolController,
     required SlotPersistenceController persistenceController,
     required BalanceController balanceController,
     required FreeSpinsController freeSpinsController,
-  }) {
-    return forceSavePool(
-      poolController: poolController,
-      persistenceController: persistenceController,
-      balanceController: balanceController,
-      freeSpinsController: freeSpinsController,
-    );
+    required GameHistoryController historyController,
+  }) async {
+    await Future.wait<void>([
+      forceSavePool(
+        poolController: poolController,
+        persistenceController: persistenceController,
+        balanceController: balanceController,
+        freeSpinsController: freeSpinsController,
+      ),
+      historyController.flushRemote(persistenceController.currentUserId),
+    ]);
   }
 
   Future<bool> validateSessionOnResume({

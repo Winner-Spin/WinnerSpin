@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../typography/app_fonts.dart';
 
 class MoneySymbol extends StatelessWidget {
   final TextStyle style;
@@ -119,7 +119,7 @@ class MoneySymbolPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final fontSize = style.fontSize ?? size.height;
-    final symbolStyle = GoogleFonts.outfit(
+    final symbolStyle = AppFonts.outfit(
       textStyle: style,
       fontSize: fontSize,
       fontWeight: FontWeight.w900,

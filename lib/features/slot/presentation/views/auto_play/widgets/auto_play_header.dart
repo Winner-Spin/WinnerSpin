@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class AutoPlayHeader extends StatelessWidget {
   const AutoPlayHeader({
@@ -29,7 +29,7 @@ class AutoPlayHeader extends StatelessWidget {
         children: [
           Text(
             'AUTO SPIN',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: textColor,

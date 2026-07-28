@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class GameHistoryEmptyState extends StatelessWidget {
   const GameHistoryEmptyState({
@@ -24,7 +24,7 @@ class GameHistoryEmptyState extends StatelessWidget {
       child: Text(
         'NO GAME HISTORY YET',
         textAlign: TextAlign.center,
-        style: GoogleFonts.barlowCondensed(
+        style: AppFonts.barlowCondensed(
           fontSize: 14,
           fontWeight: FontWeight.w800,
           color: textColor.withValues(alpha: 0.55),

@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/features/auth/domain/repositories/auth_repository.dart';
+import 'package:winner_spin/features/slot/domain/models/game_history_entry.dart';
 import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
+import 'package:winner_spin/features/slot/domain/repositories/game_history_repository.dart';
 import 'package:winner_spin/features/slot/domain/repositories/pool_repository.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/balance_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/free_spins_controller.dart';
+import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/game_history_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/player_session_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_persistence_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_pool_controller.dart';
@@ -25,13 +28,22 @@ void main() {
     final balanceController = BalanceController()..awardWin(40);
     final freeSpinsController = FreeSpinsController()
       ..awardInitial(initialWin: 15);
+    final remoteHistory = _MemoryHistoryRepository();
+    final historyController = GameHistoryController(
+      _MemoryHistoryRepository(),
+      remote: remoteHistory,
+    )..record(userId: 'user-1', newBalance: 10040, bet: 100, winAmount: 40);
 
     await SlotSessionLifecycleController().onAppLifecycleEvent(
       poolController: poolController,
       persistenceController: persistenceController,
       balanceController: balanceController,
       freeSpinsController: freeSpinsController,
+      historyController: historyController,
     );
+
+    expect(remoteHistory.saveCalls, 1);
+    expect(remoteHistory.lastSaved, hasLength(1));
 
     final savedPlayer = (await authRepository.getUserData('user-1'))!;
     expect(poolRepository.saveCalls, 1);
@@ -219,7 +231,10 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
-  Future<void> deleteAccount() => throw UnimplementedError();
+  Future<void> deleteAccount(
+    String password, {
+    Future<void> Function()? onReauthenticated,
+  }) => throw UnimplementedError();
 
   @override
   Future<void> reloadCurrentUser() async {
@@ -249,6 +264,25 @@ class _MemoryAuthRepository implements AuthRepository {
   @override
   Future<void> sendPasswordResetEmail(String uid, String email) async {
     passwordResetEmail = email;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmailForAddress(String email) async {}
+}
+
+class _MemoryHistoryRepository implements GameHistoryRepository {
+  int saveCalls = 0;
+  List<GameHistoryEntry> lastSaved = const [];
+  List<GameHistoryEntry> stored = const [];
+
+  @override
+  Future<List<GameHistoryEntry>> load(String userId) async => stored;
+
+  @override
+  Future<void> save(String userId, List<GameHistoryEntry> entries) async {
+    saveCalls++;
+    lastSaved = List.of(entries);
+    stored = List.of(entries);
   }
 }
 

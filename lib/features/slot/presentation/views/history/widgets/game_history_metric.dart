@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class GameHistoryMetric extends StatelessWidget {
   const GameHistoryMetric({
@@ -26,7 +26,7 @@ class GameHistoryMetric extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 11,
             fontWeight: FontWeight.w700,
             color: textColor.withValues(alpha: 0.48),
@@ -45,7 +45,7 @@ class GameHistoryMetric extends StatelessWidget {
                   value!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.barlowCondensed(
+                  style: AppFonts.barlowCondensed(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     color: valueColor ?? textColor,

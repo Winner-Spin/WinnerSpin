@@ -43,8 +43,12 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount() async {
+  Future<void> deleteAccount(
+    String password, {
+    Future<void> Function()? onReauthenticated,
+  }) async {
     deleteAccountCalls++;
+    await onReauthenticated?.call();
   }
 
   @override
@@ -71,6 +75,9 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> sendPasswordResetEmail(String uid, String email) async {}
+
+  @override
+  Future<void> sendPasswordResetEmailForAddress(String email) async {}
 
   @override
   Future<void> savePlayerState(

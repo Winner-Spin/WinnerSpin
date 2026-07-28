@@ -58,3 +58,7 @@ login_page.png
 .agents/
 
 symbol_payouts.md
+
+# Firebase admin credentials - never commit
+serviceAccount*.json
+*-firebase-adminsdk-*.json

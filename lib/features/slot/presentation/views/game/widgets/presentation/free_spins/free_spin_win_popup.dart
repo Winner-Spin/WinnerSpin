@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../models/game_presentation_timings.dart';
 
@@ -96,7 +96,7 @@ class _FreeSpinWinPopupState extends State<FreeSpinWinPopup>
                     child: Text(
                       '${widget.value}',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
+                      style: AppFonts.outfit(
                         fontSize: valueFontSize,
                         fontWeight: FontWeight.w900,
                         height: 1.0,

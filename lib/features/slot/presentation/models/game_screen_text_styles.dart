@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/typography/app_fonts.dart';
 
 class GameScreenTextStyles {
   final TextStyle statusBase;
@@ -27,7 +27,7 @@ class GameScreenTextStyles {
       ),
     ];
 
-    final statusBase = GoogleFonts.anton(
+    final statusBase = AppFonts.anton(
       color: Colors.white.withValues(alpha: 0.97),
       fontSize: 20,
       letterSpacing: 0.8,
@@ -46,7 +46,7 @@ class GameScreenTextStyles {
       statusBase: statusBase,
       statusAccent: statusBase.copyWith(color: const Color(0xFFFFD13B)),
       statusInsufficient: statusBase.copyWith(color: const Color(0xFFFF6A6A)),
-      bottomLabel: GoogleFonts.barlowCondensed(
+      bottomLabel: AppFonts.barlowCondensed(
         color: const Color(0xFFFFD13B),
         fontSize: 18,
         fontWeight: FontWeight.w800,
@@ -54,7 +54,7 @@ class GameScreenTextStyles {
         height: 1.0,
         shadows: softShadow,
       ),
-      bottomValue: GoogleFonts.barlowCondensed(
+      bottomValue: AppFonts.barlowCondensed(
         color: Colors.white.withValues(alpha: 0.98),
         fontSize: 18,
         fontWeight: FontWeight.w800,
@@ -62,7 +62,7 @@ class GameScreenTextStyles {
         height: 1.0,
         shadows: softShadow,
       ),
-      bottomClock: GoogleFonts.barlowCondensed(
+      bottomClock: AppFonts.barlowCondensed(
         color: Colors.white.withValues(alpha: 0.62),
         fontSize: 9.2,
         fontWeight: FontWeight.w500,

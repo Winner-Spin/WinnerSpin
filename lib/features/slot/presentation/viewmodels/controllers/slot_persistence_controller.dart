@@ -6,6 +6,9 @@ import '../../../../auth/data/repositories/firebase_auth_repository.dart';
 import '../../../../auth/domain/repositories/auth_repository.dart';
 import '../../../data/repositories/firestore_pool_repository.dart';
 import '../../../data/repositories/local_spin_recovery_repository.dart';
+import '../../../data/repositories/firestore_disclaimer_acceptance_repository.dart';
+import '../../../data/repositories/local_user_data_eraser.dart';
+import '../../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../../../domain/models/pending_spin_recovery.dart';
 import '../../../domain/models/pool_state.dart';
 import '../../../domain/repositories/pool_repository.dart';
@@ -16,24 +19,34 @@ class SlotPersistenceController {
     required AuthRepository authRepository,
     required PoolRepository poolRepository,
     SpinRecoveryRepository? spinRecoveryRepository,
+    LocalUserDataEraser localUserDataEraser = const LocalUserDataEraser(),
+    DisclaimerAcceptanceRepository? disclaimerAcceptanceRepository,
   }) : _authRepository = authRepository,
        _poolRepository = poolRepository,
-       _spinRecoveryRepository = spinRecoveryRepository;
+       _spinRecoveryRepository = spinRecoveryRepository,
+       _localUserDataEraser = localUserDataEraser,
+       _disclaimerAcceptanceRepository = disclaimerAcceptanceRepository;
 
   factory SlotPersistenceController.withDefaults({
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
     SpinRecoveryRepository? spinRecoveryRepository,
+    LocalUserDataEraser localUserDataEraser = const LocalUserDataEraser(),
+    DisclaimerAcceptanceRepository? disclaimerAcceptanceRepository,
   }) {
     return SlotPersistenceController(
       authRepository: authRepository ?? FirebaseAuthRepository(),
       poolRepository: poolRepository ?? FirestorePoolRepository(),
       spinRecoveryRepository: spinRecoveryRepository,
+      localUserDataEraser: localUserDataEraser,
+      disclaimerAcceptanceRepository: disclaimerAcceptanceRepository,
     );
   }
 
   final AuthRepository _authRepository;
   final PoolRepository _poolRepository;
+  final LocalUserDataEraser _localUserDataEraser;
+  final DisclaimerAcceptanceRepository? _disclaimerAcceptanceRepository;
   SpinRecoveryRepository? _spinRecoveryRepository;
 
   String? get currentUserId => _authRepository.currentUserId;
@@ -239,7 +252,34 @@ class SlotPersistenceController {
     return currentUserId != null;
   }
 
-  Future<void> deleteAccount() {
-    return _authRepository.deleteAccount();
+  Future<void> deleteAccount(String password) async {
+    // Read before the account goes: afterwards there is no uid to name the
+    // files with.
+    final userId = currentUserId;
+    final email = _authRepository.currentUserEmail;
+
+    await _authRepository.deleteAccount(
+      password,
+      onReauthenticated: userId == null || email == null
+          ? null
+          : () => _archiveDisclaimerAcceptance(userId, email),
+    );
+    // Only once the account is really gone. Wiping the device first would lose
+    // the player's history to a mistyped password.
+    if (userId != null) await _localUserDataEraser.eraseFor(userId);
+  }
+
+  /// Best effort. Failing to keep the evidence is a problem for us; refusing
+  /// to delete the account over it would be a problem for the player, who has
+  /// already asked and already proven who they are.
+  Future<void> _archiveDisclaimerAcceptance(String userId, String email) async {
+    final repository =
+        _disclaimerAcceptanceRepository ??
+        FirestoreDisclaimerAcceptanceRepository();
+    try {
+      await repository.archiveAcceptance(userId: userId, email: email);
+    } catch (error) {
+      debugPrint('Disclaimer acceptance could not be archived: $error');
+    }
   }
 }

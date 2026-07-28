@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../core/typography/app_fonts.dart';
 
 import 'solid_arrow_painter.dart';
 
@@ -55,7 +55,7 @@ class OnOffCapsule extends StatelessWidget {
                     child: Text(
                       isOn ? 'ON' : 'OFF',
                       key: ValueKey<bool>(isOn),
-                      style: GoogleFonts.outfit(
+                      style: AppFonts.outfit(
                         fontSize: height * 0.50,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.8,

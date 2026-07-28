@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class SystemSettingsHeader extends StatelessWidget {
   const SystemSettingsHeader({
@@ -31,7 +31,7 @@ class SystemSettingsHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: textColor,

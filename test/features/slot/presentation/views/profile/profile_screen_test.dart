@@ -4,14 +4,16 @@ import 'package:winner_spin/features/auth/domain/repositories/auth_repository.da
 import 'package:winner_spin/features/slot/domain/models/game_history_entry.dart';
 import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/repositories/game_history_repository.dart';
+import 'package:winner_spin/features/slot/domain/repositories/first_launch_disclaimer_repository.dart';
 import 'package:winner_spin/features/slot/domain/repositories/pool_repository.dart';
 import 'package:winner_spin/features/slot/presentation/audio/game_music_service.dart';
 import 'package:winner_spin/features/slot/presentation/audio/ui_click_sound.dart';
+import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_persistence_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/game_viewmodel.dart';
 import 'package:winner_spin/features/slot/presentation/views/profile/profile_screen.dart';
 
 void main() {
-  testWidgets('selects an avatar and sends reset to the Firestore email', (
+  testWidgets('shows account email once and sends reset to that email', (
     tester,
   ) async {
     UiClickSound.enabled = false;
@@ -34,7 +36,9 @@ void main() {
 
     expect(find.text('MY PROFILE'), findsOneWidget);
     expect(find.text('SELECT AVATAR'), findsNothing);
-    expect(find.text('player@example.com'), findsWidgets);
+    expect(find.text('player@example.com'), findsOneWidget);
+    expect(find.text('EMAIL'), findsOneWidget);
+    expect(find.text('FIRESTORE EMAIL'), findsNothing);
     expect(find.byKey(const ValueKey('select-avatar-button')), findsOneWidget);
     expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
     expect(find.bySemanticsLabel('Avatar heart'), findsNothing);
@@ -110,7 +114,7 @@ void main() {
     viewModel.dispose();
   });
 
-  testWidgets('shows delete above logout and confirms account deletion', (
+  testWidgets('shows delete directly below reset and confirms deletion', (
     tester,
   ) async {
     UiClickSound.enabled = false;
@@ -133,15 +137,38 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -900));
     await tester.pumpAndSettle();
 
+    final resetButton = find.byKey(const ValueKey('reset-password-button'));
     final deleteButton = find.byKey(const ValueKey('delete-account-button'));
     final logoutButton = find.byKey(const ValueKey('log-out-button'));
+    expect(resetButton, findsOneWidget);
     expect(deleteButton, findsOneWidget);
     expect(logoutButton, findsOneWidget);
     await tester.ensureVisible(logoutButton);
     await tester.pump();
     expect(
+      tester.getTopLeft(resetButton).dy,
+      lessThan(tester.getTopLeft(deleteButton).dy),
+    );
+    expect(
       tester.getTopLeft(deleteButton).dy,
       lessThan(tester.getTopLeft(logoutButton).dy),
+    );
+    expect(
+      tester
+          .widget<FilledButton>(resetButton)
+          .style
+          ?.backgroundColor
+          ?.resolve(<WidgetState>{}),
+      const Color(0xFF6750A4),
+    );
+    final deleteButtonWidget = tester.widget<FilledButton>(deleteButton);
+    expect(
+      deleteButtonWidget.style?.backgroundColor?.resolve(<WidgetState>{}),
+      const Color(0xFFC2185B),
+    );
+    expect(
+      deleteButtonWidget.style?.foregroundColor?.resolve(<WidgetState>{}),
+      Colors.white,
     );
 
     await tester.tap(deleteButton);
@@ -150,9 +177,17 @@ void main() {
     expect(find.textContaining('cannot be undone'), findsOneWidget);
     expect(authRepository.deleteAccountCalls, 0);
 
-    await tester.tap(
-      find.byKey(const ValueKey('confirm-delete-account-button')),
+    // The red button stays inert until the password is typed.
+    final confirm = find.byKey(const ValueKey('confirm-delete-account-button'));
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('delete-account-password')),
+      'hunter2',
     );
+    await tester.pump();
+
+    await tester.tap(confirm);
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
@@ -160,6 +195,11 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(authRepository.deleteAccountCalls, 1);
+    expect(
+      authRepository.deletePassword,
+      'hunter2',
+      reason: 'the password re-proves who is asking before anything is lost',
+    );
     expect(viewModel.loggedOut, isTrue);
 
     viewModel.dispose();
@@ -212,11 +252,43 @@ void main() {
       musicService: _SilentGameMusicService(),
     );
 
-    await viewModel.deleteAccount();
+    await viewModel.deleteAccount('hunter2');
 
     expect(authRepository.deleteAccountCalls, 1);
     expect(viewModel.loggedOut, isTrue);
     viewModel.dispose();
+  });
+
+  test('keeps the consent evidence when the account goes', () async {
+    final authRepository = _ProfileAuthRepository();
+    final archive = _RecordingAcceptanceRepository();
+    final controller = SlotPersistenceController(
+      authRepository: authRepository,
+      poolRepository: _ProfilePoolRepository(),
+      disclaimerAcceptanceRepository: archive,
+    );
+
+    await controller.deleteAccount('hunter2');
+
+    // Deleting the account removes the user document the acceptance lives on,
+    // so the copy has to be made while it is still there.
+    expect(archive.archivedUserId, 'user-1');
+    expect(archive.archivedEmail, 'player@example.com');
+  });
+
+  test('a failed archive does not block the deletion', () async {
+    final authRepository = _ProfileAuthRepository();
+    final controller = SlotPersistenceController(
+      authRepository: authRepository,
+      poolRepository: _ProfilePoolRepository(),
+      disclaimerAcceptanceRepository: _FailingAcceptanceRepository(),
+    );
+
+    await controller.deleteAccount('hunter2');
+
+    // The player asked and proved who they are; our bookkeeping problem is
+    // not a reason to refuse them.
+    expect(authRepository.deleteAccountCalls, 1);
   });
 
   test('rejects a stored non-English avatar id', () async {
@@ -245,6 +317,7 @@ class _ProfileAuthRepository implements AuthRepository {
   String? passwordResetEmail;
   int signOutCalls = 0;
   int deleteAccountCalls = 0;
+  String? deletePassword;
 
   final Map<String, dynamic> _userData = {
     'username': 'Player One',
@@ -280,6 +353,9 @@ class _ProfileAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> sendPasswordResetEmailForAddress(String email) async {}
+
+  @override
   Stream<Map<String, dynamic>?> watchUserData(String uid) =>
       const Stream.empty();
 
@@ -303,8 +379,15 @@ class _ProfileAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount() async {
+  Future<void> deleteAccount(
+    String password, {
+    Future<void> Function()? onReauthenticated,
+  }) async {
     deleteAccountCalls++;
+    deletePassword = password;
+    // The real repository runs this between proving the password and the
+    // first deletion, which is the only window the archive can be written in.
+    await onReauthenticated?.call();
   }
 
   @override
@@ -343,4 +426,52 @@ class _SilentGameMusicService extends GameMusicService {
 
   @override
   Future<void> dispose() async {}
+}
+
+class _RecordingAcceptanceRepository implements DisclaimerAcceptanceRepository {
+  String? archivedUserId;
+  String? archivedEmail;
+
+  @override
+  Future<bool> hasAccepted({
+    required String userId,
+    required int version,
+  }) async => false;
+
+  @override
+  Future<void> recordAcceptance({
+    required String userId,
+    required int version,
+    required String appVersion,
+  }) async {}
+
+  @override
+  Future<void> archiveAcceptance({
+    required String userId,
+    required String email,
+  }) async {
+    archivedUserId = userId;
+    archivedEmail = email;
+  }
+}
+
+class _FailingAcceptanceRepository implements DisclaimerAcceptanceRepository {
+  @override
+  Future<bool> hasAccepted({
+    required String userId,
+    required int version,
+  }) async => false;
+
+  @override
+  Future<void> recordAcceptance({
+    required String userId,
+    required int version,
+    required String appVersion,
+  }) async {}
+
+  @override
+  Future<void> archiveAcceptance({
+    required String userId,
+    required String email,
+  }) async => throw Exception('offline');
 }

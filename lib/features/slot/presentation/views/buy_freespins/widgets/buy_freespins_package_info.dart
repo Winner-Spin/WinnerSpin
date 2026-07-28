@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class BuyFreeSpinsPackageInfo extends StatelessWidget {
   const BuyFreeSpinsPackageInfo({
@@ -18,7 +18,7 @@ class BuyFreeSpinsPackageInfo extends StatelessWidget {
         Text(
           'FREE SPINS PACKAGE',
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 24,
             fontWeight: FontWeight.w900,
             color: textColor,
@@ -28,7 +28,7 @@ class BuyFreeSpinsPackageInfo extends StatelessWidget {
         Text(
           '$spinCount FREE SPINS',
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 34,
             fontWeight: FontWeight.w900,
             color: textColor,

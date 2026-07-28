@@ -36,11 +36,18 @@ class BigWinPresentationController {
     required void Function(double amount) showBigWin,
   }) {
     if (isInFreeSpins) return;
+    final currentResult = result();
+    if (currentResult == null) {
+      // A persisted lastWin is restored during session hydration. It belongs
+      // to an earlier session and must not be presented as a fresh BIG WIN.
+      _lastSeenLastWinNormal = lastWin;
+      return;
+    }
     if (lastWin > 0 && _lastSeenLastWinNormal == 0) {
       Future.microtask(() {
         if (!isMounted()) return;
         final hasSequence = SpinResultPresentationRules.hasMultiplierSequence(
-          result(),
+          currentResult,
         );
         if (!hasSequence) {
           Future.delayed(GamePresentationTimings.normalBigWinDelay, () {
@@ -79,7 +86,8 @@ class BigWinPresentationController {
       tier,
     );
     final previousHeadlineImage = _cachedHeadlineImage;
-    if (previousHeadlineImage != null && previousHeadlineImage != headlineImage) {
+    if (previousHeadlineImage != null &&
+        previousHeadlineImage != headlineImage) {
       unawaited(previousHeadlineImage.evict());
     }
     _cachedHeadlineImage = headlineImage;

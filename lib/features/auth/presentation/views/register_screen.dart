@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/typography/app_fonts.dart';
 
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
@@ -301,14 +301,14 @@ class _RegisterScreenState extends State<RegisterScreen>
             child: TextField(
               controller: controller,
               obscureText: obscureText,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 color: Colors.white.withValues(alpha: 0.95),
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: GoogleFonts.nunito(
+                hintStyle: AppFonts.nunito(
                   color: const Color(0xFFFFF0C2).withValues(alpha: 0.74),
                   fontSize: 18,
                   fontWeight: FontWeight.w800,

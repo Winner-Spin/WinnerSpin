@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../../../../core/format/money_format.dart';
 import '../../../../../../../../core/widgets/money_text.dart';
@@ -107,7 +107,7 @@ class _FreeSpinSummaryPopupState extends State<FreeSpinSummaryPopup>
                           lineLengthScale: 0.96,
                           lineTopExtend: width * 0.004,
                           symbolTextYOffset: width * 0.006,
-                          style: GoogleFonts.outfit(
+                          style: AppFonts.outfit(
                             fontSize: amountFontSize,
                             fontWeight: FontWeight.w900,
                             height: 1.0,
@@ -136,7 +136,7 @@ class _FreeSpinSummaryPopupState extends State<FreeSpinSummaryPopup>
                         child: Text(
                           '${widget.totalFreeSpins}',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
+                          style: AppFonts.outfit(
                             fontSize: spinFontSize,
                             fontWeight: FontWeight.w900,
                             height: 1.0,

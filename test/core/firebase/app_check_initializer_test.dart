@@ -14,4 +14,23 @@ void main() {
 
     expect(provider, isA<AndroidPlayIntegrityProvider>());
   });
+
+  test('uses the debug provider for Apple development builds', () {
+    // App Attest cannot run on the simulator, so development has to use the
+    // debug token instead.
+    final provider = appleAppCheckProvider(isRelease: false);
+
+    expect(provider, isA<AppleDebugProvider>());
+  });
+
+  test('uses App Attest for Apple release builds', () {
+    final provider = appleAppCheckProvider(isRelease: true);
+
+    expect(provider, isA<AppleAppAttestProvider>());
+    expect(
+      provider,
+      isNot(isA<AppleDeviceCheckProvider>()),
+      reason: 'DeviceCheck is the SDK default and the weaker attestation',
+    );
+  });
 }

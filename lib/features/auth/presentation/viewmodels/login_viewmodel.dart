@@ -50,6 +50,93 @@ class LoginViewModel extends ChangeNotifier {
   bool _isMusicMuted = !AmbientMusicPreference.enabled;
   bool get isMusicMuted => _isMusicMuted;
 
+  bool _isSendingPasswordReset = false;
+  bool get isSendingPasswordReset => _isSendingPasswordReset;
+
+  String? _passwordResetMessage;
+  String? get passwordResetMessage => _passwordResetMessage;
+
+  bool _passwordResetFailed = false;
+  bool get passwordResetFailed => _passwordResetFailed;
+
+  /// Sends a reset link to [email] for someone who cannot sign in.
+  ///
+  /// Returns true when the request went through. The in-app flow's 24-hour
+  /// limit does not apply here: it is recorded on the user's own document,
+  /// which a signed-out caller can neither read nor write.
+  Future<bool> sendPasswordReset(String email) async {
+    if (_isSendingPasswordReset) return false;
+
+    final address = email.trim();
+    if (address.isEmpty || !address.contains('@')) {
+      _passwordResetFailed = true;
+      _passwordResetMessage = 'Enter the email address of your account.';
+      notifyListeners();
+      return false;
+    }
+
+    _isSendingPasswordReset = true;
+    _passwordResetFailed = false;
+    _passwordResetMessage = null;
+    notifyListeners();
+
+    try {
+      await _authRepository
+          .sendPasswordResetEmailForAddress(address)
+          .timeout(_requestTimeout);
+      _passwordResetFailed = false;
+      // Deliberately conditional. With email enumeration protection on — the
+      // Firebase default — an unknown address also reports success, so
+      // promising that an email was sent would be a lie half the time.
+      _passwordResetMessage =
+          'If an account uses this address, a reset link is on its way. '
+          'Check your spam folder if you do not see it. After changing your '
+          'password, return to the app and sign in with the new one.';
+      return true;
+    } on AuthException catch (error) {
+      _passwordResetFailed = true;
+      _passwordResetMessage = _passwordResetError(error.code);
+      return false;
+    } catch (_) {
+      _passwordResetFailed = true;
+      _passwordResetMessage =
+          'Reset email could not be sent. Please try again.';
+      return false;
+    } finally {
+      _isSendingPasswordReset = false;
+      notifyListeners();
+    }
+  }
+
+  /// Reset-specific wording. Reusing the sign-in messages here put "Login
+  /// failed" in a dialog that has nothing to do with signing in.
+  String _passwordResetError(AuthErrorCode code) {
+    switch (code) {
+      case AuthErrorCode.userNotFound:
+        return 'This email address is not registered.';
+      case AuthErrorCode.invalidEmail:
+        return 'Invalid email address.';
+      case AuthErrorCode.userDisabled:
+        return 'This account has been disabled.';
+      case AuthErrorCode.networkRequestFailed:
+        return 'No internet connection. Please check your connection.';
+      case AuthErrorCode.wrongPassword:
+      case AuthErrorCode.invalidCredential:
+      case AuthErrorCode.emailAlreadyInUse:
+      case AuthErrorCode.weakPassword:
+      case AuthErrorCode.emailVerificationRequired:
+      case AuthErrorCode.unknown:
+        return 'Reset email could not be sent. Please try again.';
+    }
+  }
+
+  void clearPasswordResetMessage() {
+    if (_passwordResetMessage == null) return;
+    _passwordResetMessage = null;
+    _passwordResetFailed = false;
+    notifyListeners();
+  }
+
   final AmbientMusicService _musicService = AmbientMusicService.instance;
 
   Future<void> initMusic() async {

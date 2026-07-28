@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../data/repositories/local_first_launch_disclaimer_repository.dart';
-import '../../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../../audio/ui_click_sound.dart';
 import '../../ui_controllers/big_win_presentation_controller.dart';
 import '../../ui_controllers/flying_tumble_overlay_controller.dart';
@@ -47,8 +45,6 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final GameViewModel _viewModel = GameViewModel();
-  final FirstLaunchDisclaimerRepository _firstLaunchDisclaimerRepository =
-      LocalFirstLaunchDisclaimerRepository();
 
   final WinPresentationController _winCtrl = WinPresentationController();
   final BigWinPresentationController _bigWinPresentationController =
@@ -137,7 +133,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       context: context,
       viewModel: _viewModel,
       assetPrecacheService: _assetPrecacheService,
-      disclaimerRepository: _firstLaunchDisclaimerRepository,
       isMounted: () => mounted,
     );
   }

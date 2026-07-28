@@ -217,7 +217,8 @@ Pool runtime values such as balance, expected pool, and current mode are derived
 
 | Repository/store | Purpose |
 | --- | --- |
-| LocalGameHistoryRepository | Most recent 30 entries per user |
+| LocalGameHistoryRepository | The player's full history per user (written every spin) |
+| FirestoreGameHistoryRepository | Newest 10 entries only, as a `gameHistory` array on the user document, written only when the app closes |
 | LocalSpinRecoveryRepository | Pending calculated spin snapshot per user |
 | LocalFirstLaunchDisclaimerRepository | First-launch disclaimer acknowledgement |
 | AmbientMusicPreferenceStore | Ambient-music enabled/disabled preference |

@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../../core/typography/app_fonts.dart';
 import '../../../../../../../../core/widgets/money_text.dart';
 import '../../../../../../domain/models/cluster_win.dart';
 
@@ -28,7 +28,7 @@ class _FloatingWinOverlayState extends State<FloatingWinOverlay>
   final List<_WinEffect> _effects = [];
   final Random _rng = Random();
 
-  static final TextStyle _baseTextStyle = GoogleFonts.outfit(
+  static final TextStyle _baseTextStyle = AppFonts.outfit(
     color: const Color(0xFFFFD54F),
     fontSize: 28,
     fontWeight: FontWeight.w900,

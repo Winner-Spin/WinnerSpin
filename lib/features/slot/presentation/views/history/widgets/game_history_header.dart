@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class GameHistoryHeader extends StatelessWidget {
   const GameHistoryHeader({
@@ -39,7 +39,7 @@ class GameHistoryHeader extends StatelessWidget {
         children: [
           Text(
             isSelecting ? '$selectedCount SELECTED' : 'GAME HISTORY',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: textColor,

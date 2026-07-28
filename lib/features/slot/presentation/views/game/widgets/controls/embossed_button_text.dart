@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../../../core/widgets/money_text.dart';
 
@@ -69,7 +69,7 @@ class EmbossedButtonText extends StatelessWidget {
     Color? color,
     List<Shadow>? shadows,
   }) {
-    return GoogleFonts.outfit(
+    return AppFonts.outfit(
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
       letterSpacing: letterSpacing,
@@ -145,7 +145,7 @@ class EmbossedButtonMoneyText extends StatelessWidget {
     Color? color,
     List<Shadow>? shadows,
   }) {
-    return GoogleFonts.outfit(
+    return AppFonts.outfit(
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
       letterSpacing: letterSpacing,

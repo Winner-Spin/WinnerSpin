@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 import 'auto_play_slider_thumb_shape.dart';
 
@@ -48,7 +48,7 @@ class AutoPlaySpinCountSlider extends StatelessWidget {
           child: Text(
             '$spinCount',
             textAlign: TextAlign.right,
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 24,
               fontWeight: FontWeight.w900,
               color: textColor,

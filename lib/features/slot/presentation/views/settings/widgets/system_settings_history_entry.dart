@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class SystemSettingsHistoryEntry extends StatelessWidget {
   const SystemSettingsHistoryEntry({
@@ -20,7 +20,7 @@ class SystemSettingsHistoryEntry extends StatelessWidget {
         children: [
           Text(
             'GAME HISTORY',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               color: textColor.withValues(alpha: 0.70),

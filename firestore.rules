@@ -35,6 +35,66 @@ service cloud.firestore {
         && request.resource.data.freeSpinsAwardedThisRound == 0;
     }
 
+    // Game history is a bounded array written once per app-close.
+    function hasValidGameHistory() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['gameHistory'])
+        || (
+          request.resource.data.gameHistory is list
+          && request.resource.data.gameHistory.size() <= 10
+        );
+    }
+
+    // Evidence that the player accepted the disclaimer: which text version,
+    // when, and from which build.
+    //
+    // Write-once per version. The timestamp has to be the server's, so it
+    // cannot be backdated, and an existing record can only be replaced by a
+    // strictly newer version — re-sending the same version is rejected. That
+    // is what freezes the original date: without it the owner could overwrite
+    // their own acceptance with today's time and erase when it really happened.
+    function hasValidDisclaimerAcceptance() {
+      let touched = request.resource.data.diff(resource.data).affectedKeys();
+      return !touched.hasAny([
+        'disclaimerVersion',
+        'disclaimerAcceptedAt',
+        'disclaimerAppVersion'
+      ]) || (
+        request.resource.data.disclaimerVersion is int
+        && request.resource.data.disclaimerVersion > 0
+        && (
+          !('disclaimerVersion' in resource.data)
+          || request.resource.data.disclaimerVersion
+            > resource.data.disclaimerVersion
+        )
+        && request.resource.data.disclaimerAcceptedAt == request.time
+        && request.resource.data.disclaimerAppVersion is string
+        && request.resource.data.disclaimerAppVersion.size() <= 40
+      );
+    }
+
+    // The 24-hour password-reset window, enforced against the server clock.
+    // The app checks it too, but only to phrase the message — that check runs
+    // on a clock the player can move. Pinning the stored time to `request.time`
+    // is what makes the window real: a backdated record cannot be written, so
+    // an early retry cannot be unlocked.
+    function hasValidPasswordResetRequest() {
+      let touched = request.resource.data.diff(resource.data).affectedKeys();
+      return !touched.hasAny([
+        'passwordResetRequestedAt',
+        'passwordResetRequestId'
+      ]) || (
+        request.resource.data.passwordResetRequestedAt == request.time
+        && request.resource.data.passwordResetRequestId is string
+        && request.resource.data.passwordResetRequestId.size() <= 64
+        && (
+          !('passwordResetRequestedAt' in resource.data)
+          || request.time > resource.data.passwordResetRequestedAt
+            + duration.value(24, 'h')
+        )
+      );
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidInitialProfile(userId);
@@ -49,8 +109,15 @@ service cloud.firestore {
           'emailVerified',
           'passwordResetRequestedAt',
           'passwordResetRequestId',
-          'pool'
+          'pool',
+          'gameHistory',
+          'disclaimerVersion',
+          'disclaimerAcceptedAt',
+          'disclaimerAppVersion'
         ])
+        && hasValidGameHistory()
+        && hasValidDisclaimerAcceptance()
+        && hasValidPasswordResetRequest()
         && (
           !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['emailVerified'])
@@ -59,11 +126,61 @@ service cloud.firestore {
             && request.auth.token.email_verified == true
           )
         );
-      allow delete: if false;
+      // Account deletion runs from the client, so the owner has to be able to
+      // remove their own record. Recreating it is not a way around anything:
+      // `hasValidInitialProfile` pins the starting balance, and the deposit
+      // screen hands out coins for free anyway.
+      allow delete: if isOwner(userId);
     }
 
-    match /emailVerifications/{document=**} {
+    // Forced-update gate. Readable by anyone, including signed-out users, so
+    // the check can run on the login screen — an outdated build must be stopped
+    // before it can sign in. Contains no user data. Writes are console/admin
+    // only: a client that could raise minimumVersion could lock everyone out.
+    match /config/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /emailVerifications/{userId} {
       allow read, write: if false;
+      // Same reason as above: the owner clears their own record on the way
+      // out. Everything else here stays server-only.
+      allow delete: if isOwner(userId);
+    }
+
+    // Consent evidence that outlives the account.
+    //
+    // Deleting an account removes `users/{uid}`, which is where the acceptance
+    // is recorded — so the proof would vanish exactly when it is most likely to
+    // be needed. This copy is written just before deletion and cannot be
+    // touched afterwards.
+    //
+    // Every field is checked against the live user document, so the archive can
+    // only ever repeat what the account actually recorded. Write-once: no
+    // update, no delete, and not readable by any client.
+    match /disclaimerAcceptances/{userId} {
+      allow read, update, delete: if false;
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'email',
+          'disclaimerVersion',
+          'disclaimerAcceptedAt',
+          'disclaimerAppVersion',
+          'archivedAt'
+        ])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.archivedAt == request.time
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && request.resource.data.disclaimerVersion ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerVersion
+        && request.resource.data.disclaimerAcceptedAt ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerAcceptedAt
+        && request.resource.data.disclaimerAppVersion ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerAppVersion;
     }
 
     match /deletedUnverifiedAccounts/{document=**} {

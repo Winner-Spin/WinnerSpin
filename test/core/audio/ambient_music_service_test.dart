@@ -206,6 +206,48 @@ void main() {
 
     await service.disposeForTesting();
   });
+
+  test('stops the music even when the player is not reporting "playing"', (
+  ) async {
+    final player = _FakeAmbientMusicPlayer();
+    final service = AmbientMusicService.forTesting(
+      playerFactory: () => player,
+    );
+
+    await service.ensurePlaying();
+    expect(player.state, PlayerState.playing);
+
+    // audioplayers reports `completed` at a loop boundary while the track is
+    // still audible. Turning the toggle off in that window used to be ignored,
+    // leaving the music running with nothing scheduled to try again.
+    player.state = PlayerState.completed;
+    await service.setEnabled(false);
+
+    expect(player.pauseCalls, 1);
+
+    await service.disposeForTesting();
+  });
+
+  test('restarts the track after pausing from a non-playing state', () async {
+    final player = _FakeAmbientMusicPlayer();
+    final service = AmbientMusicService.forTesting(
+      playerFactory: () => player,
+    );
+
+    await service.ensurePlaying();
+    player.state = PlayerState.completed;
+    await service.setEnabled(false);
+
+    await service.setEnabled(true);
+
+    // `resume()` would pick up a position a completed player no longer holds,
+    // so the music has to be played from the top instead.
+    expect(player.playCalls, 2);
+    expect(player.resumeCalls, 0);
+    expect(player.state, PlayerState.playing);
+
+    await service.disposeForTesting();
+  });
 }
 
 class _StaticAmbientMusicPreferenceStore

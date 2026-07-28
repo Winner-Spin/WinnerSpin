@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class DepositBuyButton extends StatelessWidget {
   const DepositBuyButton({
@@ -34,7 +34,7 @@ class DepositBuyButton extends StatelessWidget {
           ),
           child: Text(
             isBuying ? 'ADDING...' : 'BUY GAME MONEY',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 23,
               fontWeight: FontWeight.w900,
               color: Colors.white,

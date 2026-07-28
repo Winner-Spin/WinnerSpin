@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../../core/format/money_format.dart';
 import '../../../../../../core/widgets/money_text.dart';
@@ -58,7 +58,7 @@ class GameHistoryEntryCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     formattedDate,
-                    style: GoogleFonts.barlowCondensed(
+                    style: AppFonts.barlowCondensed(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: textColor.withValues(alpha: 0.82),
@@ -133,7 +133,7 @@ class _HistoryMoneyText extends StatelessWidget {
       symbolOffset: const Offset(0, 1.0),
       lineYOffset: 1.25,
       symbolTextYOffset: 0.45,
-      style: GoogleFonts.barlowCondensed(
+      style: AppFonts.barlowCondensed(
         fontSize: 15,
         fontWeight: FontWeight.w900,
         color: color,

@@ -217,7 +217,8 @@ Havuz bakiyesi, beklenen havuz ve mevcut mod gibi çalışma zamanı değerleri 
 
 | Repository/store | Amaç |
 | --- | --- |
-| LocalGameHistoryRepository | Kullanıcı başına en son 30 kayıt |
+| LocalGameHistoryRepository | Kullanıcı başına geçmişin tamamı (her spinde yazılır) |
+| FirestoreGameHistoryRepository | Yalnızca en son 10 kayıt, kullanıcı dokümanında `gameHistory` dizisi olarak; yalnızca uygulama kapanınca yazılır |
 | LocalSpinRecoveryRepository | Kullanıcı başına bekleyen hesaplanmış dönüş anlık görüntüsü |
 | LocalFirstLaunchDisclaimerRepository | İlk açılış bilgilendirme onayı |
 | AmbientMusicPreferenceStore | Ortam müziği açık/kapalı tercihi |

@@ -46,6 +46,16 @@ function userDocument({uid, email}) {
   };
 }
 
+function historyEntries(count) {
+  return Array.from({length: count}, (unused, index) => ({
+    id: `spin-${index}`,
+    playedAt: new Date(Date.UTC(2026, 6, 23, 0, index)).toISOString(),
+    newBalance: 10000 - index,
+    bet: 10,
+    winAmount: 0,
+  }));
+}
+
 function authenticatedFirestore(uid, email, emailVerified = false) {
   return testEnvironment.authenticatedContext(uid, {
     email,
@@ -188,6 +198,41 @@ describe("users collection ownership", () => {
     }));
   });
 
+  test("allows the owner to mirror a bounded game history", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertSucceeds(updateDoc(doc(database, "users", ownerId), {
+      gameHistory: historyEntries(10),
+    }));
+    await assertSucceeds(updateDoc(doc(database, "users", ownerId), {
+      gameHistory: [],
+    }));
+  });
+
+  test("denies a game history longer than ten entries", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertFails(updateDoc(doc(database, "users", ownerId), {
+      gameHistory: historyEntries(11),
+    }));
+  });
+
+  test("denies a game history that is not a list", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertFails(updateDoc(doc(database, "users", ownerId), {
+      gameHistory: {id: "spin-1"},
+    }));
+  });
+
+  test("denies writing game history to another user document", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertFails(updateDoc(doc(database, "users", otherUserId), {
+      gameHistory: historyEntries(1),
+    }));
+  });
+
   test("denies changes to immutable identity fields", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
     const ownerReference = doc(database, "users", ownerId);
@@ -197,25 +242,192 @@ describe("users collection ownership", () => {
     await assertFails(updateDoc(ownerReference, {unexpectedField: true}));
   });
 
-  test("allows supported profile and password-reset metadata updates", async () => {
+  test("allows a profile update", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertSucceeds(updateDoc(doc(database, "users", ownerId), {
+      profileAvatarId: "heart",
+    }));
+  });
+
+  test("records a password reset with the server clock", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertSucceeds(updateDoc(doc(database, "users", ownerId), {
+      passwordResetRequestedAt: serverTimestamp(),
+      passwordResetRequestId: "owner-user-1000",
+    }));
+  });
+
+  test("denies a password reset stamped by the client", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    // A device clock can be set to anything, so a self-stamped time would let
+    // the player backdate the record and skip the wait.
+    await assertFails(updateDoc(doc(database, "users", ownerId), {
+      passwordResetRequestedAt: Timestamp.fromMillis(1000),
+      passwordResetRequestId: "owner-user-1000",
+    }));
+  });
+
+  test("denies a second password reset within the day", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
     const ownerReference = doc(database, "users", ownerId);
 
     await assertSucceeds(updateDoc(ownerReference, {
-      profileAvatarId: "heart",
-      passwordResetRequestedAt: Timestamp.fromMillis(1000),
+      passwordResetRequestedAt: serverTimestamp(),
       passwordResetRequestId: "owner-user-1000",
     }));
+    await assertFails(updateDoc(ownerReference, {
+      passwordResetRequestedAt: serverTimestamp(),
+      passwordResetRequestId: "owner-user-2000",
+    }));
+  });
+
+  test("denies clearing the password-reset record", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const ownerReference = doc(database, "users", ownerId);
+
     await assertSucceeds(updateDoc(ownerReference, {
+      passwordResetRequestedAt: serverTimestamp(),
+      passwordResetRequestId: "owner-user-1000",
+    }));
+    // Removing the record would be a way to clear one's own cooldown, which
+    // is the whole thing the window is meant to prevent.
+    await assertFails(updateDoc(ownerReference, {
       passwordResetRequestedAt: deleteField(),
       passwordResetRequestId: deleteField(),
     }));
   });
 
-  test("denies client-side deletion of the owner document", async () => {
+  test("records a disclaimer acceptance, once", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const ownerReference = doc(database, "users", ownerId);
+
+    await assertSucceeds(updateDoc(ownerReference, {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+    // Re-sending the same version would overwrite the original date, which is
+    // the part of the evidence that matters.
+    await assertFails(updateDoc(ownerReference, {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+    // A genuinely newer text may be accepted again.
+    await assertSucceeds(updateDoc(ownerReference, {
+      disclaimerVersion: 2,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+  });
+
+  test("denies a backdated disclaimer acceptance", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
 
-    await assertFails(deleteDoc(doc(database, "users", ownerId)));
+    await assertFails(updateDoc(doc(database, "users", ownerId), {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: Timestamp.fromMillis(1000),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+  });
+
+  test("allows the owner to delete their own document", async () => {
+    // Account deletion runs from the client now; there is no function to do it.
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertSucceeds(deleteDoc(doc(database, "users", ownerId)));
+  });
+});
+
+describe("disclaimer acceptance archive", () => {
+  test("keeps a copy that matches the account record", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const ownerReference = doc(database, "users", ownerId);
+
+    await assertSucceeds(updateDoc(ownerReference, {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+    const stored = (await getDoc(ownerReference)).data();
+
+    await assertSucceeds(setDoc(
+      doc(database, "disclaimerAcceptances", ownerId),
+      {
+        email: ownerEmail,
+        disclaimerVersion: stored.disclaimerVersion,
+        disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
+        disclaimerAppVersion: stored.disclaimerAppVersion,
+        archivedAt: serverTimestamp(),
+      },
+    ));
+  });
+
+  test("denies a copy that says more than the account did", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const ownerReference = doc(database, "users", ownerId);
+
+    await assertSucceeds(updateDoc(ownerReference, {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+    const stored = (await getDoc(ownerReference)).data();
+
+    // An archive is only evidence if it cannot claim something the account
+    // never recorded.
+    await assertFails(setDoc(
+      doc(database, "disclaimerAcceptances", ownerId),
+      {
+        email: ownerEmail,
+        disclaimerVersion: 9,
+        disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
+        disclaimerAppVersion: stored.disclaimerAppVersion,
+        archivedAt: serverTimestamp(),
+      },
+    ));
+  });
+
+  test("denies archiving under somebody else's account", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertFails(setDoc(
+      doc(database, "disclaimerAcceptances", otherUserId),
+      {
+        email: ownerEmail,
+        disclaimerVersion: 1,
+        disclaimerAcceptedAt: serverTimestamp(),
+        disclaimerAppVersion: "1.0.0+1",
+        archivedAt: serverTimestamp(),
+      },
+    ));
+  });
+
+  test("cannot be read, changed or removed once written", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const ownerReference = doc(database, "users", ownerId);
+    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
+
+    await assertSucceeds(updateDoc(ownerReference, {
+      disclaimerVersion: 1,
+      disclaimerAcceptedAt: serverTimestamp(),
+      disclaimerAppVersion: "1.0.0+1",
+    }));
+    const stored = (await getDoc(ownerReference)).data();
+    await assertSucceeds(setDoc(archiveReference, {
+      email: ownerEmail,
+      disclaimerVersion: stored.disclaimerVersion,
+      disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
+      disclaimerAppVersion: stored.disclaimerAppVersion,
+      archivedAt: serverTimestamp(),
+    }));
+
+    await assertFails(getDoc(archiveReference));
+    await assertFails(updateDoc(archiveReference, {disclaimerVersion: 2}));
+    await assertFails(deleteDoc(archiveReference));
   });
 });
 
@@ -246,6 +458,37 @@ describe("email verification claim", () => {
 
     await assertFails(updateDoc(doc(database, "users", ownerId), {
       emailVerified: false,
+    }));
+  });
+});
+
+describe("forced-update config", () => {
+  test("is readable while signed out, so the gate works before login", async () => {
+    const database = testEnvironment.unauthenticatedContext().firestore();
+
+    await assertSucceeds(getDoc(doc(database, "config", "appVersion")));
+  });
+
+  test("is readable by a signed-in user", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+
+    await assertSucceeds(getDoc(doc(database, "config", "appVersion")));
+  });
+
+  test("cannot be raised by a client, which would lock everyone out", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const reference = doc(database, "config", "appVersion");
+
+    await assertFails(setDoc(reference, {minimumVersion: "99.0.0"}));
+    await assertFails(updateDoc(reference, {minimumVersion: "99.0.0"}));
+    await assertFails(deleteDoc(reference));
+  });
+
+  test("cannot be written by an anonymous client either", async () => {
+    const database = testEnvironment.unauthenticatedContext().firestore();
+
+    await assertFails(setDoc(doc(database, "config", "appVersion"), {
+      minimumVersion: "99.0.0",
     }));
   });
 });

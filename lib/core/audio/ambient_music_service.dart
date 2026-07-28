@@ -175,7 +175,19 @@ class AmbientMusicService implements AmbientMusicLifecycle {
 
   Future<void> _pausePlayer() async {
     final player = _audioPlayer;
-    if (player == null || player.state != PlayerState.playing) return;
+    if (player == null || player.state == PlayerState.disposed) return;
+
+    // Pause whatever the player claims to be doing, rather than only when it
+    // reports `playing`. The reported state lags the real one — audioplayers
+    // flips to `completed` at a loop boundary and back, and the state also
+    // trails a `play()` that has only just been awaited. Skipping the pause in
+    // those windows left the track audible with nothing scheduled to retry, so
+    // the toggle simply did nothing.
+    if (player.state != PlayerState.playing) {
+      // Not a clean pause: the next enable must start the track from the top
+      // instead of resuming a position the player may no longer hold.
+      _hasStarted = false;
+    }
 
     try {
       await player.pause();

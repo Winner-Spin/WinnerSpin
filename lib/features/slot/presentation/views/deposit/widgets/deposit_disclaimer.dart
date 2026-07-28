@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class DepositDisclaimer extends StatelessWidget {
   const DepositDisclaimer({super.key, required this.textColor});
@@ -11,7 +11,7 @@ class DepositDisclaimer extends StatelessWidget {
     return Text(
       'This deposit action is not a real-money deposit. It only increases virtual in-game CREDIT with virtual game money that has no real-world value.',
       textAlign: TextAlign.center,
-      style: GoogleFonts.barlowCondensed(
+      style: AppFonts.barlowCondensed(
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: textColor.withValues(alpha: 0.72),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../../core/format/money_format.dart';
 import '../../../../../../core/widgets/money_text.dart';
@@ -28,7 +28,7 @@ class DepositAmountSelector extends StatelessWidget {
       children: [
         Text(
           'GAME MONEY AMOUNT',
-          style: GoogleFonts.barlowCondensed(
+          style: AppFonts.barlowCondensed(
             fontSize: 24,
             fontWeight: FontWeight.w900,
             color: textColor,
@@ -61,7 +61,7 @@ class DepositAmountSelector extends StatelessWidget {
                 symbolOffset: const Offset(0, 2.0),
                 lineYOffset: 2.35,
                 symbolTextYOffset: 2.3,
-                style: GoogleFonts.barlowCondensed(
+                style: AppFonts.barlowCondensed(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: textColor,

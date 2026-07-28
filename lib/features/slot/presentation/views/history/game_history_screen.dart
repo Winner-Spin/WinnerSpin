@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../audio/ui_click_sound.dart';
 import '../../viewmodels/game_viewmodel.dart';
+import 'widgets/game_history_backup_note.dart';
 import 'widgets/game_history_empty_state.dart';
 import 'widgets/game_history_entry_card.dart';
 import 'widgets/game_history_header.dart';
@@ -95,6 +96,13 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                                   );
                                 }
 
+                                // Shown as the last row rather than pinned to
+                                // the panel, so it scrolls away with the list
+                                // it is explaining.
+                                final showsBackupNote = widget
+                                    .viewModel
+                                    .isGameHistoryRestoredFromBackup;
+
                                 return ListView.separated(
                                   padding: const EdgeInsets.fromLTRB(
                                     20,
@@ -103,6 +111,16 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                                     28,
                                   ),
                                   itemBuilder: (context, index) {
+                                    if (index == history.length) {
+                                      return const GameHistoryBackupNote(
+                                        key: ValueKey(
+                                          'game-history-backup-note',
+                                        ),
+                                        textColor: _textColor,
+                                        headerColor: _headerColor,
+                                      );
+                                    }
+
                                     final entry = history[index];
                                     return GameHistoryEntryCard(
                                       entry: entry,
@@ -128,7 +146,9 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                                   },
                                   separatorBuilder: (_, _) =>
                                       const SizedBox(height: 10),
-                                  itemCount: history.length,
+                                  itemCount:
+                                      history.length +
+                                      (showsBackupNote ? 1 : 0),
                                 );
                               },
                             ),

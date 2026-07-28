@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../data/repositories/firestore_game_history_repository.dart';
 import '../../data/repositories/local_game_history_repository.dart';
 import '../../domain/models/pending_spin_recovery.dart';
 import '../../domain/repositories/spin_recovery_repository.dart';
@@ -45,11 +46,14 @@ class GameViewModel extends ChangeNotifier {
     AuthRepository? authRepository,
     PoolRepository? poolRepository,
     GameHistoryRepository? gameHistoryRepository,
+    GameHistoryRepository? remoteGameHistoryRepository,
     SpinRecoveryRepository? spinRecoveryRepository,
     GameMusicService? musicService,
     SpinExecutionController? spinExecutionController,
   }) : _historyCtrl = GameHistoryController(
          gameHistoryRepository ?? LocalGameHistoryRepository(),
+         remote:
+             remoteGameHistoryRepository ?? FirestoreGameHistoryRepository(),
        ),
        _feedbackCtrl = GameFeedbackController(musicService: musicService),
        _spinExecutionCtrl =
@@ -203,7 +207,16 @@ class GameViewModel extends ChangeNotifier {
   );
 
   bool get isCurrentSpinFromBuy => _roundCtrl.currentSpinFromBuy;
+  /// Account the disclaimer acceptance is recorded against, null while signed
+  /// out.
+  String? get currentUserId => _persistenceCtrl.currentUserId;
+
   List<GameHistoryEntry> get gameHistory => _historyCtrl.entries;
+
+  /// True when the shown history was recovered from the account backup, which
+  /// only keeps the most recent spins. See [GameHistoryController].
+  bool get isGameHistoryRestoredFromBackup =>
+      _historyCtrl.isRestoredFromBackup;
 
   SpinResult? get lastSpinResult => _roundCtrl.lastSpinResult;
   bool get shouldPulseLandingScatters =>
@@ -627,14 +640,16 @@ class GameViewModel extends ChangeNotifier {
       persistenceController: _persistenceCtrl,
       balanceController: _balanceCtrl,
       freeSpinsController: _fsCtrl,
+      historyController: _historyCtrl,
     );
     notifyListeners();
   }
 
-  Future<void> deleteAccount() async {
+  Future<void> deleteAccount(String password) async {
     await _sessionLifecycleCtrl.deleteAccount(
       sessionController: _sessionCtrl,
       persistenceController: _persistenceCtrl,
+      password: password,
     );
     notifyListeners();
   }
@@ -677,6 +692,7 @@ class GameViewModel extends ChangeNotifier {
       persistenceController: _persistenceCtrl,
       balanceController: _balanceCtrl,
       freeSpinsController: _fsCtrl,
+      historyController: _historyCtrl,
     );
   }
 

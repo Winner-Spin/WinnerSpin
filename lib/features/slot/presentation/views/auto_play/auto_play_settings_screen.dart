@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/typography/app_fonts.dart';
 
 import '../../audio/ui_click_sound.dart';
 import '../../viewmodels/game_viewmodel.dart';
@@ -114,7 +114,7 @@ class _AutoPlaySettingsScreenState extends State<AutoPlaySettingsScreen> {
                                         Text(
                                           'AUTOSPIN COUNT',
                                           textAlign: TextAlign.center,
-                                          style: GoogleFonts.barlowCondensed(
+                                          style: AppFonts.barlowCondensed(
                                             fontSize: 24,
                                             fontWeight: FontWeight.w900,
                                             color: _textColor,

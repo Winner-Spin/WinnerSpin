@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/typography/app_fonts.dart';
 
 import '../../audio/ui_click_sound.dart';
 import '../../../domain/models/symbol_registry.dart';
@@ -174,7 +174,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                                               Text(
                                                 'GENERAL SETTINGS',
                                                 style:
-                                                    GoogleFonts.barlowCondensed(
+                                                    AppFonts.barlowCondensed(
                                                       fontSize: 20,
                                                       fontWeight:
                                                           FontWeight.w900,

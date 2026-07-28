@@ -6,12 +6,24 @@ import 'package:path_provider/path_provider.dart';
 import '../../domain/models/game_history_entry.dart';
 import '../../domain/repositories/game_history_repository.dart';
 
-class LocalGameHistoryRepository implements GameHistoryRepository {
+class LocalGameHistoryRepository
+    implements GameHistoryRepository, StoredHistoryProbe {
   Future<void> _operations = Future<void>.value();
 
   Future<File> _historyFile(String userId) async {
     final directory = await getApplicationDocumentsDirectory();
     return File('${directory.path}/game_history_$userId.json');
+  }
+
+  /// True once a history file exists for [userId], even if it holds an empty
+  /// list. Used to tell a deleted-everything history from a fresh install.
+  @override
+  Future<bool> hasStoredHistory(String userId) {
+    return _synchronized(() async {
+      final file = await _historyFile(userId);
+      if (await file.exists()) return true;
+      return File('${file.path}.tmp').exists();
+    });
   }
 
   @override
@@ -36,12 +48,13 @@ class LocalGameHistoryRepository implements GameHistoryRepository {
     return _readEntries(file);
   }
 
+  /// Reads every stored entry. Unlike the Firestore mirror this copy is not
+  /// capped: the player's full history lives here.
   Future<List<GameHistoryEntry>> _readEntries(File file) async {
     final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
     return decoded
         .cast<Map<String, dynamic>>()
         .map(_entryFromJson)
-        .take(30)
         .toList(growable: false);
   }
 

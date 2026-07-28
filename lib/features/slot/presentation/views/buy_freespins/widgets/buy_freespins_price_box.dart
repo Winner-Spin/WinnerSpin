@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 import '../../../../../../core/format/money_format.dart';
 import '../../../../../../core/widgets/money_text.dart';
@@ -34,7 +34,7 @@ class BuyFreeSpinsPriceBox extends StatelessWidget {
         children: [
           Text(
             'COST',
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: textColor.withValues(alpha: 0.72),
@@ -46,7 +46,7 @@ class BuyFreeSpinsPriceBox extends StatelessWidget {
             symbolOffset: const Offset(0, 2.0),
             lineYOffset: 2.35,
             symbolTextYOffset: 2.3,
-            style: GoogleFonts.barlowCondensed(
+            style: AppFonts.barlowCondensed(
               fontSize: 24,
               fontWeight: FontWeight.w900,
               color: textColor,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/typography/app_fonts.dart';
 
 class AutoPlayStartButton extends StatelessWidget {
   const AutoPlayStartButton({
@@ -38,7 +38,7 @@ class AutoPlayStartButton extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               'START AUTOPLAY ($spinCount)',
-              style: GoogleFonts.barlowCondensed(
+              style: AppFonts.barlowCondensed(
                 fontSize: 23,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
