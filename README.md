@@ -288,7 +288,7 @@ See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) fo
 
 The production Android application ID is `com.winnerspin.game`. Register this exact ID in Firebase and add the release certificate SHA-1 and SHA-256 fingerprints. After enabling Google Play App Signing, also register the Play app-signing certificate fingerprints when they differ from the upload certificate.
 
-Android App Check uses the debug provider in debug/profile builds and Play Integrity in release builds. Register local debug tokens in Firebase Console without committing them. Real Play Integrity validation requires a release build distributed through a Google Play Internal Testing track; a locally installed release build does not complete that production check. App Check is not currently activated for iOS, so keep enforcement disabled until an iOS production provider is configured and metrics confirm valid traffic from every supported production client.
+Android App Check uses the debug provider in debug/profile builds and Play Integrity in release builds. Apple platforms use the debug provider in non-release builds and App Attest in release builds. Register local debug tokens without committing them. Enable enforcement for each platform only after its production app is registered and valid traffic is visible in Firebase metrics.
 
 ### Android Release Signing
 

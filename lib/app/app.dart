@@ -27,10 +27,11 @@ class WinnerSpinApp extends StatefulWidget {
     this.appUpdateMonitor,
   });
 
-  /// Where the update prompt sends the player when the Firestore config
-  /// document carries no `storeUrl` of its own.
   static const appStoreId = '6795310235';
   static const appStoreUrl = 'https://apps.apple.com/app/id$appStoreId';
+  static const playStorePackageName = 'com.winnerspin.game';
+  static const playStoreUrl =
+      'https://play.google.com/store/apps/details?id=$playStorePackageName';
 
   final AuthRepository? authRepository;
   final AmbientMusicLifecycle? ambientMusicLifecycle;
@@ -104,9 +105,13 @@ class _WinnerSpinAppState extends State<WinnerSpinApp>
 
   AppUpdateMonitor _createAppUpdateMonitor() {
     return StoreAppUpdateMonitor(
-      source: FirestoreRequiredVersionSource(),
+      source: FirestoreRequiredVersionSource(platform: defaultTargetPlatform),
       installedVersion: () async => kAppVersion,
-      fallbackStoreUrl: WinnerSpinApp.appStoreUrl,
+      fallbackStoreUrl: switch (defaultTargetPlatform) {
+        TargetPlatform.android => WinnerSpinApp.playStoreUrl,
+        TargetPlatform.iOS || TargetPlatform.macOS => WinnerSpinApp.appStoreUrl,
+        _ => null,
+      },
     );
   }
 

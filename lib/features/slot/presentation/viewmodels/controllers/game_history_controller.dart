@@ -24,16 +24,7 @@ class GameHistoryController {
   final Set<String> _restoredIds = {};
   Future<void> _remoteFlush = Future<void>.value();
 
-  /// What the Firestore mirror is believed to hold, newest first.
-  ///
-  /// [flushRemote] compares against this and writes nothing when the slice it
-  /// would upload is already there. Since the mirror only holds the newest
-  /// [kMaxRemoteGameHistoryEntries] rounds, deleting an older round changes the
-  /// device copy but not the mirror — and that case should cost no write.
-  ///
-  /// Starts empty rather than null: a controller whose history was never loaded
-  /// has nothing to reconcile, so an empty in-memory list must not trigger a
-  /// write that would wipe the mirror.
+  /// IDs last observed in the bounded Firestore mirror.
   List<String> _mirroredIds = const [];
 
   List<GameHistoryEntry> get entries => List.unmodifiable(_entries);
@@ -69,8 +60,6 @@ class GameHistoryController {
         ..clear()
         ..addAll(ordered);
       _restoredIds.clear();
-      // Firestore may still hold entries that were deleted while offline, so
-      // remember what is up there; the close-time flush reconciles it.
       final mirrored = _newestFirst(await _loadRemote(userId));
       _mirroredIds = _idsOf(_remoteSlice(mirrored));
       return;

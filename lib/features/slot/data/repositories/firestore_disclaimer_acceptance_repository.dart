@@ -47,43 +47,18 @@ class FirestoreDisclaimerAcceptanceRepository
     required int version,
     required String appVersion,
   }) {
-    return _db.collection(collection).doc(userId).set({
-      versionField: version,
-      // Server time, not the device clock: a player with a wrong or tampered
-      // clock would otherwise stamp the record with a meaningless date.
-      acceptedAtField: FieldValue.serverTimestamp(),
-      appVersionField: appVersion,
-    }, SetOptions(merge: true)).timeout(timeout);
-  }
-
-  @override
-  Future<void> archiveAcceptance({
-    required String userId,
-    required String email,
-  }) async {
-    final source = await _db
+    return _db
         .collection(collection)
         .doc(userId)
-        .get()
+        .set({
+          versionField: version,
+          // Server time, not the device clock: a player with a wrong or tampered
+          // clock would otherwise stamp the record with a meaningless date.
+          acceptedAtField: FieldValue.serverTimestamp(),
+          appVersionField: appVersion,
+        }, SetOptions(merge: true))
         .timeout(timeout);
-    final data = source.data();
-    if (acceptedVersionOf(data) <= 0) return;
-
-    // The values are copied, not re-stated. The rules check each one against
-    // the live user document, so an archive that says something the account
-    // never said cannot be written.
-    await _db.collection(archiveCollection).doc(userId).set({
-      emailField: email,
-      versionField: data![versionField],
-      acceptedAtField: data[acceptedAtField],
-      appVersionField: data[appVersionField],
-      archivedAtField: FieldValue.serverTimestamp(),
-    }).timeout(timeout);
   }
-
-  static const String archiveCollection = 'disclaimerAcceptances';
-  static const String emailField = 'email';
-  static const String archivedAtField = 'archivedAt';
 
   /// Highest disclaimer version [data] records as accepted, or 0 for none.
   @visibleForTesting

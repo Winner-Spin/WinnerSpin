@@ -180,6 +180,31 @@ void main() {
       sessionController.dispose();
     },
   );
+
+  test('keeps the balance listener after account deletion fails', () async {
+    final stream = StreamController<Map<String, dynamic>?>();
+    final sessionController = PlayerSessionController();
+    double? observedBalance;
+    sessionController.listenToUserBalance(
+      stream: stream.stream,
+      onBalanceChanged: (value) => observedBalance = value,
+    );
+
+    await expectLater(
+      sessionController.deleteAccount(
+        deleteAccount: () => Future<void>.error(StateError('offline')),
+      ),
+      throwsStateError,
+    );
+    stream.add({'userBalance': 12345.0});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(sessionController.loggedOut, isFalse);
+    expect(observedBalance, 12345.0);
+
+    await stream.close();
+    sessionController.dispose();
+  });
 }
 
 class _MemoryAuthRepository implements AuthRepository {
@@ -231,10 +256,7 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) => throw UnimplementedError();
+  Future<void> deleteAccount(String password) => throw UnimplementedError();
 
   @override
   Future<void> reloadCurrentUser() async {

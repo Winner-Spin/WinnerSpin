@@ -112,7 +112,7 @@ main.dart, ilk ekran çizilmeden önce şu işlemleri yapar:
 2. kalıcı ortam müziği tercihini yükler;
 3. ortak uygulama ses bağlamını yapılandırır;
 4. Firebase'i başlatır;
-5. Android App Check'i geliştirme derlemelerinde debug provider, release derlemelerde Play Integrity ile etkinleştirir;
+5. App Check'i Android'de Debug/Play Integrity, Apple platformlarında Debug/App Attest ile etkinleştirir;
 6. immersive sistem arayüzünü etkinleştirir;
 7. runApp'i engellemeden çarpan bombası Lottie varlığını parse etmeye başlar;
 8. WinnerSpinApp'i çalıştırır.
@@ -152,7 +152,9 @@ Doğrulama ekranı uygulama resumed durumuna döndüğünde Firebase kullanıcı
 - Profil verisi users/{uid} üzerinden izlenir.
 - Avatar değişiklikleri kaydedilmeden önce sembol registry'sine göre doğrulanır.
 - Parola sıfırlama istekleri Firestore'da rezerve edilir ve 24 saatte bir ile sınırlandırılır.
-- Tam hesap silme, deleteAccount callable Cloud Function'ını çağırır.
+- Tam hesap silme işleminde kullanıcının kimliği yeniden doğrulanır ve ardından
+  deleteAccount callable Cloud Function'ı çağrılır. Fonksiyon, saklanması gereken
+  bilgilendirme onayını arşivler ve sunucuya ait hesap kayıtlarını siler.
 
 ---
 

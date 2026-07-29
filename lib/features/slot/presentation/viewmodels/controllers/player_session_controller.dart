@@ -81,9 +81,9 @@ class PlayerSessionController extends ChangeNotifier {
   Future<void> deleteAccount({
     required Future<void> Function() deleteAccount,
   }) async {
+    await deleteAccount();
     await _userSubscription?.cancel();
     _userSubscription = null;
-    await deleteAccount();
     _loggedOut = true;
   }
 

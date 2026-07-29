@@ -301,10 +301,7 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> signOut() async {}
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) async {}
+  Future<void> deleteAccount(String password) async {}
 
   @override
   Future<void> sendEmailVerificationLink() async {}

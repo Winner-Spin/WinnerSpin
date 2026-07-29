@@ -112,7 +112,7 @@ main.dart performs startup work before rendering the first screen:
 2. loads the persisted ambient-music preference;
 3. configures the shared application audio context;
 4. initializes Firebase;
-5. activates Android App Check with the debug provider for development builds and Play Integrity for release builds;
+5. activates App Check with Debug/Play Integrity on Android and Debug/App Attest on Apple platforms;
 6. enables immersive system UI;
 7. starts parsing the multiplier-bomb Lottie asset without blocking runApp;
 8. launches WinnerSpinApp.
@@ -152,7 +152,9 @@ The verification screen reloads the Firebase user when the application resumes a
 - Profile data is observed from users/{uid}.
 - Avatar changes are validated against the symbol registry before being saved.
 - Password-reset requests are reserved in Firestore and limited to once every 24 hours.
-- Full account deletion calls the deleteAccount callable Cloud Function.
+- Full account deletion reauthenticates the player, then calls the deleteAccount
+  callable Cloud Function. The function archives the retained disclaimer
+  evidence and removes the server-owned account records.
 
 ---
 

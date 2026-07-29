@@ -334,94 +334,23 @@ describe("users collection ownership", () => {
     }));
   });
 
-  test("allows the owner to delete their own document", async () => {
-    // Account deletion runs from the client now; there is no function to do it.
+  test("denies client-side deletion of the owner document", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
 
-    await assertSucceeds(deleteDoc(doc(database, "users", ownerId)));
+    await assertFails(deleteDoc(doc(database, "users", ownerId)));
   });
 });
 
 describe("disclaimer acceptance archive", () => {
-  test("keeps a copy that matches the account record", async () => {
+  test("denies every client operation", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
-    const ownerReference = doc(database, "users", ownerId);
-
-    await assertSucceeds(updateDoc(ownerReference, {
-      disclaimerVersion: 1,
-      disclaimerAcceptedAt: serverTimestamp(),
-      disclaimerAppVersion: "1.0.0+1",
-    }));
-    const stored = (await getDoc(ownerReference)).data();
-
-    await assertSucceeds(setDoc(
-      doc(database, "disclaimerAcceptances", ownerId),
-      {
-        email: ownerEmail,
-        disclaimerVersion: stored.disclaimerVersion,
-        disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
-        disclaimerAppVersion: stored.disclaimerAppVersion,
-        archivedAt: serverTimestamp(),
-      },
-    ));
-  });
-
-  test("denies a copy that says more than the account did", async () => {
-    const database = authenticatedFirestore(ownerId, ownerEmail);
-    const ownerReference = doc(database, "users", ownerId);
-
-    await assertSucceeds(updateDoc(ownerReference, {
-      disclaimerVersion: 1,
-      disclaimerAcceptedAt: serverTimestamp(),
-      disclaimerAppVersion: "1.0.0+1",
-    }));
-    const stored = (await getDoc(ownerReference)).data();
-
-    // An archive is only evidence if it cannot claim something the account
-    // never recorded.
-    await assertFails(setDoc(
-      doc(database, "disclaimerAcceptances", ownerId),
-      {
-        email: ownerEmail,
-        disclaimerVersion: 9,
-        disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
-        disclaimerAppVersion: stored.disclaimerAppVersion,
-        archivedAt: serverTimestamp(),
-      },
-    ));
-  });
-
-  test("denies archiving under somebody else's account", async () => {
-    const database = authenticatedFirestore(ownerId, ownerEmail);
-
-    await assertFails(setDoc(
-      doc(database, "disclaimerAcceptances", otherUserId),
-      {
-        email: ownerEmail,
-        disclaimerVersion: 1,
-        disclaimerAcceptedAt: serverTimestamp(),
-        disclaimerAppVersion: "1.0.0+1",
-        archivedAt: serverTimestamp(),
-      },
-    ));
-  });
-
-  test("cannot be read, changed or removed once written", async () => {
-    const database = authenticatedFirestore(ownerId, ownerEmail);
-    const ownerReference = doc(database, "users", ownerId);
     const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
 
-    await assertSucceeds(updateDoc(ownerReference, {
+    await assertFails(setDoc(archiveReference, {
+      email: ownerEmail,
       disclaimerVersion: 1,
       disclaimerAcceptedAt: serverTimestamp(),
       disclaimerAppVersion: "1.0.0+1",
-    }));
-    const stored = (await getDoc(ownerReference)).data();
-    await assertSucceeds(setDoc(archiveReference, {
-      email: ownerEmail,
-      disclaimerVersion: stored.disclaimerVersion,
-      disclaimerAcceptedAt: stored.disclaimerAcceptedAt,
-      disclaimerAppVersion: stored.disclaimerAppVersion,
       archivedAt: serverTimestamp(),
     }));
 
@@ -505,6 +434,7 @@ describe("server-owned collections", () => {
 
       await assertFails(getDoc(reference));
       await assertFails(setDoc(reference, {ownerId}));
+      await assertFails(deleteDoc(reference));
     });
   }
 

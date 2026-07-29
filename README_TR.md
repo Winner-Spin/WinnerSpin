@@ -288,7 +288,7 @@ Kesin ayrım için [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFIC
 
 Üretim Android uygulama kimliği `com.winnerspin.game`'dir. Firebase'e bu kimliği eksiksiz olarak kaydedin ve release sertifikasının SHA-1 ile SHA-256 parmak izlerini ekleyin. Google Play App Signing etkinleştirildikten sonra Play uygulama imzalama sertifikasının parmak izleri upload sertifikasından farklıysa onları da kaydedin.
 
-Android App Check, debug/profile derlemelerde debug provider; release derlemelerde Play Integrity kullanır. Yerel debug tokenlarını Firebase Console'a kaydedin ve hiçbir zaman commitlemeyin. Gerçek Play Integrity doğrulaması, Google Play Internal Testing kanalı üzerinden dağıtılan bir release derlemesi gerektirir; yerel olarak kurulan release derlemesi bu üretim kontrolünü tamamlamaz. App Check henüz iOS için etkinleştirilmediğinden, iOS üretim sağlayıcısı yapılandırılıp desteklenen tüm üretim istemcilerinden geçerli trafik metriklerde doğrulanana kadar enforcement özelliğini kapalı tutun.
+Android App Check, debug/profile derlemelerde debug provider; release derlemelerde Play Integrity kullanır. Apple platformları release olmayan derlemelerde debug provider, release derlemelerde App Attest kullanır. Yerel debug tokenlarını hiçbir zaman commitlemeyin. Her platform için enforcement özelliğini yalnızca üretim uygulaması kaydedildikten ve Firebase metriklerinde geçerli trafik görüldükten sonra etkinleştirin.
 
 ### Android Release İmzalama
 

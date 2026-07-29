@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/network/internet_connection_probe.dart';
@@ -13,21 +14,24 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
     InternetConnectionCheck? internetConnectionCheck,
     DateTime Function()? now,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1'),
        _internetConnectionCheck =
            internetConnectionCheck ?? hasInternetConnection,
        _now = now ?? DateTime.now;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
   final InternetConnectionCheck _internetConnectionCheck;
   final DateTime Function() _now;
 
   static const String _usersCollection = 'users';
-  static const String _emailVerificationsCollection = 'emailVerifications';
   static const String _passwordResetRequestedAtField =
       'passwordResetRequestedAt';
   static const String _passwordResetRequestIdField = 'passwordResetRequestId';
@@ -110,10 +114,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) async {
+  Future<void> deleteAccount(String password) async {
     final user = _auth.currentUser;
     final email = user?.email;
     if (user == null || email == null) {
@@ -121,33 +122,22 @@ class FirebaseAuthRepository implements AuthRepository {
     }
 
     try {
-      // Re-proving identity comes first, on purpose. Firebase rejects the
-      // delete outright on a stale sign-in, and doing it up front means a
-      // wrong password costs nothing — the data is still there to try again.
       await user.reauthenticateWithCredential(
         EmailAuthProvider.credential(email: email, password: password),
       );
+      await user.getIdToken(true);
 
-      // Anything that has to outlive the account is written here, in the gap
-      // between a proven password and the first deletion.
-      if (onReauthenticated != null) await onReauthenticated();
-
-      // Then the documents, while the account still exists: the rules key
-      // every one of them off `request.auth.uid`, so nothing here is reachable
-      // once the Auth user is gone.
-      await _deleteUserDocuments(user.uid);
-
-      await user.delete();
+      await _functions.httpsCallable('deleteAccount').call<void>();
+      try {
+        await _auth.signOut();
+      } catch (_) {
+        // Server deletion already succeeded; device cleanup must still run.
+      }
     } on FirebaseAuthException catch (error) {
       throw AuthException(_mapFirebaseCode(error.code), error.message);
+    } on FirebaseFunctionsException catch (error) {
+      throw AuthException(AuthErrorCode.unknown, error.message);
     }
-  }
-
-  Future<void> _deleteUserDocuments(String uid) async {
-    final batch = _firestore.batch();
-    batch.delete(_firestore.collection(_usersCollection).doc(uid));
-    batch.delete(_firestore.collection(_emailVerificationsCollection).doc(uid));
-    await batch.commit();
   }
 
   @override

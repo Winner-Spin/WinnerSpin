@@ -126,11 +126,7 @@ service cloud.firestore {
             && request.auth.token.email_verified == true
           )
         );
-      // Account deletion runs from the client, so the owner has to be able to
-      // remove their own record. Recreating it is not a way around anything:
-      // `hasValidInitialProfile` pins the starting balance, and the deposit
-      // screen hands out coins for free anyway.
-      allow delete: if isOwner(userId);
+      allow delete: if false;
     }
 
     // Forced-update gate. Readable by anyone, including signed-out users, so
@@ -142,45 +138,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /emailVerifications/{userId} {
+    match /emailVerifications/{document=**} {
       allow read, write: if false;
-      // Same reason as above: the owner clears their own record on the way
-      // out. Everything else here stays server-only.
-      allow delete: if isOwner(userId);
     }
 
-    // Consent evidence that outlives the account.
-    //
-    // Deleting an account removes `users/{uid}`, which is where the acceptance
-    // is recorded — so the proof would vanish exactly when it is most likely to
-    // be needed. This copy is written just before deletion and cannot be
-    // touched afterwards.
-    //
-    // Every field is checked against the live user document, so the archive can
-    // only ever repeat what the account actually recorded. Write-once: no
-    // update, no delete, and not readable by any client.
-    match /disclaimerAcceptances/{userId} {
-      allow read, update, delete: if false;
-      allow create: if isOwner(userId)
-        && request.resource.data.keys().hasOnly([
-          'email',
-          'disclaimerVersion',
-          'disclaimerAcceptedAt',
-          'disclaimerAppVersion',
-          'archivedAt'
-        ])
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.archivedAt == request.time
-        && exists(/databases/$(database)/documents/users/$(userId))
-        && request.resource.data.disclaimerVersion ==
-          get(/databases/$(database)/documents/users/$(userId))
-            .data.disclaimerVersion
-        && request.resource.data.disclaimerAcceptedAt ==
-          get(/databases/$(database)/documents/users/$(userId))
-            .data.disclaimerAcceptedAt
-        && request.resource.data.disclaimerAppVersion ==
-          get(/databases/$(database)/documents/users/$(userId))
-            .data.disclaimerAppVersion;
+    // Retained consent evidence is written only by the deletion Cloud Function.
+    match /disclaimerAcceptances/{document=**} {
+      allow read, write: if false;
     }
 
     match /deletedUnverifiedAccounts/{document=**} {

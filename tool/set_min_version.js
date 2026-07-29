@@ -9,8 +9,8 @@
  * written with admin credentials, which is what this script uses.
  *
  * Usage:
- *   node tool/set_min_version.js 1.1.0
- *   node tool/set_min_version.js 1.1.0 --store-url https://apps.apple.com/app/id6795310235
+ *   node tool/set_min_version.js 1.1.0 --platform android
+ *   node tool/set_min_version.js 1.1.0 --platform ios --store-url https://apps.apple.com/app/id6795310235
  *   node tool/set_min_version.js --show
  *
  * Credentials — either works:
@@ -27,11 +27,18 @@ const COLLECTION = 'config';
 const DOCUMENT = 'appVersion';
 
 function parseArgs(argv) {
-  const args = {version: null, storeUrl: null, show: false, projectId: null};
+  const args = {
+    version: null,
+    storeUrl: null,
+    platform: null,
+    show: false,
+    projectId: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--show') args.show = true;
     else if (arg === '--store-url') args.storeUrl = argv[++i];
+    else if (arg === '--platform') args.platform = argv[++i];
     else if (arg === '--project') args.projectId = argv[++i];
     else if (!arg.startsWith('-') && args.version === null) args.version = arg;
   }
@@ -94,13 +101,19 @@ async function main() {
       console.log(JSON.stringify(snapshot.data(), null, 2));
     }
     if (args.version === null && !args.show) {
-      console.log('\nTo set it:  node tool/set_min_version.js 1.1.0');
+      console.log(
+          '\nTo set Android:  node tool/set_min_version.js 1.1.0 --platform android',
+      );
     }
     process.exit(0);
   }
 
   if (!isValidVersion(args.version)) {
     console.error(`"${args.version}" is not a version like 1.1.0.`);
+    process.exit(1);
+  }
+  if (args.platform !== null && !['android', 'ios'].includes(args.platform)) {
+    console.error('--platform must be android or ios.');
     process.exit(1);
   }
 
@@ -117,8 +130,14 @@ async function main() {
     console.warn('');
   }
 
-  const payload = {minimumVersion: args.version};
-  if (args.storeUrl) payload.storeUrl = args.storeUrl;
+  const versionField = args.platform === null
+      ? 'minimumVersion'
+      : `${args.platform}MinimumVersion`;
+  const storeUrlField = args.platform === null
+      ? 'storeUrl'
+      : `${args.platform}StoreUrl`;
+  const payload = {[versionField]: args.version};
+  if (args.storeUrl) payload[storeUrlField] = args.storeUrl;
 
   await reference.set(payload, {merge: true});
 

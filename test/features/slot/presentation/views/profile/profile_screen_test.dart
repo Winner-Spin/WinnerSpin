@@ -4,11 +4,9 @@ import 'package:winner_spin/features/auth/domain/repositories/auth_repository.da
 import 'package:winner_spin/features/slot/domain/models/game_history_entry.dart';
 import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/repositories/game_history_repository.dart';
-import 'package:winner_spin/features/slot/domain/repositories/first_launch_disclaimer_repository.dart';
 import 'package:winner_spin/features/slot/domain/repositories/pool_repository.dart';
 import 'package:winner_spin/features/slot/presentation/audio/game_music_service.dart';
 import 'package:winner_spin/features/slot/presentation/audio/ui_click_sound.dart';
-import 'package:winner_spin/features/slot/presentation/viewmodels/controllers/slot_persistence_controller.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/game_viewmodel.dart';
 import 'package:winner_spin/features/slot/presentation/views/profile/profile_screen.dart';
 
@@ -259,38 +257,6 @@ void main() {
     viewModel.dispose();
   });
 
-  test('keeps the consent evidence when the account goes', () async {
-    final authRepository = _ProfileAuthRepository();
-    final archive = _RecordingAcceptanceRepository();
-    final controller = SlotPersistenceController(
-      authRepository: authRepository,
-      poolRepository: _ProfilePoolRepository(),
-      disclaimerAcceptanceRepository: archive,
-    );
-
-    await controller.deleteAccount('hunter2');
-
-    // Deleting the account removes the user document the acceptance lives on,
-    // so the copy has to be made while it is still there.
-    expect(archive.archivedUserId, 'user-1');
-    expect(archive.archivedEmail, 'player@example.com');
-  });
-
-  test('a failed archive does not block the deletion', () async {
-    final authRepository = _ProfileAuthRepository();
-    final controller = SlotPersistenceController(
-      authRepository: authRepository,
-      poolRepository: _ProfilePoolRepository(),
-      disclaimerAcceptanceRepository: _FailingAcceptanceRepository(),
-    );
-
-    await controller.deleteAccount('hunter2');
-
-    // The player asked and proved who they are; our bookkeeping problem is
-    // not a reason to refuse them.
-    expect(authRepository.deleteAccountCalls, 1);
-  });
-
   test('rejects a stored non-English avatar id', () async {
     final authRepository = _ProfileAuthRepository();
     authRepository._userData['profileAvatarId'] = 'unsupported_avatar';
@@ -379,15 +345,9 @@ class _ProfileAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) async {
+  Future<void> deleteAccount(String password) async {
     deleteAccountCalls++;
     deletePassword = password;
-    // The real repository runs this between proving the password and the
-    // first deletion, which is the only window the archive can be written in.
-    await onReauthenticated?.call();
   }
 
   @override
@@ -426,52 +386,4 @@ class _SilentGameMusicService extends GameMusicService {
 
   @override
   Future<void> dispose() async {}
-}
-
-class _RecordingAcceptanceRepository implements DisclaimerAcceptanceRepository {
-  String? archivedUserId;
-  String? archivedEmail;
-
-  @override
-  Future<bool> hasAccepted({
-    required String userId,
-    required int version,
-  }) async => false;
-
-  @override
-  Future<void> recordAcceptance({
-    required String userId,
-    required int version,
-    required String appVersion,
-  }) async {}
-
-  @override
-  Future<void> archiveAcceptance({
-    required String userId,
-    required String email,
-  }) async {
-    archivedUserId = userId;
-    archivedEmail = email;
-  }
-}
-
-class _FailingAcceptanceRepository implements DisclaimerAcceptanceRepository {
-  @override
-  Future<bool> hasAccepted({
-    required String userId,
-    required int version,
-  }) async => false;
-
-  @override
-  Future<void> recordAcceptance({
-    required String userId,
-    required int version,
-    required String appVersion,
-  }) async {}
-
-  @override
-  Future<void> archiveAcceptance({
-    required String userId,
-    required String email,
-  }) async => throw Exception('offline');
 }

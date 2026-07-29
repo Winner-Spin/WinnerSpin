@@ -48,9 +48,7 @@ flutter:
     - assets/audio/Items/
     - assets/animations/
 
-  # Bundled instead of fetched at runtime: a fresh install used to render heavy
-  # weights with the platform fallback font (too thin) until the google_fonts
-  # download finished. Shipping the files fixes the first-launch flash.
+  # Bundled fonts keep typography consistent on first launch and offline.
   fonts:
     - family: Anton
       fonts:

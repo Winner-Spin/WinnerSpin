@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/core/update/firestore_required_version_source.dart';
 
@@ -23,6 +24,42 @@ void main() {
     expect(result?.storeUrl, isNull);
   });
 
+  test('selects Android version and store URL independently', () {
+    final result = FirestoreRequiredVersionSource.parse({
+      'minimumVersion': '1.0.0',
+      'androidMinimumVersion': '1.2.0',
+      'iosMinimumVersion': '1.3.0',
+      'androidStoreUrl': 'https://play.google.com/store/apps/details?id=game',
+      'iosStoreUrl': 'https://apps.apple.com/app/id1',
+    }, platform: TargetPlatform.android);
+
+    expect(result?.version, '1.2.0');
+    expect(result?.storeUrl, contains('play.google.com'));
+  });
+
+  test('selects iOS version and store URL independently', () {
+    final result = FirestoreRequiredVersionSource.parse({
+      'minimumVersion': '1.0.0',
+      'androidMinimumVersion': '1.2.0',
+      'iosMinimumVersion': '1.3.0',
+      'androidStoreUrl': 'https://play.google.com/store/apps/details?id=game',
+      'iosStoreUrl': 'https://apps.apple.com/app/id1',
+    }, platform: TargetPlatform.iOS);
+
+    expect(result?.version, '1.3.0');
+    expect(result?.storeUrl, contains('apps.apple.com'));
+  });
+
+  test('uses the shared store URL as a platform fallback', () {
+    final result = FirestoreRequiredVersionSource.parse({
+      'minimumVersion': '1.0.0',
+      'storeUrl': 'https://example.com/update',
+    }, platform: TargetPlatform.android);
+
+    expect(result?.version, '1.0.0');
+    expect(result?.storeUrl, 'https://example.com/update');
+  });
+
   test('returns null for a missing document', () {
     // The state of a fresh project: nothing may block on a missing document.
     expect(FirestoreRequiredVersionSource.parse(null), isNull);
@@ -31,9 +68,7 @@ void main() {
   test('returns null when minimumVersion is unusable', () {
     for (final value in <Object?>[null, '', '   ', 42, true, <String>[]]) {
       expect(
-        FirestoreRequiredVersionSource.parse({
-          if (value != null) 'minimumVersion': value,
-        }),
+        FirestoreRequiredVersionSource.parse({'minimumVersion': ?value}),
         isNull,
         reason: 'minimumVersion: $value',
       );
@@ -62,6 +97,9 @@ void main() {
   test('the document path is the one the rules and docs describe', () {
     expect(FirestoreRequiredVersionSource.collection, 'config');
     expect(FirestoreRequiredVersionSource.document, 'appVersion');
-    expect(FirestoreRequiredVersionSource.minimumVersionField, 'minimumVersion');
+    expect(
+      FirestoreRequiredVersionSource.minimumVersionField,
+      'minimumVersion',
+    );
   });
 }

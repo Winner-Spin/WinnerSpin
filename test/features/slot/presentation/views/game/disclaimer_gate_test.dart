@@ -34,10 +34,7 @@ void main() {
       reason: 'the game must not be mounted behind the notice',
     );
 
-    await tester.tap(find.byKey(const ValueKey('disclaimer-checkbox')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('disclaimer-okay')));
-    await tester.pumpAndSettle();
+    await _acceptDisclaimer(tester);
 
     expect(find.text('GAME'), findsOneWidget);
     expect(find.byType(FirstLaunchDisclaimerDialog), findsNothing);
@@ -50,10 +47,7 @@ void main() {
     await tester.pumpWidget(_host(local: local, remote: remote));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('disclaimer-checkbox')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('disclaimer-okay')));
-    await tester.pumpAndSettle();
+    await _acceptDisclaimer(tester);
 
     expect(local.seen['user-1'], kDisclaimerVersion);
     expect(remote.accepted['user-1'], kDisclaimerVersion);
@@ -130,7 +124,7 @@ void main() {
     expect(find.byType(FirstLaunchDisclaimerDialog), findsOneWidget);
   });
 
-  testWidgets('lets the player in when the account write fails', (
+  testWidgets('keeps the gate open when the account write fails', (
     tester,
   ) async {
     final local = _MemoryLocalRepository();
@@ -138,16 +132,40 @@ void main() {
     await tester.pumpWidget(_host(local: local, remote: _FailingRemote()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('disclaimer-checkbox')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('disclaimer-okay')));
+    await _acceptDisclaimer(tester);
+
+    expect(find.text('GAME'), findsNothing);
+    expect(find.byType(FirstLaunchDisclaimerDialog), findsOneWidget);
+    expect(find.textContaining('could not be saved'), findsOneWidget);
+    expect(local.seen['user-1'], isNull);
+  });
+
+  testWidgets('recovers when a timed-out write was committed remotely', (
+    tester,
+  ) async {
+    final local = _MemoryLocalRepository();
+
+    await tester.pumpWidget(
+      _host(local: local, remote: _CommittedThenFailedRemote()),
+    );
     await tester.pumpAndSettle();
 
-    // Losing the evidence copy is a problem for us, not a reason to lock the
-    // player out of a game they just agreed to play.
+    await _acceptDisclaimer(tester);
+
     expect(find.text('GAME'), findsOneWidget);
     expect(local.seen['user-1'], kDisclaimerVersion);
   });
+}
+
+Future<void> _acceptDisclaimer(WidgetTester tester) async {
+  final acknowledgement = find.byKey(
+    const ValueKey('disclaimer-acknowledgement'),
+  );
+  await tester.ensureVisible(acknowledgement);
+  await tester.tap(acknowledgement);
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('disclaimer-okay')));
+  await tester.pumpAndSettle();
 }
 
 Widget _host({
@@ -212,12 +230,6 @@ class _MemoryAcceptanceRepository implements DisclaimerAcceptanceRepository {
     accepted[userId] = version;
     recordedAppVersion = appVersion;
   }
-
-  @override
-  Future<void> archiveAcceptance({
-    required String userId,
-    required String email,
-  }) async {}
 }
 
 class _FailingRemote implements DisclaimerAcceptanceRepository {
@@ -233,12 +245,18 @@ class _FailingRemote implements DisclaimerAcceptanceRepository {
     required int version,
     required String appVersion,
   }) async => throw Exception('offline');
+}
 
+class _CommittedThenFailedRemote extends _MemoryAcceptanceRepository {
   @override
-  Future<void> archiveAcceptance({
+  Future<void> recordAcceptance({
     required String userId,
-    required String email,
-  }) async => throw Exception('offline');
+    required int version,
+    required String appVersion,
+  }) async {
+    accepted[userId] = version;
+    throw Exception('response lost');
+  }
 }
 
 class _StubAuthRepository implements AuthRepository {

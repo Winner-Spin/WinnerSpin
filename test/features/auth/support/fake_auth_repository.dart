@@ -43,12 +43,8 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) async {
+  Future<void> deleteAccount(String password) async {
     deleteAccountCalls++;
-    await onReauthenticated?.call();
   }
 
   @override

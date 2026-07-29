@@ -90,8 +90,7 @@ class _FirstLaunchDisclaimerDialogState
                       child: SpringPopupCard(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.92,
+                            maxWidth: MediaQuery.of(context).size.width * 0.92,
                             // Taller than the plain notice was: the tick row
                             // and its link lines need the room.
                             maxHeight:
@@ -125,7 +124,7 @@ class _FirstLaunchDisclaimerDialogState
                                         22,
                                         24,
                                         22,
-                                        24,
+                                        14,
                                       ),
                                       child: Column(
                                         crossAxisAlignment:
@@ -144,11 +143,18 @@ class _FirstLaunchDisclaimerDialogState
                                           ),
                                           const SizedBox(height: 18),
                                           _buildAcknowledgement(),
-                                          const SizedBox(height: 20),
-                                          _buildOkayButton(),
                                         ],
                                       ),
                                     ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      22,
+                                      6,
+                                      22,
+                                      20,
+                                    ),
+                                    child: _buildOkayButton(),
                                   ),
                                 ],
                               ),
@@ -237,7 +243,8 @@ class _FirstLaunchDisclaimerDialogState
                   style: baseStyle,
                   children: [
                     const TextSpan(
-                      text: 'I have read and understood the notice above. '
+                      text:
+                          'I have read and understood the notice above. '
                           'I confirm that I am 18 or older, and I accept the ',
                     ),
                     TextSpan(

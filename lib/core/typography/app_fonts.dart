@@ -1,22 +1,6 @@
-// `material.dart` re-exports every type in these signatures (Color, Paint,
-// Shadow, Locale, FontFeature, ...). Importing `dart:ui` directly would make
-// `TextStyle` ambiguous, since dart:ui declares its own low-level TextStyle.
 import 'package:flutter/material.dart';
 
 /// App typography backed by **bundled** font assets.
-///
-/// This replaces the previous `google_fonts` usage. That package downloads font
-/// files from the network on first run and caches them on disk, which caused a
-/// visible bug: on a fresh install (or right after clearing app data) the
-/// download had not finished yet, so Flutter fell back to the platform default
-/// font and heavy weights (w800/w900) rendered noticeably thinner. Once the
-/// download completed the real font kicked in and the text "became bold again".
-///
-/// Shipping the `.ttf` files inside the APK/IPA removes the network dependency
-/// entirely: the correct weight is available on the very first frame, offline.
-///
-/// The method signatures mirror the old `GoogleFonts.*` helpers, so call sites
-/// only needed the prefix swapped.
 class AppFonts {
   const AppFonts._();
 

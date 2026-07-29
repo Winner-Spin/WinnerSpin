@@ -10,12 +10,15 @@ Console → Firestore Database → koleksiyon `config`, doküman `appVersion`:
 
 | Alan | Tip | Zorunlu | Örnek |
 | --- | --- | --- | --- |
-| `minimumVersion` | string | evet | `1.1.0` |
-| `storeUrl` | string | hayır | `https://apps.apple.com/app/id6795310235` |
+| `androidMinimumVersion` | string | Android için | `1.1.0` |
+| `iosMinimumVersion` | string | iOS için | `1.2.0` |
+| `androidStoreUrl` | string | hayır | `https://play.google.com/store/apps/details?id=com.winnerspin.game` |
+| `iosStoreUrl` | string | hayır | `https://apps.apple.com/app/id6795310235` |
+| `minimumVersion` | string | hayır | Platform alanı yoksa kullanılan ortak yedek |
 
-`storeUrl` boş bırakılırsa uygulama kendi içine gömülü App Store adresini
-kullanır. Bu alan, ileride Android'e de çıkarsan mağazaya göre farklı adres
-vermek istersen işine yarar.
+Mağaza adresi boş bırakılırsa uygulama Android'de Play Store, iOS'ta App Store
+adresini kullanır. Platform sürümleri ayrı tutulduğu için mağaza yayınları farklı
+zamanlarda tamamlanabilir.
 
 Kuralları yayınlamayı unutma:
 
@@ -43,7 +46,7 @@ sayılır:
 - doküman yok
 - cihaz çevrimdışı
 - Firestore yavaş veya erişilemiyor
-- `minimumVersion` boş, sayı, dizi ya da ayrıştırılamaz bir metin
+- ilgili platform sürümü ve ortak `minimumVersion` alanı yok veya geçersiz
 
 Tersi çok daha kötü olurdu: bir okuma hatası yüzünden bütün oyuncuların
 kilitlenmesi. Bu yüzden her hata yolu geçirgen.
@@ -59,18 +62,18 @@ Yayın sırası:
 1. `pubspec.yaml` → `version: 1.1.0+2`
 2. `app_build_info.dart` → `kAppVersion = '1.1.0'`
 3. `flutter test`
-4. Yeni sürümü App Store'a yayınla ve **yayında olduğunu doğrula**
-5. Ancak ondan sonra Firestore'da `minimumVersion` → `1.1.0`
+4. Yeni sürümü ilgili mağazada yayınla ve **yayında olduğunu doğrula**
+5. Android için `androidMinimumVersion`, iOS için `iosMinimumVersion` değerini yükselt
 
-Dördüncü adım önemli: `minimumVersion`'ı mağazadaki sürüm gerçekten
+Dördüncü adım önemli: platform sürümünü mağazadaki sürüm gerçekten
 indirilebilir olmadan yükseltirsen, kullanıcılar güncelleyemedikleri hâlde
 oyuna giremezler.
 
 ## Test
 
-Kilidi görmek için Console'dan `minimumVersion` değerini cihazdakinden büyük bir
+Kilidi görmek için cihaz platformuna ait sürüm değerini cihazdakinden büyük bir
 şeye çek, örneğin `99.0.0`. Uygulamayı aç — ekran çıkmalı. Değeri geri düşür,
 uygulamayı arka plana atıp geri getir — kilit kalkmalı.
 
-Kilitlememe kuralını denemek için dokümanı sil ya da `minimumVersion`'ı boş
-bırak; oyun normal açılmalı.
+Kilitlememe kuralını denemek için dokümanı sil veya platform sürümüyle ortak
+`minimumVersion` alanını boş bırak; oyun normal açılmalı.

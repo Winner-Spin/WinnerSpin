@@ -31,17 +31,4 @@ abstract class DisclaimerAcceptanceRepository {
     required int version,
     required String appVersion,
   });
-
-  /// Copies the acceptance somewhere the account deletion cannot reach.
-  ///
-  /// The record normally lives on the user document, which is exactly what
-  /// deleting an account removes — so without this the evidence disappears at
-  /// the moment it is most likely to be asked for. Called just before the
-  /// account goes, while the source record is still readable.
-  ///
-  /// Does nothing when there is no acceptance to copy.
-  Future<void> archiveAcceptance({
-    required String userId,
-    required String email,
-  });
 }

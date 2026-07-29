@@ -124,10 +124,7 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  }) => throw UnimplementedError();
+  Future<void> deleteAccount(String password) => throw UnimplementedError();
 
   @override
   Future<void> reloadCurrentUser() => throw UnimplementedError();

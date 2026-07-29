@@ -37,7 +37,7 @@ DeviceCheck'e geri düşmeye (fallback) gerek yok.
 
 1. [Firebase Console](https://console.firebase.google.com/project/_/appcheck/)
    → **Build** > **App Check**
-2. **Apps** sekmesi → iOS uygulamasını (`com.winnerSpin`) seç
+2. **Apps** sekmesi → `firebase_options.dart` içindeki `iosBundleId` ile eşleşen iOS uygulamasını seç
 3. **App Attest**'i seç ve kaydet
 4. TTL'i olduğu gibi bırak — varsayılan 1 saat çoğu uygulama için uygundur
 

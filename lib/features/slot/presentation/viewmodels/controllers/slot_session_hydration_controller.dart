@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../domain/models/pool_state.dart';
 import 'balance_controller.dart';
 import 'free_spins_controller.dart';
 import 'game_history_controller.dart';
@@ -23,9 +24,13 @@ class SlotSessionHydrationController {
       final userId = persistenceController.currentUserId;
       if (userId == null) return;
 
-      await historyController.load(userId);
-
-      final sessionData = await persistenceController.loadUserSession(userId);
+      late ({Map<String, dynamic>? userData, PoolState pool}) sessionData;
+      await Future.wait<void>([
+        persistenceController.loadUserSession(userId).then((value) {
+          sessionData = value;
+        }),
+        historyController.load(userId),
+      ]);
       final userData = sessionData.userData;
       poolController.hydrate(sessionData.pool);
 

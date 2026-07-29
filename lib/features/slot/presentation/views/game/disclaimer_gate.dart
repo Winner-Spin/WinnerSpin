@@ -7,6 +7,7 @@ import '../../../data/repositories/firestore_disclaimer_acceptance_repository.da
 import '../../../data/repositories/local_first_launch_disclaimer_repository.dart';
 import '../../../domain/repositories/first_launch_disclaimer_repository.dart';
 import '../../services/game_background_image_provider.dart';
+import '../../viewmodels/controllers/disclaimer_gate_controller.dart';
 import 'game_screen.dart';
 import 'widgets/presentation/dialogs/first_launch_disclaimer_dialog.dart';
 
@@ -37,108 +38,54 @@ class DisclaimerGate extends StatefulWidget {
   State<DisclaimerGate> createState() => _DisclaimerGateState();
 }
 
-enum _GateStatus { checking, needsAcceptance, accepted }
-
 class _DisclaimerGateState extends State<DisclaimerGate> {
-  late final AuthRepository _authRepository;
-  late final FirstLaunchDisclaimerRepository _local;
-  late final DisclaimerAcceptanceRepository _acceptance;
-
-  _GateStatus _status = _GateStatus.checking;
-  bool _isRecording = false;
-
-  String? get _userId => _authRepository.currentUserId;
+  late final DisclaimerGateController _controller;
 
   @override
   void initState() {
     super.initState();
-    _authRepository = widget.authRepository ?? FirebaseAuthRepository();
-    _local = widget.localRepository ?? LocalFirstLaunchDisclaimerRepository();
-    _acceptance =
-        widget.acceptanceRepository ??
-        FirestoreDisclaimerAcceptanceRepository();
+    _controller = DisclaimerGateController(
+      authRepository: widget.authRepository ?? FirebaseAuthRepository(),
+      localRepository:
+          widget.localRepository ?? LocalFirstLaunchDisclaimerRepository(),
+      acceptanceRepository:
+          widget.acceptanceRepository ??
+          FirestoreDisclaimerAcceptanceRepository(),
+      appVersion: '$kAppVersion+$kAppBuildNumber',
+    );
     _resolve();
   }
 
   Future<void> _resolve() async {
-    final status = await _resolveStatus();
+    await _controller.resolve();
     if (!mounted) return;
-    setState(() => _status = status);
-  }
-
-  /// The device answer is authoritative when it exists; the account is only
-  /// consulted when this device has no record, which is the reinstall and
-  /// second-device case.
-  ///
-  /// Every failure lands on [_GateStatus.needsAcceptance]. Asking a second time
-  /// costs a tap; letting someone through unasked costs the record entirely.
-  Future<_GateStatus> _resolveStatus() async {
-    final userId = _userId;
-    if (userId == null) return _GateStatus.needsAcceptance;
-
-    try {
-      if (await _local.hasSeenDisclaimer(userId)) return _GateStatus.accepted;
-    } catch (_) {
-      // Fall through to the remote check.
-    }
-
-    try {
-      final accepted = await _acceptance.hasAccepted(
-        userId: userId,
-        version: kDisclaimerVersion,
-      );
-      if (!accepted) return _GateStatus.needsAcceptance;
-      // Mirror it so the next launch answers without a network read.
-      await _markSeenQuietly(userId);
-      return _GateStatus.accepted;
-    } catch (_) {
-      return _GateStatus.needsAcceptance;
-    }
+    setState(() {});
   }
 
   Future<void> _accept() async {
-    if (_isRecording) return;
-    _isRecording = true;
-
-    final userId = _userId;
-    if (userId != null) {
-      // The device record is written first: it is what stops the notice coming
-      // back on every launch, and it must not depend on the network.
-      await _markSeenQuietly(userId);
-      try {
-        await _acceptance.recordAcceptance(
-          userId: userId,
-          version: kDisclaimerVersion,
-          appVersion: '$kAppVersion+$kAppBuildNumber',
-        );
-      } catch (_) {
-        // Losing the evidence copy must not lock the player out of the game.
-      }
-    }
-
+    final accepted = await _controller.accept();
     if (!mounted) return;
-    setState(() => _status = _GateStatus.accepted);
-  }
-
-  Future<void> _markSeenQuietly(String userId) async {
-    try {
-      await _local.markDisclaimerSeen(userId);
-    } catch (_) {}
+    setState(() {});
+    if (!accepted && _controller.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_controller.errorMessage!)));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    switch (_status) {
-      case _GateStatus.checking:
+    switch (_controller.status) {
+      case DisclaimerGateStatus.checking:
         return const _GateBackdrop(child: _GateSpinner());
-      case _GateStatus.needsAcceptance:
+      case DisclaimerGateStatus.needsAcceptance:
         // The game's own backdrop, so the notice reads as part of the app
         // rather than as a system alert on a blank screen. It is only a
         // picture — the game itself is still not mounted.
         return _GateBackdrop(
           child: FirstLaunchDisclaimerDialog(onOkay: _accept),
         );
-      case _GateStatus.accepted:
+      case DisclaimerGateStatus.accepted:
         return widget.child ?? const GameScreen();
     }
   }

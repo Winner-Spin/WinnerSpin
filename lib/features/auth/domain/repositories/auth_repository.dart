@@ -56,13 +56,7 @@ abstract class AuthRepository {
   /// Throws [AuthException] with [AuthErrorCode.wrongPassword] when the
   /// password does not match.
   ///
-  /// [onReauthenticated] runs once the password is proven and before anything
-  /// is removed. Used to preserve records that the deletion would otherwise
-  /// take with it; the auth layer does not need to know what those are.
-  Future<void> deleteAccount(
-    String password, {
-    Future<void> Function()? onReauthenticated,
-  });
+  Future<void> deleteAccount(String password);
 
   Future<void> reloadCurrentUser();
 
