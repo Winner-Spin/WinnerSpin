@@ -325,6 +325,8 @@ flutter build ios
 
 Winner Spin is an actively developed portfolio/gameplay project. Its math, pool behavior, balances, recovery model, and Firebase configuration must not be treated as audited, regulated, secure, or production-ready gambling infrastructure without formal mathematical review, security hardening, compliance work, and independent certification.
 
+For questions, feedback, or project-related inquiries, contact us at [winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com).
+
 ---
 
 ## License
