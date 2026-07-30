@@ -13,7 +13,7 @@ class SystemSettingsFooter extends StatelessWidget {
   final TargetPlatform? platform;
 
   static const _privacyPolicyUrl =
-      'https://github.com/Winner-Spin/WinnerSpin/blob/main/PRIVACY_POLICY.md';
+      'https://sites.google.com/view/winner-spin-privacy-policy';
   static const _appleTermsUrl =
       'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
   static const _projectUrl = 'https://github.com/Winner-Spin/WinnerSpin';
@@ -24,7 +24,8 @@ class SystemSettingsFooter extends StatelessWidget {
   // A fixed year, not `DateTime.now().year`: a copyright line should not follow
   // whatever the device clock happens to say. Bump it when the app ships in a
   // new year.
-  static const _copyrightText = '\u00A9 2026 Winner Spin. All rights reserved.';
+  static const _copyrightText =
+      '\u00A9 2026 Hakan G\u00FCne\u015F & Enes Eken. All rights reserved.';
   static const _disclaimerText =
       'This project is created solely for entertainment and portfolio purposes. It does not offer real-money gambling, betting, cash prizes, or withdrawal services. All coins, spins, bonuses, and rewards included in this project are entirely virtual; they have no real-world monetary value and cannot be purchased, sold, or converted into money in any way. This project does not promote or encourage gambling or betting activities.';
 

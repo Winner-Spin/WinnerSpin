@@ -76,7 +76,7 @@ void main() {
     expect(copyrightFinder, findsOneWidget);
     expect(
       tester.widget<Text>(copyrightFinder).data,
-      '© 2026 Winner Spin. All rights reserved.',
+      '© 2026 Hakan Güneş & Enes Eken. All rights reserved.',
     );
     expect(
       tester.getCenter(copyrightFinder).dy,

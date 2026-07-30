@@ -26,7 +26,7 @@ class FirstLaunchDisclaimerDialog extends StatefulWidget {
   final TargetPlatform? platform;
 
   static const String privacyPolicyUrl =
-      'https://github.com/Winner-Spin/WinnerSpin/blob/main/PRIVACY_POLICY.md';
+      'https://sites.google.com/view/winner-spin-privacy-policy';
   static const String appleTermsUrl =
       'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
