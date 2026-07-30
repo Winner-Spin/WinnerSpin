@@ -279,7 +279,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Open the email and tap VERIFY EMAIL. Then return to Winner Spin.',
+                  'Open the email and tap VERIFY EMAIL, then return to Winner '
+                  'Spin. Check your spam folder if you do not see it.',
                   style: AppFonts.barlowCondensed(
                     fontSize: 15,
                     height: 1.25,
