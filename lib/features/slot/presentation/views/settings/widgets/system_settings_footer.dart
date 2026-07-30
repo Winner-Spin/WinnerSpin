@@ -6,6 +6,9 @@ import '../../../../../../core/update/app_build_info.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../audio/ui_click_sound.dart';
+import 'github_avatar.dart';
+import 'github_mark.dart';
+import 'instagram_mark.dart';
 
 class SystemSettingsFooter extends StatelessWidget {
   const SystemSettingsFooter({super.key, this.platform});
@@ -19,6 +22,10 @@ class SystemSettingsFooter extends StatelessWidget {
   static const _projectUrl = 'https://github.com/Winner-Spin/WinnerSpin';
   static const _hakanUrl = 'https://github.com/hakangunesdev';
   static const _enesUrl = 'https://github.com/eneseken95';
+  // Without the `igsh` share token: that parameter tags the link back to the
+  // account that copied it and is not needed to reach the profile.
+  static const _instagramUrl = 'https://www.instagram.com/winnerspinapp';
+  static const instagramHandle = '@winnerspinapp';
   static const supportEmail = 'winnerspinapp@gmail.com';
   static const _creditText = 'Made with \u2615\uFE0F & \u{1F4BB} by';
   // A fixed year, not `DateTime.now().year`: a copyright line should not follow
@@ -60,6 +67,11 @@ class SystemSettingsFooter extends StatelessWidget {
                 const SizedBox(width: 6),
                 _GitHubLink(
                   title: 'HAKAN GÜNEŞ',
+                  leading: const GitHubAvatar(
+                    key: ValueKey('hakan-github-avatar'),
+                    login: 'hakangunesdev',
+                    size: 15,
+                  ),
                   onTap: () => _openUrl(context, _hakanUrl),
                 ),
                 const SizedBox(width: 6),
@@ -67,6 +79,11 @@ class SystemSettingsFooter extends StatelessWidget {
                 const SizedBox(width: 6),
                 _GitHubLink(
                   title: 'ENES EKEN',
+                  leading: const GitHubAvatar(
+                    key: ValueKey('enes-github-avatar'),
+                    login: 'eneseken95',
+                    size: 15,
+                  ),
                   onTap: () => _openUrl(context, _enesUrl),
                 ),
               ],
@@ -83,29 +100,26 @@ class SystemSettingsFooter extends StatelessWidget {
               children: [
                 _GitHubLink(
                   title: 'WINNER SPIN SOURCE CODE',
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.asset(
-                      'assets/app_icon.png',
-                      key: const ValueKey('winner-spin-source-app-icon'),
-                      width: 16,
-                      height: 16,
-                      cacheWidth: 48,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.medium,
-                    ),
+                  // The GitHub mark, not the app icon: the chip leads to the
+                  // repository, so the destination is what the icon should
+                  // announce.
+                  leading: const GitHubMark(
+                    key: ValueKey('winner-spin-source-github-icon'),
+                    size: 15.5,
                   ),
                   onTap: () => _openUrl(context, _projectUrl),
                 ),
                 const SizedBox(width: 8),
                 _GitHubLink(
                   title: 'PRIVACY POLICY',
+                  leading: _chipIcon(Icons.shield_outlined),
                   onTap: () => _openUrl(context, _privacyPolicyUrl),
                 ),
                 if (_usesAppleTerms) ...[
                   const SizedBox(width: 8),
                   _GitHubLink(
                     title: 'TERMS OF USE',
+                    leading: _chipIcon(Icons.description_outlined),
                     onTap: () => _openUrl(context, _appleTermsUrl),
                   ),
                 ],
@@ -118,14 +132,28 @@ class SystemSettingsFooter extends StatelessWidget {
           alignment: Alignment.center,
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: _GitHubLink(
-              title: supportEmail.toUpperCase(),
-              leading: const Icon(
-                Icons.mail_outline_rounded,
-                size: 14,
-                color: Color(0xFF2C2530),
-              ),
-              onTap: () => _openSupportEmail(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _GitHubLink(
+                  title: supportEmail.toUpperCase(),
+                  leading: _chipIcon(Icons.mail_outline_rounded),
+                  onTap: () => _openSupportEmail(context),
+                ),
+                const SizedBox(width: 8),
+                // Sits with the mail address rather than the legal chips:
+                // both are ways to reach the app's authors.
+                _GitHubLink(
+                  title: instagramHandle.toUpperCase(),
+                  // A pinch smaller than the GitHub mark: a filled square
+                  // reads bigger than a circle at the same box size.
+                  leading: const InstagramMark(
+                    key: ValueKey('winner-spin-instagram-icon'),
+                    size: 12.5,
+                  ),
+                  onTap: () => _openUrl(context, _instagramUrl),
+                ),
+              ],
             ),
           ),
         ),
@@ -169,6 +197,16 @@ class SystemSettingsFooter extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Every chip icon is the same size and colour as the link text beside it,
+  /// so they are built from one place instead of repeating the constants.
+  ///
+  /// Larger than the painted marks on purpose: a Material glyph carries a
+  /// transparent margin inside its box, so at a matching `size` it reads
+  /// noticeably smaller than a mark that fills its box edge to edge.
+  static Widget _chipIcon(IconData icon) {
+    return Icon(icon, size: 17.5, color: const Color(0xFF2C2530));
   }
 
   bool get _usesAppleTerms {

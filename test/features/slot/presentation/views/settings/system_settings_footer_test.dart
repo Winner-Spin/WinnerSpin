@@ -33,8 +33,20 @@ void main() {
     expect(find.text('&'), findsOneWidget);
     expect(find.text('WINNER SPIN SOURCE CODE'), findsOneWidget);
     expect(find.byIcon(Icons.open_in_new_rounded), findsNothing);
+    // Every chip carries an icon that names its destination.
+    expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.description_outlined), findsNothing);
+    // The credit chips lead with each developer's GitHub avatar. There is no
+    // network under test, so these render their offline fallback - the point
+    // of the assertion is that the slot exists and does not throw.
+    expect(find.byKey(const ValueKey('hakan-github-avatar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('enes-github-avatar')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('winner-spin-source-app-icon')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('winner-spin-source-github-icon')),
       findsOneWidget,
     );
 
@@ -58,6 +70,20 @@ void main() {
     expect(supportFinder, findsOneWidget);
     expect(tester.getCenter(supportFinder).dy, greaterThan(sourceCodeY));
     expect(find.byIcon(Icons.mail_outline_rounded), findsOneWidget);
+
+    // Instagram shares that row: it is a contact channel, not a legal link.
+    final instagramFinder = find.text(
+      SystemSettingsFooter.instagramHandle.toUpperCase(),
+    );
+    expect(instagramFinder, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('winner-spin-instagram-icon')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getCenter(instagramFinder).dy,
+      closeTo(tester.getCenter(supportFinder).dy, 1),
+    );
 
     // Version metadata reads last, below the disclaimer.
     final versionFinder = find.byKey(const ValueKey('settings-app-version'));
@@ -116,6 +142,8 @@ void main() {
 
     expect(find.text('PRIVACY POLICY'), findsOneWidget);
     expect(find.text('TERMS OF USE'), findsOneWidget);
+    expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.description_outlined), findsOneWidget);
     final sourceCodeY = tester
         .getCenter(find.text('WINNER SPIN SOURCE CODE'))
         .dy;
