@@ -325,6 +325,8 @@ flutter build ios
 
 Winner Spin aktif olarak geliştirilen bir portföy/oyun projesidir. Matematiği, havuz davranışı, bakiyeleri, kurtarma modeli ve Firebase yapılandırması; resmi matematik incelemesi, güvenlik sıkılaştırması, mevzuat çalışması ve bağımsız sertifikasyon olmadan denetlenmiş, düzenlemeye tabi, güvenli veya üretime hazır bir kumar altyapısı olarak değerlendirilmemelidir.
 
+Sorularınız, geri bildirimleriniz veya projeyle ilgili talepleriniz için winnerspinapp@gmail.com adresinden bizimle iletişime geçebilirsiniz.
+
 ---
 
 ## Lisans
