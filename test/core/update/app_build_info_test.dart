@@ -13,7 +13,8 @@ void main() {
 
     expect(match, isNotNull, reason: 'pubspec.yaml has no version: line');
 
-    // pubspec carries `1.0.0+1`: marketing version, then build number.
+    // pubspec carries `<version>+<build>`: marketing version, then build
+    // number.
     final parts = match!.group(1)!.split('+');
     final declaredVersion = parts.first;
     final declaredBuild = parts.length > 1 ? parts[1] : '1';
