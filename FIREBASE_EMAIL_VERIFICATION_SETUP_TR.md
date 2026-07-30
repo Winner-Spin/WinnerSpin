@@ -2,7 +2,7 @@
 
 TR Türkçe | [EN English](FIREBASE_EMAIL_VERIFICATION_SETUP.md)
 
-Bu belge Winner Spin'in güncel Firebase e-posta doğrulama akışını, doğrulanmış durumun Firestore ile eşitlenmesini ve tam hesap silme için gereken Cloud Function'ı açıklar.
+Bu belge Winner Spin'in güncel Firebase e-posta doğrulama akışını, doğrulanmış durumun Firestore ile eşitlenmesini ve istemci tarafındaki hesap silme akışını açıklar.
 
 Aşağıdaki bütün komutlarda kendi Firebase proje kimliğinizi kullanın.
 
@@ -49,15 +49,17 @@ Bu Firestore kuralları dağıtılmasa bile Firebase Authentication doğrulama b
 
 ## 3. Tam Hesap Silme
 
-Profildeki tam hesap silme işlemi deleteAccount callable Cloud Function'ını çağırır. Yalnızca bu fonksiyonu dağıtın:
+Profildeki tam hesap silme işlemi tamamen istemci tarafında çalışır. Kullanıcının kimliği yeniden doğrulandıktan sonra bilgilendirme onayı `disclaimerAcceptances/{uid}` altına arşivlenir, `users/{uid}` silinir ve en son Firebase Authentication kullanıcısı kaldırılır. Son adım başarısız olursa hata bildirilir; işlem tekrar denendiğinde tamamlanır.
+
+Bu sıra değiştirilemez. Firestore kuralları profili yalnızca sahibine sildirdiği için, doküman silinene kadar Authentication kullanıcısının yaşaması gerekir.
+
+İşlem Cloud Functions veya faturalandırma hesabı gerektirmez. Gerektirdiği tek şey Firestore kurallarının dağıtılmış olmasıdır; `users/{uid}` için silme, `disclaimerAcceptances/{uid}` için bir kereye mahsus oluşturma iznini bu kurallar verir:
 
 ~~~sh
-firebase deploy --only functions:deleteAccount --project=YOUR_PROJECT_ID
+firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID
 ~~~
 
-Cloud Functions dağıtımı, Firebase projesinin geçerli faturalandırma gereksinimlerini karşılamasını gerektirir.
-
-E-posta doğrulama bu fonksiyona bağlı değildir; tam hesap silme işlemi bağlıdır.
+Arşivlenen onay kaydı yalnızca bir kez oluşturulabilir ve hiçbir istemciden okunamaz. Hesabı geride bıraktığı için 18+ onayı sonradan da belgelenebilir.
 
 ---
 

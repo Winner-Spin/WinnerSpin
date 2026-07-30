@@ -86,7 +86,7 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 | Kategori | Teknolojiler |
 | --- | --- |
 | Mobil | Flutter, Dart |
-| Backend | Firebase Authentication, Cloud Firestore, Cloud Functions |
+| Backend | Firebase Authentication, Cloud Firestore, Firebase App Check |
 | Sunum | Flutter widget'ları, Lottie, gömülü fontlar |
 | Ses | audioplayers |
 | Yerel kalıcılık | dart:io, path_provider, atomik geçici dosya değiştirme |
@@ -95,7 +95,6 @@ Güncel uygulama, feature-first katmanlı MVVM yapısını Clean Architecture'da
 | İş akışı | GitHub ve Jira tarzı WSPIN görev takibi |
 
 - Dart SDK kısıtı: **^3.10.8**
-- Cloud Functions çalışma zamanı: **Node.js 22**
 - Hedeflenen platformlar: **Android ve iOS**
 
 Güncel istemci yerel kalıcılık için dart:io kullandığından web, desteklenen bir derleme hedefi olarak sunulmamaktadır.
@@ -276,13 +275,7 @@ flutter doctor
    firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID
    ~~~
 
-Firebase'in yerleşik doğrulama bağlantısı Cloud Functions gerektirmez. Tam hesap silme işlemi ise callable deleteAccount fonksiyonunu ve Cloud Functions faturalandırma uygunluğunu gerektirir:
-
-~~~sh
-firebase deploy --only functions:deleteAccount --project=YOUR_PROJECT_ID
-~~~
-
-Yalnızca güncel uygulama akışının ihtiyaç duyduğu Firebase servislerini dağıtın. E-posta doğrulamanın kendisi bir Cloud Function gerektirmez.
+E-posta doğrulama ve hesap silme işlemlerinin ikisi de tamamen istemci tarafında, Firebase Authentication ve Cloud Firestore üzerinden çalışır. Proje Cloud Functions, Trigger Email uzantısı veya özel SMTP sunucusu gerektirmez; Firebase Spark planı yeterlidir. Hesap silmeyi mümkün kılan şey Firestore kurallarının dağıtılmasıdır: kurallar, kullanıcıya kendi profil dokümanını silme yetkisi verir.
 
 Kesin ayrım için [Firebase E-posta Doğrulama Kurulumu](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md) belgesine bakın.
 

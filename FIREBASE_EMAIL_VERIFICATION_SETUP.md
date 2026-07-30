@@ -2,7 +2,7 @@
 
 EN English | [TR Türkçe](FIREBASE_EMAIL_VERIFICATION_SETUP_TR.md)
 
-This document explains Winner Spin's active Firebase email-verification flow, Firestore verified-state synchronization, and the Cloud Function required for full account deletion.
+This document explains Winner Spin's active Firebase email-verification flow, Firestore verified-state synchronization, and the client-side account deletion flow.
 
 Use your own Firebase project ID in every command below.
 
@@ -49,15 +49,17 @@ Firebase Authentication link verification still works if these Firestore rules a
 
 ## 3. Full Account Deletion
 
-The profile's full account-deletion action calls the deleteAccount callable Cloud Function. Deploy only this function:
+The profile's full account-deletion action runs entirely on the client. After reauthenticating the player it archives the disclaimer acceptance to `disclaimerAcceptances/{uid}`, deletes `users/{uid}` and finally removes the Firebase Authentication user. If the last step fails the error is reported and retrying finishes the job.
+
+The order cannot be reversed. Firestore rules only let the owner delete their own profile, so the Authentication user has to survive until the document is gone.
+
+This requires no Cloud Functions and no billing account. What it does require is the Firestore rules being deployed, because they grant the owner delete access on `users/{uid}` and create-once access on `disclaimerAcceptances/{uid}`:
 
 ~~~sh
-firebase deploy --only functions:deleteAccount --project=YOUR_PROJECT_ID
+firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID
 ~~~
 
-Deploying Cloud Functions requires the Firebase project to meet the applicable billing requirements.
-
-Email verification does not depend on this function; full account deletion does.
+The archived acceptance record is create-once and is not readable from any client. It survives the account so the 18+ confirmation can still be evidenced afterwards.
 
 ---
 

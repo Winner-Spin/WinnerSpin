@@ -66,11 +66,6 @@ lib/
   firebase_options.dart
   main.dart
 
-functions/
-  index.js
-
-package.json
-
 test/
   app/
   core/
@@ -152,9 +147,14 @@ Doğrulama ekranı uygulama resumed durumuna döndüğünde Firebase kullanıcı
 - Profil verisi users/{uid} üzerinden izlenir.
 - Avatar değişiklikleri kaydedilmeden önce sembol registry'sine göre doğrulanır.
 - Parola sıfırlama istekleri Firestore'da rezerve edilir ve 24 saatte bir ile sınırlandırılır.
-- Tam hesap silme işleminde kullanıcının kimliği yeniden doğrulanır ve ardından
-  deleteAccount callable Cloud Function'ı çağrılır. Fonksiyon, saklanması gereken
-  bilgilendirme onayını arşivler ve sunucuya ait hesap kayıtlarını siler.
+- Tam hesap silme işleminde kullanıcının kimliği yeniden doğrulanır, saklanması
+  gereken bilgilendirme onayı disclaimerAcceptances/{uid} altına arşivlenir,
+  users/{uid} silinir ve en son Firebase Authentication kullanıcısı kaldırılır.
+  Sıra güvenlik kurallarının dayattığı sıradır: dokümanı yalnızca sahibi
+  silebildiği için auth kullanıcısının ondan sonra silinmesi gerekir. Son adım
+  başarısız olursa geri alma yapılmaz, hata kullanıcıya bildirilir: profili
+  yeniden yazmak bir `create` sayılır ve kurallar orada yalnızca sıfırdan
+  10.000 coin'lik bir doküman kabul eder. Tekrar denendiğinde silme tamamlanır.
 
 ---
 

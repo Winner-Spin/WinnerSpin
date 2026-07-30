@@ -1,11 +1,9 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
-
     function hasValidInitialProfile(userId) {
       return request.resource.data.keys().hasOnly([
         'uid',
@@ -34,8 +32,6 @@ service cloud.firestore {
         && request.resource.data.freeSpinAccumulatedWin == 0
         && request.resource.data.freeSpinsAwardedThisRound == 0;
     }
-
-    // Game history is a bounded array written once per app-close.
     function hasValidGameHistory() {
       return !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['gameHistory'])
@@ -44,15 +40,6 @@ service cloud.firestore {
           && request.resource.data.gameHistory.size() <= 10
         );
     }
-
-    // Evidence that the player accepted the disclaimer: which text version,
-    // when, and from which build.
-    //
-    // Write-once per version. The timestamp has to be the server's, so it
-    // cannot be backdated, and an existing record can only be replaced by a
-    // strictly newer version — re-sending the same version is rejected. That
-    // is what freezes the original date: without it the owner could overwrite
-    // their own acceptance with today's time and erase when it really happened.
     function hasValidDisclaimerAcceptance() {
       let touched = request.resource.data.diff(resource.data).affectedKeys();
       return !touched.hasAny([
@@ -72,12 +59,6 @@ service cloud.firestore {
         && request.resource.data.disclaimerAppVersion.size() <= 40
       );
     }
-
-    // The 24-hour password-reset window, enforced against the server clock.
-    // The app checks it too, but only to phrase the message — that check runs
-    // on a clock the player can move. Pinning the stored time to `request.time`
-    // is what makes the window real: a backdated record cannot be written, so
-    // an early retry cannot be unlocked.
     function hasValidPasswordResetRequest() {
       let touched = request.resource.data.diff(resource.data).affectedKeys();
       return !touched.hasAny([
@@ -94,7 +75,6 @@ service cloud.firestore {
         )
       );
     }
-
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidInitialProfile(userId);
@@ -126,31 +106,42 @@ service cloud.firestore {
             && request.auth.token.email_verified == true
           )
         );
-      allow delete: if false;
+      allow delete: if isOwner(userId);
     }
-
-    // Forced-update gate. Readable by anyone, including signed-out users, so
-    // the check can run on the login screen — an outdated build must be stopped
-    // before it can sign in. Contains no user data. Writes are console/admin
-    // only: a client that could raise minimumVersion could lock everyone out.
     match /config/{document=**} {
       allow read: if true;
       allow write: if false;
     }
-
-    match /emailVerifications/{document=**} {
+    match /emailVerifications/{userId} {
       allow read, write: if false;
+      allow delete: if isOwner(userId);
     }
-
-    // Retained consent evidence is written only by the deletion Cloud Function.
-    match /disclaimerAcceptances/{document=**} {
-      allow read, write: if false;
+    match /disclaimerAcceptances/{userId} {
+      allow read, update, delete: if false;
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'email',
+          'disclaimerVersion',
+          'disclaimerAcceptedAt',
+          'disclaimerAppVersion',
+          'archivedAt'
+        ])
+        && request.resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.archivedAt == request.time
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && request.resource.data.disclaimerVersion ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerVersion
+        && request.resource.data.disclaimerAcceptedAt ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerAcceptedAt
+        && request.resource.data.disclaimerAppVersion ==
+          get(/databases/$(database)/documents/users/$(userId))
+            .data.disclaimerAppVersion;
     }
-
     match /deletedUnverifiedAccounts/{document=**} {
       allow read, write: if false;
     }
-
     match /mail/{document=**} {
       allow read, write: if false;
     }

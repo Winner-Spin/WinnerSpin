@@ -66,11 +66,6 @@ lib/
   firebase_options.dart
   main.dart
 
-functions/
-  index.js
-
-package.json
-
 test/
   app/
   core/
@@ -152,9 +147,14 @@ The verification screen reloads the Firebase user when the application resumes a
 - Profile data is observed from users/{uid}.
 - Avatar changes are validated against the symbol registry before being saved.
 - Password-reset requests are reserved in Firestore and limited to once every 24 hours.
-- Full account deletion reauthenticates the player, then calls the deleteAccount
-  callable Cloud Function. The function archives the retained disclaimer
-  evidence and removes the server-owned account records.
+- Full account deletion reauthenticates the player, archives the retained
+  disclaimer evidence to disclaimerAcceptances/{uid}, deletes users/{uid} and
+  only then removes the Firebase Authentication user. The order is dictated by
+  the security rules: the document may only be deleted by its owner, so the
+  auth user has to outlive it. A failure at the last step is surfaced instead
+  of rolled back, because recreating the profile would be a `create` and the
+  rules only accept a fresh 10,000-coin document there. Retrying completes the
+  deletion.
 
 ---
 

@@ -86,7 +86,7 @@ The current implementation combines a feature-first layered MVVM structure with 
 | Category | Technologies |
 | --- | --- |
 | Mobile | Flutter, Dart |
-| Backend | Firebase Authentication, Cloud Firestore, Cloud Functions |
+| Backend | Firebase Authentication, Cloud Firestore, Firebase App Check |
 | Presentation | Flutter widgets, Lottie, bundled fonts |
 | Audio | audioplayers |
 | Local persistence | dart:io, path_provider, atomic temporary-file replacement |
@@ -95,7 +95,6 @@ The current implementation combines a feature-first layered MVVM structure with 
 | Workflow | GitHub and Jira-style WSPIN task tracking |
 
 - Dart SDK constraint: **^3.10.8**
-- Cloud Functions runtime: **Node.js 22**
 - Intended targets: **Android and iOS**
 
 The current client imports dart:io for local persistence, so web is not an advertised build target.
@@ -276,13 +275,7 @@ flutter doctor
    firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID
    ~~~
 
-Firebase's built-in verification link does not require Cloud Functions. Full account deletion does require the callable deleteAccount function and Cloud Functions billing eligibility:
-
-~~~sh
-firebase deploy --only functions:deleteAccount --project=YOUR_PROJECT_ID
-~~~
-
-Deploy only the Firebase services required by the active application flow. Email verification itself does not require a Cloud Function.
+Email verification and account deletion both run entirely on the client against Firebase Authentication and Cloud Firestore. The project needs no Cloud Functions, no Trigger Email extension and no custom SMTP server, so the Firebase Spark plan is sufficient. Deploying the Firestore rules is what enables account deletion: the rules grant the owner delete access to their own profile document.
 
 See [Firebase Email Verification Setup](FIREBASE_EMAIL_VERIFICATION_SETUP.md) for the exact distinction.
 
