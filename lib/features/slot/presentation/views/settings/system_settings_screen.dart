@@ -287,7 +287,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       context: context,
       barrierColor: Colors.transparent,
       barrierDismissible: true,
-      barrierLabel: 'Deposit Money',
+      barrierLabel: 'Free Game Money',
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, _, child) =>
           DepositMoneyScreen(viewModel: widget.viewModel),

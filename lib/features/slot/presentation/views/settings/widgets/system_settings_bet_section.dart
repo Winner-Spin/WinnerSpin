@@ -70,13 +70,16 @@ class SystemSettingsBetSection extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Text(
-                'BUY GAME MONEY',
-                style: AppFonts.barlowCondensed(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.1,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'GET FREE GAME MONEY',
+                  style: AppFonts.barlowCondensed(
+                    fontSize: 23,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 1.1,
+                  ),
                 ),
               ),
             ),

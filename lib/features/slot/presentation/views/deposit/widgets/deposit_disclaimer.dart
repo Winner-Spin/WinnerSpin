@@ -9,7 +9,7 @@ class DepositDisclaimer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'This deposit action is not a real-money deposit. It only increases virtual in-game CREDIT with virtual game money that has no real-world value.',
+      'This is not a real-money payment. It only tops up your virtual in-game CREDIT with free game money that has no real-world value.',
       textAlign: TextAlign.center,
       style: AppFonts.barlowCondensed(
         fontSize: 11,

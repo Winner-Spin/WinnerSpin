@@ -32,13 +32,16 @@ class DepositBuyButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(
-            isBuying ? 'ADDING...' : 'BUY GAME MONEY',
-            style: AppFonts.barlowCondensed(
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 1.1,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              isBuying ? 'ADDING...' : 'GET FREE GAME MONEY',
+              style: AppFonts.barlowCondensed(
+                fontSize: 23,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.1,
+              ),
             ),
           ),
         ),

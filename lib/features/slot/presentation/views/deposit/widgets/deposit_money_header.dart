@@ -28,7 +28,7 @@ class DepositMoneyHeader extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Text(
-            'DEPOSIT MONEY',
+            'FREE GAME MONEY',
             style: AppFonts.barlowCondensed(
               fontSize: 27,
               fontWeight: FontWeight.w900,

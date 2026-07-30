@@ -66,7 +66,7 @@ class GameStatusText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (showInsufficientFundsHint) {
-      return Text('PLEASE DEPOSIT MONEY!', style: insufficientStyle);
+      return Text('GET FREE GAME MONEY!', style: insufficientStyle);
     }
 
     if (isFreeSpinVisualMode) {
