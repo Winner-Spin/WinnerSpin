@@ -96,7 +96,13 @@ The cupcake is the scatter symbol. Scatter payout is based on the final resolved
 | 0–3 | 0× |
 | 4 | 3× |
 | 5 | 5× |
-| 6+ | 100× |
+| 6+ | 10× |
+
+For an initial 10-spin entry, whether triggered naturally or bought, the
+entry grid contains 4–6 cupcakes and safely fills the remaining cells so no
+regular symbol is forced to reach the eight-symbol payout threshold. The
+cupcake entry payout is still credited and included in the accumulated Free
+Spins win shown to the player.
 
 Free Spins awards:
 
@@ -230,7 +236,8 @@ The live UI checks the player's displayed balance. After payment:
 
 - the paid amount is charged;
 - a base-game calculation is sent with forced Free Spins trigger enabled;
-- a 4+ scatter result is produced;
+- a 4–6 scatter entry result is produced without a forced regular-symbol
+  cluster win;
 - 10 Free Spins begin after the award presentation is acknowledged.
 
 PoolGuard.canAffordBuyFs remains available for diagnostics and stress tests, but it is not the live Buy Feature UI gate.

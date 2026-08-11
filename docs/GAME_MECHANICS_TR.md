@@ -96,7 +96,13 @@ Cupcake scatter sembolüdür. Scatter ödemesi son çözümlenen grid'e göre ve
 | 0–3 | 0× |
 | 4 | 3× |
 | 5 | 5× |
-| 6+ | 100× |
+| 6+ | 10× |
+
+İlk 10 Ücretsiz Dönüş girişi doğal olarak tetiklendiğinde veya satın
+alındığında giriş grid'i 4–6 cupcake içerir. Kalan hücreler, hiçbir normal
+sembolün sekiz sembollük ödeme eşiğine zorunlu olarak ulaşmamasını sağlayacak
+şekilde doldurulur. Cupcake giriş ödemesi yine oyuncuya verilir ve gösterilen
+birikmiş Ücretsiz Dönüş kazancına dahil edilir.
 
 Ücretsiz Dönüş ödülleri:
 
@@ -230,7 +236,8 @@ Canlı arayüz oyuncunun görünen bakiyesini kontrol eder. Ödemeden sonra:
 
 - ücret bakiyeden düşülür;
 - ana oyun hesabı zorunlu Ücretsiz Dönüş tetiklemesi açık olarak gönderilir;
-- 4+ scatter sonucu üretilir;
+- zorunlu normal sembol kümesi kazancı içermeyen 4–6 scatter giriş sonucu
+  üretilir;
 - ödül sunumu onaylandıktan sonra 10 Ücretsiz Dönüş başlar.
 
 PoolGuard.canAffordBuyFs tanı ve stres testleri için kullanılabilir durumda kalır ancak canlı Özellik Satın Alma arayüz koruması değildir.

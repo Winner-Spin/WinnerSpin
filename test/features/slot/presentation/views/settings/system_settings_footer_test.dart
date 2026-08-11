@@ -185,7 +185,12 @@ void main() {
   testWidgets('copies the support address when no mail client opens', (
     tester,
   ) async {
+    const urlLauncherChannel = MethodChannel('plugins.flutter.io/url_launcher');
     final messages = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      urlLauncherChannel,
+      (_) async => false,
+    );
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
       (call) async {
@@ -193,12 +198,16 @@ void main() {
         return null;
       },
     );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    addTearDown(() async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        urlLauncherChannel,
+        null,
+      );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
         null,
-      ),
-    );
+      );
+    });
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -210,9 +219,12 @@ void main() {
       ),
     );
 
-    await tester.tap(
-      find.text(SystemSettingsFooter.supportEmail.toUpperCase()),
+    final supportEmail = find.text(
+      SystemSettingsFooter.supportEmail.toUpperCase(),
     );
+    await tester.ensureVisible(supportEmail);
+    await tester.pumpAndSettle();
+    await tester.tap(supportEmail);
     await tester.pumpAndSettle();
 
     // url_launcher has no platform implementation under test, so the tap falls

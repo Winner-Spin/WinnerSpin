@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/features/auth/domain/repositories/auth_repository.dart';
 import 'package:winner_spin/features/slot/domain/models/game_history_entry.dart';
+import 'package:winner_spin/features/slot/domain/models/pending_spin_recovery.dart';
 import 'package:winner_spin/features/slot/domain/models/pool_state.dart';
 import 'package:winner_spin/features/slot/domain/repositories/game_history_repository.dart';
 import 'package:winner_spin/features/slot/domain/repositories/pool_repository.dart';
+import 'package:winner_spin/features/slot/domain/repositories/spin_recovery_repository.dart';
 import 'package:winner_spin/features/slot/presentation/audio/game_music_service.dart';
 import 'package:winner_spin/features/slot/presentation/audio/ui_click_sound.dart';
 import 'package:winner_spin/features/slot/presentation/viewmodels/game_viewmodel.dart';
@@ -20,6 +22,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
     await viewModel.fetchUserData();
@@ -90,6 +94,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
     await viewModel.fetchUserData();
@@ -121,6 +127,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
     await viewModel.fetchUserData();
@@ -212,6 +220,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
     await viewModel.fetchUserData();
@@ -247,6 +257,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
 
@@ -264,6 +276,8 @@ void main() {
       authRepository: authRepository,
       poolRepository: _ProfilePoolRepository(),
       gameHistoryRepository: _ProfileHistoryRepository(),
+      remoteGameHistoryRepository: _ProfileHistoryRepository(),
+      spinRecoveryRepository: _ProfileSpinRecoveryRepository(),
       musicService: _SilentGameMusicService(),
     );
 
@@ -351,7 +365,6 @@ class _ProfileAuthRepository implements AuthRepository {
   }) async {
     deleteAccountCalls++;
     deletePassword = password;
-    await beforeAuthDeletion?.call(currentUserId!);
   }
 
   @override
@@ -386,6 +399,17 @@ class _ProfileHistoryRepository implements GameHistoryRepository {
 
   @override
   Future<void> save(String userId, List<GameHistoryEntry> entries) async {}
+}
+
+class _ProfileSpinRecoveryRepository implements SpinRecoveryRepository {
+  @override
+  Future<PendingSpinRecovery?> load(String userId) async => null;
+
+  @override
+  Future<void> save(String userId, PendingSpinRecovery recovery) async {}
+
+  @override
+  Future<void> clear(String userId, String spinId) async {}
 }
 
 class _SilentGameMusicService extends GameMusicService {
