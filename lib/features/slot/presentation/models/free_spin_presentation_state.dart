@@ -11,6 +11,7 @@ class FreeSpinPresentationState {
 
   void resetRound() {
     accumulatedWin = 0;
+    lastSeenLastWin = 0;
     pendingSpinWin = 0;
     awardedThisRound = 0;
   }
