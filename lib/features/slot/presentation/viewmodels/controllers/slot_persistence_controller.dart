@@ -246,8 +246,9 @@ class SlotPersistenceController {
   }
 
   Future<void> deleteAccount(String password) async {
-    final userId = currentUserId;
-    await _authRepository.deleteAccount(password);
-    if (userId != null) await _localUserDataEraser.eraseFor(userId);
+    await _authRepository.deleteAccount(
+      password,
+      beforeAuthDeletion: _localUserDataEraser.eraseFor,
+    );
   }
 }

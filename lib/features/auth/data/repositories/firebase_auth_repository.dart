@@ -125,7 +125,10 @@ class FirebaseAuthRepository implements AuthRepository {
   /// error is surfaced so the player can retry; the retry succeeds, since
   /// deleting an absent document is a no-op and the archive is create-once.
   @override
-  Future<void> deleteAccount(String password) async {
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  }) async {
     final user = _auth.currentUser;
     final email = user?.email;
     if (user == null || email == null) {
@@ -141,6 +144,9 @@ class FirebaseAuthRepository implements AuthRepository {
       final userReference = _firestore
           .collection(_usersCollection)
           .doc(user.uid);
+      final emailVerificationReference = _firestore
+          .collection('emailVerifications')
+          .doc(user.uid);
       final snapshot = await userReference.get();
       final profile = snapshot.data();
 
@@ -149,7 +155,11 @@ class FirebaseAuthRepository implements AuthRepository {
         email: email,
         profile: profile,
       );
-      await userReference.delete();
+      final deletionBatch = _firestore.batch();
+      deletionBatch.delete(userReference);
+      deletionBatch.delete(emailVerificationReference);
+      await deletionBatch.commit();
+      await beforeAuthDeletion?.call(user.uid);
       await user.delete();
     } on FirebaseAuthException catch (error) {
       throw AuthException(_mapFirebaseCode(error.code), error.message);
@@ -182,12 +192,12 @@ class FirebaseAuthRepository implements AuthRepository {
           .collection(_disclaimerAcceptancesCollection)
           .doc(uid)
           .set({
-        'email': email.trim().toLowerCase(),
-        _disclaimerVersionField: version,
-        _disclaimerAcceptedAtField: acceptedAt,
-        _disclaimerAppVersionField: appVersion,
-        'archivedAt': FieldValue.serverTimestamp(),
-      });
+            'email': email.trim().toLowerCase(),
+            _disclaimerVersionField: version,
+            _disclaimerAcceptedAtField: acceptedAt,
+            _disclaimerAppVersionField: appVersion,
+            'archivedAt': FieldValue.serverTimestamp(),
+          });
     } on FirebaseException {
       // An existing record is rejected by the rules, which is the intended
       // outcome: the first acceptance is the one worth keeping. Losing the
@@ -265,6 +275,17 @@ class FirebaseAuthRepository implements AuthRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  @override
+  Future<UserProfileExistence> getUserProfileExistence(String uid) async {
+    final snapshot = await _firestore
+        .collection(_usersCollection)
+        .doc(uid)
+        .get();
+    return snapshot.exists
+        ? UserProfileExistence.present
+        : UserProfileExistence.missing;
   }
 
   @override

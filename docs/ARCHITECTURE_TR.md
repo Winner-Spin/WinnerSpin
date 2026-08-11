@@ -149,12 +149,24 @@ Doğrulama ekranı uygulama resumed durumuna döndüğünde Firebase kullanıcı
 - Parola sıfırlama istekleri Firestore'da rezerve edilir ve 24 saatte bir ile sınırlandırılır.
 - Tam hesap silme işleminde kullanıcının kimliği yeniden doğrulanır, saklanması
   gereken bilgilendirme onayı disclaimerAcceptances/{uid} altına arşivlenir,
-  users/{uid} silinir ve en son Firebase Authentication kullanıcısı kaldırılır.
+  users/{uid} ile eski emailVerifications/{uid} dokümanı atomik olarak silinir
+  ve en son Firebase Authentication kullanıcısı kaldırılır. Yıkıcı yazmalarda
+  Güvenlik Kuralları gelecekte olmayan ve en fazla beş dakikalık bir kimlik
+  doğrulama zamanı ister.
   Sıra güvenlik kurallarının dayattığı sıradır: dokümanı yalnızca sahibi
   silebildiği için auth kullanıcısının ondan sonra silinmesi gerekir. Son adım
   başarısız olursa geri alma yapılmaz, hata kullanıcıya bildirilir: profili
   yeniden yazmak bir `create` sayılır ve kurallar orada yalnızca sıfırdan
   10.000 coin'lik bir doküman kabul eder. Tekrar denendiğinde silme tamamlanır.
+- Ortak giriş sonrası profil kapısı, Authentication hesabı bulunan ancak profil
+  dokümanı eksik kullanıcıyı oyundan uzak tutar; tekrar deneme, çıkış ve yeniden
+  kimlik doğrulamalı silme seçenekleri sağlar.
+- Yerel kullanıcı repository'leri UID bazlı ortak kuyruk kullanır. Hesap silme
+  UID'yi bloke eder, önceki I/O işlemlerini tamamlar, gerçek ve geçici dosyaları
+  siler ve geç yazmaların dosyaları yeniden oluşturmasını engeller. Bu yerel
+  temizlik Firestore batch işleminden sonra, Firebase Authentication silme
+  işleminden önce çalışır; yarıda kalan temizlikte auth hesabı güvenli tekrar
+  deneme için varlığını korur.
 
 ### Bilgilendirme Arşivi Saklama Süresi
 

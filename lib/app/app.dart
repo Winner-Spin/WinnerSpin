@@ -15,7 +15,7 @@ import '../features/auth/domain/repositories/auth_repository.dart';
 import '../features/auth/presentation/viewmodels/login_viewmodel.dart';
 import '../features/auth/presentation/views/email_verification_screen.dart';
 import '../features/auth/presentation/views/login_screen.dart';
-import '../features/slot/presentation/views/game/disclaimer_gate.dart';
+import '../features/auth/presentation/views/post_login_gate.dart';
 
 /// Root application widget.
 class WinnerSpinApp extends StatefulWidget {
@@ -181,7 +181,9 @@ class _AuthGateState extends State<_AuthGate> {
     }
 
     if (_authRepository.currentUserId == null) return _loginScreen();
-    if (_authRepository.currentUserEmailVerified) return const DisclaimerGate();
+    if (_authRepository.currentUserEmailVerified) {
+      return PostLoginGate(authRepository: _authRepository);
+    }
 
     final email = _authRepository.currentUserEmail;
     if (email == null || email.isEmpty) {
@@ -197,6 +199,7 @@ class _AuthGateState extends State<_AuthGate> {
   Widget _loginScreen() {
     if (widget.authRepository == null) return const LoginScreen();
     return LoginScreen(
+      authRepository: _authRepository,
       viewModel: LoginViewModel.withRepository(_authRepository),
     );
   }

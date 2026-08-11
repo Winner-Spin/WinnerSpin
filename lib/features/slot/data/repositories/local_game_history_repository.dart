@@ -5,13 +5,22 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/game_history_entry.dart';
 import '../../domain/repositories/game_history_repository.dart';
+import 'local_user_data_coordinator.dart';
 
 class LocalGameHistoryRepository
     implements GameHistoryRepository, StoredHistoryProbe {
-  Future<void> _operations = Future<void>.value();
+  LocalGameHistoryRepository({
+    LocalUserDataCoordinator? coordinator,
+    Future<Directory> Function()? directoryProvider,
+  }) : _coordinator = coordinator ?? LocalUserDataCoordinator.shared,
+       _directoryProvider =
+           directoryProvider ?? getApplicationDocumentsDirectory;
+
+  final LocalUserDataCoordinator _coordinator;
+  final Future<Directory> Function() _directoryProvider;
 
   Future<File> _historyFile(String userId) async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _directoryProvider();
     return File('${directory.path}/game_history_$userId.json');
   }
 
@@ -19,16 +28,20 @@ class LocalGameHistoryRepository
   /// list. Used to tell a deleted-everything history from a fresh install.
   @override
   Future<bool> hasStoredHistory(String userId) {
-    return _synchronized(() async {
+    return _coordinator.run(userId, () async {
       final file = await _historyFile(userId);
       if (await file.exists()) return true;
       return File('${file.path}.tmp').exists();
-    });
+    }, whenBlocked: () => false);
   }
 
   @override
   Future<List<GameHistoryEntry>> load(String userId) {
-    return _synchronized(() => _load(userId));
+    return _coordinator.run(
+      userId,
+      () => _load(userId),
+      whenBlocked: () => const <GameHistoryEntry>[],
+    );
   }
 
   Future<List<GameHistoryEntry>> _load(String userId) async {
@@ -60,7 +73,11 @@ class LocalGameHistoryRepository
 
   @override
   Future<void> save(String userId, List<GameHistoryEntry> entries) {
-    return _synchronized(() => _save(userId, entries));
+    return _coordinator.run(
+      userId,
+      () => _save(userId, entries),
+      whenBlocked: () {},
+    );
   }
 
   Future<void> _save(String userId, List<GameHistoryEntry> entries) async {
@@ -93,14 +110,5 @@ class LocalGameHistoryRepository
       'bet': entry.bet,
       'winAmount': entry.winAmount,
     };
-  }
-
-  Future<T> _synchronized<T>(Future<T> Function() operation) {
-    final result = _operations.then((_) => operation());
-    _operations = result.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
-    return result;
   }
 }

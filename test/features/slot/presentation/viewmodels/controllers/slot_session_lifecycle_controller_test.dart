@@ -256,7 +256,14 @@ class _MemoryAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
-  Future<void> deleteAccount(String password) => throw UnimplementedError();
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<UserProfileExistence> getUserProfileExistence(String uid) async =>
+      UserProfileExistence.present;
 
   @override
   Future<void> reloadCurrentUser() async {

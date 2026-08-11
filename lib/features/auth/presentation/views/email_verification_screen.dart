@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/typography/app_fonts.dart';
 
-import '../../../slot/presentation/views/game/disclaimer_gate.dart';
 import '../../../slot/presentation/views/shared/widgets/spring_popup_card.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../viewmodels/email_verification_viewmodel.dart';
 import '../viewmodels/login_viewmodel.dart';
 import '../widgets/delete_account_dialog.dart';
 import 'login_screen.dart';
+import 'post_login_gate.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   const EmailVerificationScreen({
@@ -95,7 +95,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         return;
       }
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DisclaimerGate()),
+        MaterialPageRoute(
+          builder: (_) => PostLoginGate(authRepository: widget.authRepository),
+        ),
         (_) => false,
       );
     });
@@ -458,6 +460,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           : const LoginScreen();
     }
     return LoginScreen(
+      authRepository: authRepository,
       viewModel: LoginViewModel.withRepository(authRepository),
       showAccountDeletedNotice: showAccountDeletedNotice,
     );

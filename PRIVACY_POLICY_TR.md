@@ -141,6 +141,8 @@ geçerli olur. Winner Spin, oyun hesabı verilerinizi bu bağlantılara eklemez.
 Hesabınızı uygulamada **Profilim > Hesabı Sil** yolunu kullanarak doğrudan
 silebilirsiniz. Hesabınızı korumak için silme işleminden önce yeniden kimlik
 doğrulaması yapmanız gerekir.
+E-posta adresiniz henüz doğrulanmadıysa e-posta doğrulama ekranındaki
+**Bu Hesabı Sil** seçeneğini kullanabilirsiniz.
 
 Uygulamayı kullanmadan da
 [winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com?subject=Winner%20Spin%20Account%20Deletion%20Request)

@@ -10,17 +10,20 @@ import '../models/auth_image_assets.dart';
 import '../widgets/account_deleted_dialog.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_dialog.dart';
+import 'post_login_gate.dart';
 import 'register_screen.dart';
-import '../../../slot/presentation/views/game/disclaimer_gate.dart';
+import '../../domain/repositories/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.viewModel,
+    this.authRepository,
     this.showAccountDeletedNotice = false,
   });
 
   final LoginViewModel? viewModel;
+  final AuthRepository? authRepository;
   final bool showAccountDeletedNotice;
 
   @override
@@ -51,11 +54,11 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    _viewModel = widget.viewModel ?? LoginViewModel();
-    _viewModel.addListener(_onViewModelChange);
-    _emailFocus.addListener(_onFocusChange);
-    _passwordFocus.addListener(_onFocusChange);
-    unawaited(_viewModel.initMusic());
+    _viewModel =
+        widget.viewModel ??
+        (widget.authRepository == null
+            ? LoginViewModel()
+            : LoginViewModel.withRepository(widget.authRepository!));
     _errorPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -63,6 +66,13 @@ class _LoginScreenState extends State<LoginScreen>
     _errorPulseScale = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _errorPulseCtrl, curve: Curves.easeOutBack),
     );
+    // Initialize every field read by the listener before a method that may
+    // synchronously notify it. With music disabled, initMusic reaches
+    // notifyListeners without awaiting the audio service.
+    _viewModel.addListener(_onViewModelChange);
+    _emailFocus.addListener(_onFocusChange);
+    _passwordFocus.addListener(_onFocusChange);
+    unawaited(_viewModel.initMusic());
     _scheduleAccountDeletedNotice();
   }
 
@@ -360,7 +370,10 @@ class _LoginScreenState extends State<LoginScreen>
       _viewModel.resetLoginSuccess();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const DisclaimerGate()),
+        MaterialPageRoute(
+          builder: (context) =>
+              PostLoginGate(authRepository: widget.authRepository),
+        ),
       );
     }
   }

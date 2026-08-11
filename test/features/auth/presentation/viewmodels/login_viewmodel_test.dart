@@ -124,7 +124,10 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> signOut() => throw UnimplementedError();
 
   @override
-  Future<void> deleteAccount(String password) => throw UnimplementedError();
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  }) => throw UnimplementedError();
 
   @override
   Future<void> reloadCurrentUser() => throw UnimplementedError();
@@ -134,6 +137,10 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Map<String, dynamic>?> getUserData(String uid) =>
+      throw UnimplementedError();
+
+  @override
+  Future<UserProfileExistence> getUserProfileExistence(String uid) =>
       throw UnimplementedError();
 
   @override

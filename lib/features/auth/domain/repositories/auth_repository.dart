@@ -30,6 +30,10 @@ class PasswordResetLimitException implements Exception {
       'PasswordResetLimitException(nextAllowedAt: $nextAllowedAt)';
 }
 
+enum UserProfileExistence { missing, present }
+
+typedef BeforeAuthDeletion = Future<void> Function(String uid);
+
 abstract class AuthRepository {
   String? get currentUserId;
 
@@ -56,13 +60,23 @@ abstract class AuthRepository {
   /// Throws [AuthException] with [AuthErrorCode.wrongPassword] when the
   /// password does not match.
   ///
-  Future<void> deleteAccount(String password);
+  /// When supplied, [beforeAuthDeletion] runs after the remote profile data is
+  /// removed but before the Firebase Authentication user is deleted. It lets
+  /// callers tombstone and drain local writes while a failed or interrupted
+  /// cleanup can still be retried by the authenticated user.
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  });
 
   Future<void> reloadCurrentUser();
 
   Future<void> sendEmailVerificationLink();
 
   Future<Map<String, dynamic>?> getUserData(String uid);
+
+  /// Checks profile existence without treating backend failures as missing.
+  Future<UserProfileExistence> getUserProfileExistence(String uid);
 
   Stream<Map<String, dynamic>?> watchUserData(String uid);
 

@@ -7,12 +7,15 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> Function()? onSendVerificationLink;
   Future<void> Function()? onReloadCurrentUser;
   Future<void> Function(String password)? onDeleteAccount;
+  Future<UserProfileExistence> Function(String uid)? onGetUserProfileExistence;
 
   int signOutCalls = 0;
   int deleteAccountCalls = 0;
   int sendVerificationLinkCalls = 0;
   int reloadCurrentUserCalls = 0;
+  int getUserProfileExistenceCalls = 0;
   String? deleteAccountPassword;
+  bool authDeletionCompleted = false;
 
   @override
   String? currentUserId = 'user-1';
@@ -45,10 +48,16 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount(String password) async {
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  }) async {
     deleteAccountCalls++;
     deleteAccountPassword = password;
     await onDeleteAccount?.call(password);
+    final userId = currentUserId;
+    if (userId != null) await beforeAuthDeletion?.call(userId);
+    authDeletionCompleted = true;
   }
 
   @override
@@ -65,6 +74,12 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Map<String, dynamic>?> getUserData(String uid) async => null;
+
+  @override
+  Future<UserProfileExistence> getUserProfileExistence(String uid) async {
+    getUserProfileExistenceCalls++;
+    return onGetUserProfileExistence?.call(uid) ?? UserProfileExistence.missing;
+  }
 
   @override
   Stream<Map<String, dynamic>?> watchUserData(String uid) =>

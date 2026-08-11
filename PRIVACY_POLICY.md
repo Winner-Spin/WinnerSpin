@@ -140,6 +140,8 @@ Spin does not attach your game-account data to those links.
 
 You can delete your account directly in the app through **My Profile > Delete
 Account**. You must reauthenticate before deletion to protect your account.
+If your email has not yet been verified, you can instead use **Delete This
+Account** on the email-verification screen.
 
 You can also request deletion without using the app by emailing
 [winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com?subject=Winner%20Spin%20Account%20Deletion%20Request)

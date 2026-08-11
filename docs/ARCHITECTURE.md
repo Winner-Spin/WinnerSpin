@@ -149,12 +149,22 @@ The verification screen reloads the Firebase user when the application resumes a
 - Password-reset requests are reserved in Firestore and limited to once every 24 hours.
 - Full account deletion reauthenticates the player, archives the retained
   disclaimer evidence to disclaimerAcceptances/{uid}, deletes users/{uid} and
-  only then removes the Firebase Authentication user. The order is dictated by
+  legacy emailVerifications/{uid} atomically, and only then removes the Firebase
+  Authentication user. Security Rules require a non-future authentication time
+  no older than five minutes for every destructive write. The order is dictated by
   the security rules: the document may only be deleted by its owner, so the
   auth user has to outlive it. A failure at the last step is surfaced instead
   of rolled back, because recreating the profile would be a `create` and the
   rules only accept a fresh 10,000-coin document there. Retrying completes the
   deletion.
+- A shared post-login profile gate prevents a verified Authentication account
+  with a missing profile from entering the game and provides retry, sign-out,
+  and reauthenticated deletion recovery paths.
+- Local per-user repositories share a uid-scoped queue. Account deletion first
+  tombstones the uid, drains earlier I/O, deletes real and temporary files, and
+  prevents late writes from recreating them. This local cleanup runs after the
+  Firestore batch but before Firebase Authentication deletion; therefore, an
+  interrupted cleanup leaves the auth account available for a safe retry.
 
 ### Disclaimer Archive Retention
 

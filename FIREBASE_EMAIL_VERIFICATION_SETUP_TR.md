@@ -49,11 +49,11 @@ Bu Firestore kuralları dağıtılmasa bile Firebase Authentication doğrulama b
 
 ## 3. Tam Hesap Silme
 
-Profildeki tam hesap silme işlemi tamamen istemci tarafında çalışır. Kullanıcının kimliği yeniden doğrulandıktan sonra bilgilendirme onayı `disclaimerAcceptances/{uid}` altına arşivlenir, `users/{uid}` silinir ve en son Firebase Authentication kullanıcısı kaldırılır. Son adım başarısız olursa hata bildirilir; işlem tekrar denendiğinde tamamlanır.
+Tam hesap silme işlemi hem profil hem de doğrulanmamış e-posta ekranından kullanılabilir ve tamamen istemci tarafında çalışır. Kullanıcının kimliği yeniden doğrulandıktan sonra varsa bilgilendirme onayı arşivlenir, `users/{uid}` ile eski `emailVerifications/{uid}` dokümanı tek batch içinde silinir, kullanıcının yerel dosyaları UID bazında bloke edilip temizlenir ve en son Firebase Authentication kullanıcısı kaldırılır. Yerel temizliğin Authentication silme işleminden önce yapılması, yarıda kalan bir temizliğin güvenli tekrar deneme için auth hesabını korumasını sağlar. Son adım başarısız olursa giriş sonrası profil kapısı eksik hesabın oyuna girmesini engeller ve güvenli tekrar deneme veya çıkış yolu sunar.
 
 Bu sıra değiştirilemez. Firestore kuralları profili yalnızca sahibine sildirdiği için, doküman silinene kadar Authentication kullanıcısının yaşaması gerekir.
 
-İşlem Cloud Functions veya faturalandırma hesabı gerektirmez. Gerektirdiği tek şey Firestore kurallarının dağıtılmış olmasıdır; `users/{uid}` için silme, `disclaimerAcceptances/{uid}` için bir kereye mahsus oluşturma iznini bu kurallar verir:
+İşlem Cloud Functions veya faturalandırma hesabı gerektirmez. Firestore kurallarının dağıtılmış olması gerekir. Yıkıcı yazmalar için sahip token'ındaki `auth_time` en fazla beş dakika önce olmalı ve gelecekte olmamalıdır; silmeden hemen önce yapılan yeniden kimlik doğrulaması bu güncel token'ı sağlar:
 
 ~~~sh
 firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID

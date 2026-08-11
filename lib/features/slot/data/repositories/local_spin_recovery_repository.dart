@@ -5,18 +5,31 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/pending_spin_recovery.dart';
 import '../../domain/repositories/spin_recovery_repository.dart';
+import 'local_user_data_coordinator.dart';
 
 class LocalSpinRecoveryRepository implements SpinRecoveryRepository {
-  Future<void> _operations = Future<void>.value();
+  LocalSpinRecoveryRepository({
+    LocalUserDataCoordinator? coordinator,
+    Future<Directory> Function()? directoryProvider,
+  }) : _coordinator = coordinator ?? LocalUserDataCoordinator.shared,
+       _directoryProvider =
+           directoryProvider ?? getApplicationDocumentsDirectory;
+
+  final LocalUserDataCoordinator _coordinator;
+  final Future<Directory> Function() _directoryProvider;
 
   Future<File> _recoveryFile(String userId) async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _directoryProvider();
     return File('${directory.path}/pending_spin_recovery_$userId.json');
   }
 
   @override
   Future<PendingSpinRecovery?> load(String userId) {
-    return _synchronized(() => _load(userId));
+    return _coordinator.run(
+      userId,
+      () => _load(userId),
+      whenBlocked: () => null,
+    );
   }
 
   Future<PendingSpinRecovery?> _load(String userId) async {
@@ -38,7 +51,11 @@ class LocalSpinRecoveryRepository implements SpinRecoveryRepository {
 
   @override
   Future<void> save(String userId, PendingSpinRecovery recovery) {
-    return _synchronized(() => _save(userId, recovery));
+    return _coordinator.run(
+      userId,
+      () => _save(userId, recovery),
+      whenBlocked: () {},
+    );
   }
 
   Future<void> _save(String userId, PendingSpinRecovery recovery) async {
@@ -54,7 +71,11 @@ class LocalSpinRecoveryRepository implements SpinRecoveryRepository {
 
   @override
   Future<void> clear(String userId, String spinId) {
-    return _synchronized(() => _clear(userId, spinId));
+    return _coordinator.run(
+      userId,
+      () => _clear(userId, spinId),
+      whenBlocked: () {},
+    );
   }
 
   Future<void> _clear(String userId, String spinId) async {
@@ -70,14 +91,5 @@ class LocalSpinRecoveryRepository implements SpinRecoveryRepository {
   Future<PendingSpinRecovery> _read(File file) async {
     final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
     return PendingSpinRecovery.fromJson(json);
-  }
-
-  Future<T> _synchronized<T>(Future<T> Function() operation) {
-    final result = _operations.then((_) => operation());
-    _operations = result.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
-    return result;
   }
 }

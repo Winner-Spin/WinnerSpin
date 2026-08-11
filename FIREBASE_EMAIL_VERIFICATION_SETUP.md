@@ -49,11 +49,11 @@ Firebase Authentication link verification still works if these Firestore rules a
 
 ## 3. Full Account Deletion
 
-The profile's full account-deletion action runs entirely on the client. After reauthenticating the player it archives the disclaimer acceptance to `disclaimerAcceptances/{uid}`, deletes `users/{uid}` and finally removes the Firebase Authentication user. If the last step fails the error is reported and retrying finishes the job.
+The full account-deletion action is available from both the profile and the unverified-email screen and runs entirely on the client. After reauthenticating the player it archives any disclaimer acceptance, deletes `users/{uid}` and the legacy `emailVerifications/{uid}` document in one batch, tombstones and erases the user's local files, and finally removes the Firebase Authentication user. Keeping local cleanup before Authentication deletion ensures that an interrupted cleanup leaves an authenticated account that can safely retry. If the last step fails, the post-login profile gate keeps the incomplete account out of the game and offers a safe retry or sign-out path.
 
 The order cannot be reversed. Firestore rules only let the owner delete their own profile, so the Authentication user has to survive until the document is gone.
 
-This requires no Cloud Functions and no billing account. What it does require is the Firestore rules being deployed, because they grant the owner delete access on `users/{uid}` and create-once access on `disclaimerAcceptances/{uid}`:
+This requires no Cloud Functions and no billing account. What it does require is the Firestore rules being deployed. Destructive writes require the owner token's `auth_time` to be no more than five minutes old (and not in the future); reauthentication immediately before deletion supplies that fresh token.
 
 ~~~sh
 firebase deploy --only firestore:rules --project=YOUR_PROJECT_ID

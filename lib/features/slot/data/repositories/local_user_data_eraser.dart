@@ -3,15 +3,19 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'local_user_data_coordinator.dart';
+
 /// Removes everything this device stores for one account.
 ///
-/// Deleting the account clears Firestore and Firebase Auth, but the device
-/// keeps its own copies — the game history, the pending-spin recovery file and
-/// the disclaimer acceptance. They are named after a uid that will never exist
-/// again, so nothing would ever read them, yet leaving a deleted player's data
-/// sitting on the phone is not what "delete my account" promises.
+/// Account deletion removes remote profile data first, then calls this eraser
+/// while the Firebase Authentication user still exists. A local cleanup
+/// failure is surfaced so that final Auth deletion does not run and the player
+/// can safely retry.
 class LocalUserDataEraser {
-  const LocalUserDataEraser();
+  const LocalUserDataEraser({this.coordinator, this.directoryProvider});
+
+  final LocalUserDataCoordinator? coordinator;
+  final Future<Directory> Function()? directoryProvider;
 
   /// File names, without the directory, that belong to [userId].
   ///
@@ -30,24 +34,44 @@ class LocalUserDataEraser {
     ];
   }
 
-  /// Best effort: a file that refuses to go is not a reason to tell the player
-  /// their account survived, since the account itself is already gone.
+  /// Tombstones the uid, drains pending writes, and removes all known files.
+  ///
+  /// Every file is attempted even after one removal fails. Any failure is
+  /// rethrown afterward so Firebase Authentication finalization stays blocked
+  /// and the deletion can be retried without allowing late local writes.
   Future<void> eraseFor(String userId) async {
-    final Directory directory;
-    try {
-      directory = await getApplicationDocumentsDirectory();
-    } catch (error) {
-      debugPrint('Local user data could not be located: $error');
-      return;
-    }
+    await (coordinator ?? LocalUserDataCoordinator.shared).erase(
+      userId,
+      () async {
+        final Directory directory;
+        try {
+          directory =
+              await (directoryProvider ?? getApplicationDocumentsDirectory)();
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Local user data could not be located: $error\n$stackTrace',
+          );
+          Error.throwWithStackTrace(error, stackTrace);
+        }
 
-    for (final name in fileNamesFor(userId)) {
-      try {
-        final file = File('${directory.path}/$name');
-        if (await file.exists()) await file.delete();
-      } catch (error) {
-        debugPrint('Local user data could not be erased: $error');
-      }
-    }
+        Object? firstError;
+        StackTrace? firstStackTrace;
+        for (final name in fileNamesFor(userId)) {
+          try {
+            final file = File('${directory.path}/$name');
+            if (await file.exists()) await file.delete();
+          } catch (error, stackTrace) {
+            firstError ??= error;
+            firstStackTrace ??= stackTrace;
+            debugPrint(
+              'Local user data could not be erased: $error\n$stackTrace',
+            );
+          }
+        }
+        if (firstError != null) {
+          Error.throwWithStackTrace(firstError, firstStackTrace!);
+        }
+      },
+    );
   }
 }

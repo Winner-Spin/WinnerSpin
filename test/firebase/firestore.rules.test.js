@@ -56,11 +56,18 @@ function historyEntries(count) {
   }));
 }
 
-function authenticatedFirestore(uid, email, emailVerified = false) {
-  return testEnvironment.authenticatedContext(uid, {
+function authenticatedFirestore(
+    uid,
+    email,
+    emailVerified = false,
+    {authTime = Math.floor(Date.now() / 1000)} = {},
+) {
+  const claims = {
     email,
     email_verified: emailVerified,
-  }).firestore();
+  };
+  if (authTime !== null) claims.auth_time = authTime;
+  return testEnvironment.authenticatedContext(uid, claims).firestore();
 }
 
 async function seedUsers() {
@@ -340,6 +347,19 @@ describe("users collection ownership", () => {
 
     await assertSucceeds(deleteDoc(doc(database, "users", ownerId)));
   });
+
+  test("denies profile deletion with stale, future, or missing auth_time", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const authTime of [now - 301, now + 30, null]) {
+      const database = authenticatedFirestore(
+          ownerId,
+          ownerEmail,
+          false,
+          {authTime},
+      );
+      await assertFails(deleteDoc(doc(database, "users", ownerId)));
+    }
+  });
 });
 
 describe("disclaimer acceptance archive", () => {
@@ -371,6 +391,25 @@ describe("disclaimer acceptance archive", () => {
     const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
 
     await assertSucceeds(setDoc(archiveReference, archiveData(profile)));
+  });
+
+  test("requires recent authentication to create the archive", async () => {
+    const freshDatabase = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(freshDatabase);
+    const now = Math.floor(Date.now() / 1000);
+
+    for (const authTime of [now - 301, now + 30, null]) {
+      const database = authenticatedFirestore(
+          ownerId,
+          ownerEmail,
+          false,
+          {authTime},
+      );
+      await assertFails(setDoc(
+          doc(database, "disclaimerAcceptances", ownerId),
+          archiveData(profile),
+      ));
+    }
   });
 
   test("denies forged past and future archive timestamps", async () => {
@@ -512,6 +551,21 @@ describe("server-owned collections", () => {
     await assertFails(getDoc(reference));
     await assertFails(setDoc(reference, {ownerId}));
     await assertSucceeds(deleteDoc(reference));
+  });
+
+  test("requires recent authentication to delete email verification data", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const authTime of [now - 301, now + 30, null]) {
+      const database = authenticatedFirestore(
+          ownerId,
+          ownerEmail,
+          false,
+          {authTime},
+      );
+      await assertFails(deleteDoc(
+          doc(database, "emailVerifications", ownerId),
+      ));
+    }
   });
 
   test("denies access to collections without an explicit rule", async () => {

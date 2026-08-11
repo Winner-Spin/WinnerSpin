@@ -345,10 +345,18 @@ class _ProfileAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> deleteAccount(String password) async {
+  Future<void> deleteAccount(
+    String password, {
+    BeforeAuthDeletion? beforeAuthDeletion,
+  }) async {
     deleteAccountCalls++;
     deletePassword = password;
+    await beforeAuthDeletion?.call(currentUserId!);
   }
+
+  @override
+  Future<UserProfileExistence> getUserProfileExistence(String uid) async =>
+      UserProfileExistence.present;
 
   @override
   Future<void> reloadCurrentUser() => throw UnimplementedError();
