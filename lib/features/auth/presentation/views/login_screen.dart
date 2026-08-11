@@ -7,15 +7,21 @@ import '../../../../core/typography/app_fonts.dart';
 import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
+import '../widgets/account_deleted_dialog.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_dialog.dart';
 import 'register_screen.dart';
 import '../../../slot/presentation/views/game/disclaimer_gate.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.viewModel});
+  const LoginScreen({
+    super.key,
+    this.viewModel,
+    this.showAccountDeletedNotice = false,
+  });
 
   final LoginViewModel? viewModel;
+  final bool showAccountDeletedNotice;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -40,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen>
   late final AnimationController _errorPulseCtrl;
   late final Animation<double> _errorPulseScale;
   bool _isRoutingToVerification = false;
+  bool _accountDeletedNoticeHandled = false;
 
   @override
   void initState() {
@@ -56,6 +63,24 @@ class _LoginScreenState extends State<LoginScreen>
     _errorPulseScale = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _errorPulseCtrl, curve: Curves.easeOutBack),
     );
+    _scheduleAccountDeletedNotice();
+  }
+
+  void _scheduleAccountDeletedNotice() {
+    if (!widget.showAccountDeletedNotice || _accountDeletedNoticeHandled) {
+      return;
+    }
+    _accountDeletedNoticeHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const AccountDeletedDialog(),
+        ),
+      );
+    });
   }
 
   void _onViewModelChange() {

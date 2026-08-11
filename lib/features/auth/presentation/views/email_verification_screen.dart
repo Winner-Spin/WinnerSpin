@@ -7,6 +7,8 @@ import '../../../slot/presentation/views/game/disclaimer_gate.dart';
 import '../../../slot/presentation/views/shared/widgets/spring_popup_card.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../viewmodels/email_verification_viewmodel.dart';
+import '../viewmodels/login_viewmodel.dart';
+import '../widgets/delete_account_dialog.dart';
 import 'login_screen.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class EmailVerificationScreen extends StatefulWidget {
     this.sendLinkOnOpen = true,
     this.onVerified,
     this.onCancel,
+    this.onAccountDeleted,
   });
 
   final String email;
@@ -26,6 +29,7 @@ class EmailVerificationScreen extends StatefulWidget {
   final bool sendLinkOnOpen;
   final VoidCallback? onVerified;
   final VoidCallback? onCancel;
+  final VoidCallback? onAccountDeleted;
 
   @override
   State<EmailVerificationScreen> createState() =>
@@ -44,6 +48,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   late final bool _ownsViewModel;
   bool _handledSuccess = false;
   bool _isCancelling = false;
+  bool _isDeleteDialogOpen = false;
 
   @override
   void initState() {
@@ -74,7 +79,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !_isDeleteDialogOpen) {
       unawaited(_viewModel.checkVerificationStatus(silent: true));
     }
   }
@@ -188,7 +193,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
             alignment: Alignment.centerRight,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: _isCancelling ? null : _cancel,
+              onTap: _isScreenBusy ? null : _cancel,
               child: Container(
                 width: 48,
                 height: 48,
@@ -309,9 +314,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         const SizedBox(height: 18),
         FilledButton.icon(
           key: const ValueKey('verify-email-button'),
-          onPressed: _viewModel.isChecking
-              ? null
-              : _viewModel.checkVerificationStatus,
+          onPressed: _isScreenBusy ? null : _viewModel.checkVerificationStatus,
           style: FilledButton.styleFrom(
             backgroundColor: _textColor,
             foregroundColor: Colors.white,
@@ -343,7 +346,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         const SizedBox(height: 10),
         TextButton(
           key: const ValueKey('resend-email-button'),
-          onPressed: _viewModel.canResend
+          onPressed: !_isCancelling && _viewModel.canResend
               ? _viewModel.sendVerificationLink
               : null,
           child: Text(
@@ -360,7 +363,42 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           ),
         ),
         TextButton(
-          onPressed: _isCancelling ? null : _cancel,
+          key: const ValueKey('delete-unverified-account-button'),
+          onPressed: _isScreenBusy ? null : _confirmDeleteAccount,
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E)),
+          child: _viewModel.isDeletingAccount
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Color(0xFFB3261E),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'DELETING...',
+                      style: AppFonts.barlowCondensed(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  'DELETE THIS ACCOUNT',
+                  style: AppFonts.barlowCondensed(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+        ),
+        TextButton(
+          onPressed: _isScreenBusy ? null : _cancel,
           child: Text(
             'USE A DIFFERENT ACCOUNT',
             style: AppFonts.barlowCondensed(
@@ -374,8 +412,59 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     );
   }
 
+  bool get _isScreenBusy =>
+      _isCancelling || _isDeleteDialogOpen || _viewModel.isBusy;
+
+  Future<void> _confirmDeleteAccount() async {
+    if (_isScreenBusy) return;
+    setState(() => _isDeleteDialogOpen = true);
+    String? password;
+    try {
+      password = await showDialog<String>(
+        context: context,
+        builder: (_) => DeleteAccountDialog(
+          description:
+              'This permanently deletes ${widget.email} and all associated '
+              'account data. This action cannot be undone. Enter your password '
+              'to confirm.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isDeleteDialogOpen = false);
+    }
+    if (password == null || !mounted) return;
+
+    final deleted = await _viewModel.deleteAccount(password);
+    if (!mounted || !deleted) return;
+
+    final callback = widget.onAccountDeleted;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => _buildLoginScreen(showAccountDeletedNotice: true),
+      ),
+      (_) => false,
+    );
+  }
+
+  Widget _buildLoginScreen({bool showAccountDeletedNotice = false}) {
+    final authRepository = widget.authRepository;
+    if (authRepository == null) {
+      return showAccountDeletedNotice
+          ? const LoginScreen(showAccountDeletedNotice: true)
+          : const LoginScreen();
+    }
+    return LoginScreen(
+      viewModel: LoginViewModel.withRepository(authRepository),
+      showAccountDeletedNotice: showAccountDeletedNotice,
+    );
+  }
+
   Future<void> _cancel() async {
-    if (_isCancelling) return;
+    if (_isScreenBusy) return;
     setState(() => _isCancelling = true);
     await _viewModel.cancelVerification();
     if (!mounted) return;
@@ -390,7 +479,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
       navigator.pop();
     } else {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => _buildLoginScreen()),
       );
     }
   }

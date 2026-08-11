@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/typography/app_fonts.dart';
 
 import '../../../../auth/domain/repositories/auth_repository.dart';
+import '../../../../auth/presentation/widgets/delete_account_dialog.dart';
 import '../../../domain/models/slot_symbol.dart';
 import '../../../domain/models/symbol_registry.dart';
 import '../../audio/ui_click_sound.dart';
@@ -575,7 +576,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     UiClickSound.play();
     final password = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => const _DeleteAccountDialog(),
+      builder: (dialogContext) => const DeleteAccountDialog(),
     );
     if (password == null || !mounted) return;
 
@@ -649,116 +650,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month $hour:$minute';
-  }
-}
-
-/// Confirms account deletion and collects the password in one step.
-///
-/// Returns the password, or null when the player backs out. Asking for it here
-/// keeps the destructive action behind something only the account holder knows
-/// — an unlocked phone left on a table should not be enough.
-class _DeleteAccountDialog extends StatefulWidget {
-  const _DeleteAccountDialog();
-
-  @override
-  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
-}
-
-class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  static const Color _headerColor = Color(0xFFF6D7EB);
-  static const Color _textColor = Color(0xFF2C2530);
-
-  final TextEditingController _password = TextEditingController();
-  bool _canDelete = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _password.addListener(() {
-      final canDelete = _password.text.isNotEmpty;
-      if (canDelete != _canDelete) setState(() => _canDelete = canDelete);
-    });
-  }
-
-  @override
-  void dispose() {
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: _headerColor,
-      title: Text(
-        'DELETE ACCOUNT?',
-        style: AppFonts.barlowCondensed(
-          fontWeight: FontWeight.w900,
-          color: _textColor,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'This permanently deletes your account and game data. '
-            'This action cannot be undone. Enter your password to confirm.',
-            style: AppFonts.barlowCondensed(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _textColor,
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            key: const ValueKey('delete-account-password'),
-            controller: _password,
-            obscureText: true,
-            autofocus: true,
-            style: AppFonts.barlowCondensed(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: _textColor,
-            ),
-            decoration: InputDecoration(
-              labelText: 'Password',
-              labelStyle: AppFonts.barlowCondensed(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: _textColor.withValues(alpha: 0.7),
-              ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.7),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('CANCEL'),
-        ),
-        FilledButton(
-          key: const ValueKey('confirm-delete-account-button'),
-          // Disabled while empty: an accidental tap on a red button should not
-          // be one confirmation away from wiping the account.
-          onPressed: _canDelete
-              ? () => Navigator.of(context).pop(_password.text)
-              : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFB3261E),
-            disabledBackgroundColor: const Color(0xFFB3261E).withValues(
-              alpha: 0.4,
-            ),
-          ),
-          child: const Text('DELETE'),
-        ),
-      ],
-    );
   }
 }

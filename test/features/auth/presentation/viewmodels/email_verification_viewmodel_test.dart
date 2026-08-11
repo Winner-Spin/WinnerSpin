@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/features/auth/domain/models/email_verification_failure.dart';
+import 'package:winner_spin/features/auth/domain/repositories/auth_repository.dart';
 import 'package:winner_spin/features/auth/presentation/viewmodels/email_verification_viewmodel.dart';
 
 import '../../support/fake_auth_repository.dart';
@@ -74,5 +77,69 @@ void main() {
       expect(viewModel.message, contains('Too many verification emails'));
       viewModel.dispose();
     });
+
+    test('deletes the account with the supplied password', () async {
+      final repository = FakeAuthRepository();
+      final viewModel = EmailVerificationViewModel(
+        email: 'player@example.com',
+        authRepository: repository,
+      );
+
+      final deleted = await viewModel.deleteAccount('hunter2');
+
+      expect(deleted, isTrue);
+      expect(repository.deleteAccountCalls, 1);
+      expect(repository.deleteAccountPassword, 'hunter2');
+      expect(viewModel.isDeletingAccount, isFalse);
+      viewModel.dispose();
+    });
+
+    test('shows a useful error when the password is incorrect', () async {
+      final repository = FakeAuthRepository()
+        ..onDeleteAccount = (_) => Future<void>.error(
+          const AuthException(AuthErrorCode.invalidCredential),
+        );
+      final viewModel = EmailVerificationViewModel(
+        email: 'player@example.com',
+        authRepository: repository,
+      );
+
+      final deleted = await viewModel.deleteAccount('wrong-password');
+
+      expect(deleted, isFalse);
+      expect(viewModel.message, contains('Incorrect password'));
+      expect(viewModel.messageIsError, isTrue);
+      expect(viewModel.isDeletingAccount, isFalse);
+      viewModel.dispose();
+    });
+
+    test(
+      'blocks conflicting actions while account deletion is pending',
+      () async {
+        final deletion = Completer<void>();
+        final repository = FakeAuthRepository()
+          ..onDeleteAccount = (_) => deletion.future;
+        final viewModel = EmailVerificationViewModel(
+          email: 'player@example.com',
+          authRepository: repository,
+        );
+
+        final result = viewModel.deleteAccount('hunter2');
+
+        expect(viewModel.isDeletingAccount, isTrue);
+        expect(viewModel.canResend, isFalse);
+        await viewModel.sendVerificationLink();
+        await viewModel.checkVerificationStatus();
+        await viewModel.cancelVerification();
+        expect(repository.sendVerificationLinkCalls, 0);
+        expect(repository.reloadCurrentUserCalls, 0);
+        expect(repository.signOutCalls, 0);
+
+        deletion.complete();
+        expect(await result, isTrue);
+        expect(viewModel.isDeletingAccount, isFalse);
+        viewModel.dispose();
+      },
+    );
   });
 }

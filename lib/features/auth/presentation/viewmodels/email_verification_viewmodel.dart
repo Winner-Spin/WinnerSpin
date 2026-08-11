@@ -21,6 +21,11 @@ class EmailVerificationViewModel extends ChangeNotifier {
   bool _isChecking = false;
   bool get isChecking => _isChecking;
 
+  bool _isDeletingAccount = false;
+  bool get isDeletingAccount => _isDeletingAccount;
+
+  bool get isBusy => _isSendingLink || _isChecking || _isDeletingAccount;
+
   bool _verificationSuccess = false;
   bool get verificationSuccess => _verificationSuccess;
 
@@ -32,13 +37,12 @@ class EmailVerificationViewModel extends ChangeNotifier {
 
   int _resendSecondsRemaining = 0;
   int get resendSecondsRemaining => _resendSecondsRemaining;
-  bool get canResend =>
-      !_isSendingLink && !_isChecking && _resendSecondsRemaining == 0;
+  bool get canResend => !isBusy && _resendSecondsRemaining == 0;
 
   Timer? _resendTimer;
 
   Future<void> sendVerificationLink() async {
-    if (_isSendingLink || _verificationSuccess) return;
+    if (isBusy || _verificationSuccess) return;
     _isSendingLink = true;
     _setMessage(null);
     notifyListeners();
@@ -63,7 +67,7 @@ class EmailVerificationViewModel extends ChangeNotifier {
   }
 
   Future<void> checkVerificationStatus({bool silent = false}) async {
-    if (_isChecking || _verificationSuccess) return;
+    if (isBusy || _verificationSuccess) return;
     _isChecking = true;
     if (!silent) _setMessage(null);
     notifyListeners();
@@ -92,7 +96,51 @@ class EmailVerificationViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> cancelVerification() => _authRepository.signOut();
+  Future<void> cancelVerification() {
+    if (_isDeletingAccount) return Future<void>.value();
+    return _authRepository.signOut();
+  }
+
+  Future<bool> deleteAccount(String password) async {
+    if (isBusy || _verificationSuccess) return false;
+    _isDeletingAccount = true;
+    _setMessage(null);
+    notifyListeners();
+
+    try {
+      await _authRepository.deleteAccount(password);
+      return true;
+    } on AuthException catch (error) {
+      switch (error.code) {
+        case AuthErrorCode.wrongPassword:
+        case AuthErrorCode.invalidCredential:
+          _setMessage(
+            'Incorrect password. The account was not deleted.',
+            isError: true,
+          );
+        case AuthErrorCode.networkRequestFailed:
+          _setMessage(
+            'Account deletion requires a network connection. Please try again.',
+            isError: true,
+          );
+        default:
+          _setMessage(
+            'Account could not be deleted. Please try again.',
+            isError: true,
+          );
+      }
+      return false;
+    } catch (_) {
+      _setMessage(
+        'Account could not be deleted. Please try again.',
+        isError: true,
+      );
+      return false;
+    } finally {
+      _isDeletingAccount = false;
+      notifyListeners();
+    }
+  }
 
   void _handleVerificationError(EmailVerificationException error) {
     switch (error.code) {

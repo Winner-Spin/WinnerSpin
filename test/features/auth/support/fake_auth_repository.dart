@@ -6,11 +6,13 @@ class FakeAuthRepository implements AuthRepository {
   onSignUp;
   Future<void> Function()? onSendVerificationLink;
   Future<void> Function()? onReloadCurrentUser;
+  Future<void> Function(String password)? onDeleteAccount;
 
   int signOutCalls = 0;
   int deleteAccountCalls = 0;
   int sendVerificationLinkCalls = 0;
   int reloadCurrentUserCalls = 0;
+  String? deleteAccountPassword;
 
   @override
   String? currentUserId = 'user-1';
@@ -45,6 +47,8 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<void> deleteAccount(String password) async {
     deleteAccountCalls++;
+    deleteAccountPassword = password;
+    await onDeleteAccount?.call(password);
   }
 
   @override
