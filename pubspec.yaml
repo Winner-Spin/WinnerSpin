@@ -38,6 +38,7 @@ flutter:
 
   assets:
     - assets/app_icon.png
+    - assets/avatars/
     - lib/images/auth_shared/
     - lib/images/login_screen/
     - lib/images/register_screen/

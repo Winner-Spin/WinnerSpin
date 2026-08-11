@@ -156,6 +156,20 @@ The verification screen reloads the Firebase user when the application resumes a
   rules only accept a fresh 10,000-coin document there. Retrying completes the
   deletion.
 
+### Disclaimer Archive Retention
+
+For an allowed `disclaimerAcceptances/{uid}` create, Security Rules require
+`archivedAt` to equal `request.time`. A client therefore cannot forge, backdate,
+or future-date that field. The create-once rule and denied client updates mean
+the value cannot be changed after creation; this does not make a broader claim
+about when the owner initiates the create request.
+
+Retention is not automated. Authorized administrators perform a manual review
+at least once every three months and remove records at the four-years-six-months
+early operational cutoff in
+[the manual retention runbook](DISCLAIMER_RETENTION_RUNBOOK.md). Missing or
+malformed timestamps are reviewed separately and are never assumed eligible.
+
 ---
 
 ## 5. Game Components and State Management
@@ -325,6 +339,7 @@ The repository currently contains 45 Dart test files and a Firestore Security Ru
 - slot controllers and Free Spins presentation;
 - exact interrupted-spin recovery and settlement;
 - Firestore account isolation, initial-profile integrity, and server-owned collections;
+- disclaimer archive create-once and server-timestamp Security Rules;
 - symbol registry and multiplier assets;
 - RTP, mode calibration, Ante, Buy Feature, tumble distribution, and stress simulations.
 

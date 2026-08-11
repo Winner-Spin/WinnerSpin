@@ -309,12 +309,13 @@ describe("users collection ownership", () => {
       disclaimerAcceptedAt: serverTimestamp(),
       disclaimerAppVersion: "1.0.0+1",
     }));
-    // Re-sending the same version would overwrite the original date, which is
-    // the part of the evidence that matters.
+    // A changed app version makes this a definite write even if two emulator
+    // server timestamps resolve identically; the disclaimer version must still
+    // advance before acceptance evidence can be replaced.
     await assertFails(updateDoc(ownerReference, {
       disclaimerVersion: 1,
       disclaimerAcceptedAt: serverTimestamp(),
-      disclaimerAppVersion: "1.0.0+1",
+      disclaimerAppVersion: "1.0.0+2",
     }));
     // A genuinely newer text may be accepted again.
     await assertSucceeds(updateDoc(ownerReference, {
@@ -334,29 +335,96 @@ describe("users collection ownership", () => {
     }));
   });
 
-  test("denies client-side deletion of the owner document", async () => {
+  test("allows owner deletion required by the account-deletion flow", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);
 
-    await assertFails(deleteDoc(doc(database, "users", ownerId)));
+    await assertSucceeds(deleteDoc(doc(database, "users", ownerId)));
   });
 });
 
 describe("disclaimer acceptance archive", () => {
-  test("denies every client operation", async () => {
-    const database = authenticatedFirestore(ownerId, ownerEmail);
-    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
-
-    await assertFails(setDoc(archiveReference, {
-      email: ownerEmail,
+  async function acceptedDisclaimer(database) {
+    const userReference = doc(database, "users", ownerId);
+    await updateDoc(userReference, {
       disclaimerVersion: 1,
       disclaimerAcceptedAt: serverTimestamp(),
       disclaimerAppVersion: "1.0.0+1",
+    });
+    const snapshot = await getDoc(userReference);
+    return snapshot.data();
+  }
+
+  function archiveData(profile, overrides = {}) {
+    return {
+      email: ownerEmail,
+      disclaimerVersion: profile.disclaimerVersion,
+      disclaimerAcceptedAt: profile.disclaimerAcceptedAt,
+      disclaimerAppVersion: profile.disclaimerAppVersion,
       archivedAt: serverTimestamp(),
-    }));
+      ...overrides,
+    };
+  }
+
+  test("allows only the owner to create a matching server-stamped archive", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(database);
+    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
+
+    await assertSucceeds(setDoc(archiveReference, archiveData(profile)));
+  });
+
+  test("denies forged past and future archive timestamps", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(database);
+    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
+
+    await assertFails(setDoc(archiveReference, archiveData(profile, {
+      archivedAt: Timestamp.fromMillis(1),
+    })));
+    await assertFails(setDoc(archiveReference, archiveData(profile, {
+      archivedAt: Timestamp.fromDate(new Date("2099-01-01T00:00:00Z")),
+    })));
+  });
+
+  test("denies another user creating the owner's archive", async () => {
+    const ownerDatabase = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(ownerDatabase);
+    const otherDatabase = authenticatedFirestore(otherUserId, otherUserEmail);
+
+    await assertFails(setDoc(
+        doc(otherDatabase, "disclaimerAcceptances", ownerId),
+        archiveData(profile, {email: otherUserEmail}),
+    ));
+  });
+
+  test("denies client-controlled retention fields", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(database);
+    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
+
+    for (const extra of [
+      {expiresAt: serverTimestamp()},
+      {retentionDays: 1824},
+      {legalHold: true},
+    ]) {
+      await assertFails(setDoc(
+          archiveReference,
+          archiveData(profile, extra),
+      ));
+    }
+  });
+
+  test("denies reads, updates, deletes, and a second create", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const profile = await acceptedDisclaimer(database);
+    const archiveReference = doc(database, "disclaimerAcceptances", ownerId);
+
+    await assertSucceeds(setDoc(archiveReference, archiveData(profile)));
 
     await assertFails(getDoc(archiveReference));
     await assertFails(updateDoc(archiveReference, {disclaimerVersion: 2}));
     await assertFails(deleteDoc(archiveReference));
+    await assertFails(setDoc(archiveReference, archiveData(profile)));
   });
 });
 
@@ -424,7 +492,6 @@ describe("forced-update config", () => {
 
 describe("server-owned collections", () => {
   for (const collectionName of [
-    "emailVerifications",
     "deletedUnverifiedAccounts",
     "mail",
   ]) {
@@ -437,6 +504,15 @@ describe("server-owned collections", () => {
       await assertFails(deleteDoc(reference));
     });
   }
+
+  test("keeps email verification data opaque but lets its owner delete it", async () => {
+    const database = authenticatedFirestore(ownerId, ownerEmail);
+    const reference = doc(database, "emailVerifications", ownerId);
+
+    await assertFails(getDoc(reference));
+    await assertFails(setDoc(reference, {ownerId}));
+    await assertSucceeds(deleteDoc(reference));
+  });
 
   test("denies access to collections without an explicit rule", async () => {
     const database = authenticatedFirestore(ownerId, ownerEmail);

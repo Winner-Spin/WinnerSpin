@@ -36,11 +36,29 @@ void main() {
     // Every chip carries an icon that names its destination.
     expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
     expect(find.byIcon(Icons.description_outlined), findsNothing);
-    // The credit chips lead with each developer's GitHub avatar. There is no
-    // network under test, so these render their offline fallback - the point
-    // of the assertion is that the slot exists and does not throw.
+    // The credit chips lead with their bundled, offline GitHub avatars.
     expect(find.byKey(const ValueKey('hakan-github-avatar')), findsOneWidget);
     expect(find.byKey(const ValueKey('enes-github-avatar')), findsOneWidget);
+    final hakanAvatar = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(const ValueKey('hakan-github-avatar')),
+        matching: find.byType(Image),
+      ),
+    );
+    final enesAvatar = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(const ValueKey('enes-github-avatar')),
+        matching: find.byType(Image),
+      ),
+    );
+    expect(
+      hakanAvatar.image,
+      const AssetImage('assets/avatars/hakangunesdev.jpg'),
+    );
+    expect(
+      enesAvatar.image,
+      const AssetImage('assets/avatars/eneseken95.jpg'),
+    );
     expect(
       find.byKey(const ValueKey('winner-spin-source-app-icon')),
       findsNothing,

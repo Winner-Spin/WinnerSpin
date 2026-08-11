@@ -156,6 +156,20 @@ Doğrulama ekranı uygulama resumed durumuna döndüğünde Firebase kullanıcı
   yeniden yazmak bir `create` sayılır ve kurallar orada yalnızca sıfırdan
   10.000 coin'lik bir doküman kabul eder. Tekrar denendiğinde silme tamamlanır.
 
+### Bilgilendirme Arşivi Saklama Süresi
+
+İzin verilen bir `disclaimerAcceptances/{uid}` create işleminde Güvenlik
+Kuralları `archivedAt` değerinin `request.time` değerine eşit olmasını zorunlu
+tutar. Böylece istemci bu alanı sahte, geçmiş veya gelecek tarihli yazamaz.
+Create-once kuralı ve istemci update işlemlerinin reddedilmesi, oluşturulduktan
+sonra değerin değiştirilememesini sağlar; bu, sahibin create isteğini ne zaman
+başlattığı hakkında daha geniş bir iddia değildir.
+
+Saklama süreci otomatik değildir. Yetkili yöneticiler en az üç ayda bir manuel
+inceleme yapar ve kayıtları [manuel saklama runbook'undaki](DISCLAIMER_RETENTION_RUNBOOK.md)
+dört yıl altı aylık erken operasyonel cutoff'ta siler. Eksik veya bozuk
+timestamp'ler ayrı incelenir ve uygun oldukları varsayılmaz.
+
 ---
 
 ## 5. Oyun Bileşenleri ve Durum Yönetimi
@@ -325,6 +339,7 @@ Repository şu anda aşağıdaki alanları kapsayan 45 Dart test dosyası ve bir
 - slot controller'ları ve Ücretsiz Dönüş sunumu;
 - kesin kesintili dönüş kurtarması ve sonuçlandırma;
 - Firestore hesap izolasyonu, başlangıç profili bütünlüğü ve sunucuya ait koleksiyonlar;
+- bilgilendirme arşivinin create-once ve server-timestamp Güvenlik Kuralları;
 - sembol registry'si ve çarpan varlıkları;
 - RTP, mod kalibrasyonu, Ante, Özellik Satın Alma, tumble dağılımı ve stres simülasyonları.
 

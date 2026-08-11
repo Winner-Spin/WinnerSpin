@@ -1,279 +1,253 @@
-# Privacy Policy
+# Winner Spin Privacy Policy
 
-The published version of this policy, and the one linked from inside the app and
-from the app stores, is available at
-<https://sites.google.com/view/winner-spin-privacy-policy>. This file is kept in
-the repository as a copy of that text.
+Last updated: August 9, 2026
 
-This privacy policy applies to the Winner Spin app for mobile devices, together
-with any related services operated by Hakan Güneş & Enes Eken (collectively, the
-"Application"). Hakan Güneş & Enes Eken are hereby referred to as the "Service
-Provider" and act as joint data controllers for the data described below. Winner
-Spin is distributed on Google Play by Hakan Güneş and on the Apple App Store by
-Enes Eken. This policy applies to both distributions.
+## 1. Scope and Who We Are
 
-This privacy policy is effective as of 2026-07-30.
+This Privacy Policy explains how personal information is processed when you use
+the Winner Spin Android application and its related online services.
 
-## About the Application
+Winner Spin is published on Google Play by Hakan Güneş and is operated by
+Hakan Güneş and Enes Eken (collectively, "we," "us," or "Winner Spin"). Hakan
+Güneş and Enes Eken are jointly responsible for the processing described in
+this policy.
 
-Winner Spin is an entertainment and portfolio project. It does not offer
-real-money gambling, betting, cash prizes, deposits, or withdrawals. All coins,
-spins, bonuses, and rewards in the Application are entirely virtual, have no
-real-world monetary value, and cannot be purchased, sold, or converted into
-money. The Application contains no advertising and no in-app purchases.
+For privacy questions or requests, contact
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com). Do not send us your
+password or other authentication credentials.
 
-## Information Collection and Use
+## 2. About Winner Spin
 
-The Application collects information when you create an account and use it. This
-information includes:
+Winner Spin is an entertainment game that uses virtual game currency. It does
+not offer real-money gambling, betting, cash prizes, real-money deposits,
+purchases, or withdrawals. All credits, spins, bonuses, and rewards are virtual,
+have no real-world monetary value, and cannot be purchased, sold, transferred,
+or converted into money.
 
-* your email address;
-* your chosen username;
-* a Firebase-generated user identifier (uid);
-* your email verification status;
-* your selected profile avatar;
-* your account creation date;
-* your virtual coin balance, last virtual win, free-spin status, and shared
-  virtual pool state;
-* your game history (bet amount, win amount, timestamp);
-* password-reset request timestamps, used to enforce request limits; and
-* your acceptance of the in-app disclaimer (its version, the date you accepted
-  it, and the app version you used).
+Winner Spin contains no advertising and no in-app purchases.
 
-Passwords are processed by Google Firebase Authentication. The Service Provider
-never receives or stores plaintext passwords.
+## 3. Information We Process
 
-### Automatically processed technical information
+### Account and profile information
 
-* Your device's Internet Protocol (IP) address and user-agent string are
-  processed by Firebase Authentication for security and abuse prevention. Google
-  retains authentication log IP addresses for a limited period. The Service
-  Provider does not store IP addresses in its own database and does not use them
-  for profiling.
-* On Android, Firebase App Check with the Play Integrity API processes device
-  and app integrity signals. On Apple platforms, App Attest is used for the same
-  purpose. This protects the backend from forged requests.
-* The Application requires an active internet connection and periodically checks
-  Google-hosted endpoints to determine whether real internet access is
-  available. These checks do not include your account content, but the endpoint
-  provider may receive standard network information such as your IP address and
-  a request timestamp.
+When you create and use an account, we process:
 
-The Application does **not** collect analytics about which screens you visit,
-how long you spend in the app, crash reports, advertising identifiers, your
-location, contacts, photos, or any biometric data.
+- your email address;
+- your chosen username;
+- your Firebase-generated user identifier;
+- your email-verification status;
+- your selected profile avatar; and
+- your account-creation timestamp.
+
+Passwords are handled by Google Firebase Authentication. We do not receive or
+store plaintext passwords.
+
+### Gameplay information
+
+To operate the game and synchronize your progress, we process:
+
+- your virtual balance and most recent virtual win;
+- your Free Spin status and accumulated virtual rewards;
+- your account-linked virtual pool state;
+- recent game-history entries, including bet amount, win amount, resulting
+  virtual balance, and timestamp; and
+- information required to recover an interrupted spin.
+
+### Account security and acknowledgement information
+
+We process limited records used for account security and service operation,
+including:
+
+- password-reset request metadata used to apply request limits; and
+- the version of the in-app 18+ and no-real-money disclaimer you acknowledged,
+  the acknowledgement time, and the app version used.
+
+### Technical and security information
+
+Google Firebase and Google Play Integrity may automatically process limited
+technical information needed to authenticate users, protect the service, and
+prevent abuse. This may include your IP address, user-agent information,
+request timestamps, and device or app-integrity signals.
+
+Winner Spin also performs basic connectivity checks. These checks do not
+include your Winner Spin account content, although the network service may
+receive standard connection information such as your IP address and request
+timestamp.
 
 ### Information stored on your device
 
-The Application stores limited data locally on your device, including recent
-game history, pending-spin recovery information, music preferences, and whether
-the first-launch notice has been shown. This local data is used only to operate
-the Application and restore its state. It can be removed by deleting your
-account from within the app, clearing the app's data, or uninstalling the
-Application.
+Winner Spin stores the following information locally so the game can operate
+and recover its state:
 
-## Cookies and Tracking Technologies
+- game history associated with your account;
+- pending-spin recovery information;
+- your first-launch disclaimer status; and
+- your music preference.
 
-The Application does not use cookies, advertising pixels, advertising SDKs,
-analytics SDKs, or cross-app tracking technologies. No non-essential tracking
-technology is used, and no tracking consent is therefore requested.
+Account-linked local files are removed when the in-app account-deletion flow
+completes. The device-level music preference may remain until you clear the
+app's data or uninstall the app.
 
-## How the Service Provider Uses Information
+### Information we do not collect
 
-The Service Provider uses the information to:
+Winner Spin does not use advertising or analytics SDKs and does not collect
+advertising identifiers, contacts, photos, audio recordings, biometric data,
+payment-card information, or browsing history. The app does not request device
+location permission or use technical information to determine your location.
+We do not use personal information for cross-app tracking or targeted
+advertising.
 
-* create, authenticate, verify, and manage your account;
-* save and synchronize your profile and gameplay state;
-* send account-related emails, such as email verification and password reset;
-* recover interrupted game sessions;
-* provide account deletion;
-* protect the Application and its backend against fraud, abuse, and unauthorized
+## 4. How We Use Information
+
+We use information only as needed to:
+
+- create, authenticate, verify, and manage accounts;
+- save and synchronize profiles and gameplay progress;
+- provide email verification and password-reset functions;
+- recover interrupted game sessions;
+- process account and data-deletion requests;
+- protect Winner Spin and its backend against fraud, abuse, and unauthorized
   access; and
-* maintain and diagnose essential app functionality.
+- maintain essential application functionality.
 
-The Application sends only service-related messages. It does not send marketing
-communications, does not sell or share personal information for advertising, and
-does not carry out automated decision-making that produces legal effects
-concerning you.
+We do not sell or rent personal information. We do not send marketing messages
+or use personal information for advertising.
 
-## Third Party Access
+## 5. Service Providers and Disclosure
 
-The Application does not transmit analytics or aggregated behavioural data to
-external services. Personal data is processed by Google as a service provider
-(processor) acting on the Service Provider's behalf, through the following
-Firebase services: Firebase Authentication, Cloud Firestore, and Firebase App
-Check.
+Winner Spin uses Google services, including Firebase Authentication, Cloud
+Firestore, Firebase App Check, and Google Play Integrity. Google processes
+information as a service provider to supply authentication, cloud storage, and
+security functions.
 
-Personal information may be disclosed:
+For more information, see:
 
-* where disclosure is required by law, such as to comply with a subpoena or
-  similar legal process;
-* where disclosure is necessary to protect the rights or safety of users or
-  others, to investigate fraud, or to respond to a government request; and
-* to service providers who process data on the Service Provider's behalf and are
-  bound by confidentiality and data protection obligations.
+- [Google Privacy Policy](https://policies.google.com/privacy)
+- [Firebase Privacy and Security](https://firebase.google.com/support/privacy)
 
-The Application may open external links to GitHub and Apple. Once opened, those
-services process information under their own privacy policies.
+We may disclose information only:
 
-Links to the privacy policies of the third-party services used:
+- to service providers that process it on our behalf;
+- when required by applicable law or a valid legal request; or
+- when reasonably necessary to protect users, investigate abuse, or secure the
+  service.
 
-* [Google Privacy Policy](https://policies.google.com/privacy)
-* [Firebase Privacy and Security](https://firebase.google.com/support/privacy)
-* [Google Play Services](https://www.google.com/policies/privacy/)
-* [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
-* [Apple Privacy Policy](https://www.apple.com/legal/privacy/)
+The app may open optional external links, including GitHub and Instagram. These
+services apply their own privacy policies after you choose to open them. Winner
+Spin does not attach your game-account data to those links.
 
-## International Data Transfers
+## 6. Account and Data Deletion
 
-Google processes data on the Service Provider's behalf outside your country of
-residence, including outside the European Economic Area (EEA). Firebase
-Authentication is operated exclusively from data centres in the United States.
-Cloud Firestore for this project is configured for a European region, although
-Google may process limited operational data elsewhere.
+You can delete your account directly in the app through **My Profile > Delete
+Account**. You must reauthenticate before deletion to protect your account.
 
-These transfers rely on the safeguards Google applies as the processor. Google's
-documentation describes these as including the Standard Contractual Clauses
-incorporated into the Firebase Data Processing and Security Terms and Google's
-certification under the EU–U.S. Data Privacy Framework. Data protection laws in
-other countries may differ from those in your jurisdiction.
+You can also request deletion without using the app by emailing
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com?subject=Winner%20Spin%20Account%20Deletion%20Request)
+with the subject **Winner Spin Account Deletion Request**. We may ask you to
+verify control of the registered email address. Never send your password.
 
-## Your Rights
+We normally complete verified deletion requests within 30 days, subject to the
+limited retained record described below. If applicable law permits more time
+and additional time is needed because of request complexity or another legally
+permitted reason, we will tell you.
 
-Depending on where you live, you may have the right to request access to,
-correction of, or deletion of your personal data; to restrict or object to
-processing; to receive your data in a portable format; and to withdraw consent
-where processing is based on consent. Withdrawing consent does not affect
-processing carried out before withdrawal.
+After a verified deletion request:
 
-To exercise these rights, contact winnerspinapp@gmail.com. Requests are handled
-by the two individuals who develop the Application, not by a dedicated support
-organisation. If you are not satisfied with the response, you may contact your
-local data protection authority.
+- your Firebase Authentication account is deleted;
+- your Winner Spin profile, synchronized gameplay state, and cloud game history
+  are deleted; and
+- account-linked files on the device are deleted when deletion is completed
+  through the app.
 
-### Your California privacy rights (CCPA/CPRA)
+We cannot remotely erase files that remain only on your device. If you request
+deletion by email, you can remove those files by clearing Winner Spin's app data
+or uninstalling the app.
 
-If you are a California resident, you have the right to know what personal
-information is collected, the right to delete personal information, the right to
-correct inaccurate personal information, the right to opt out of the sale or
-sharing of personal information, and the right to non-discrimination for
-exercising these rights. The Service Provider does not sell or share personal
-information as those terms are defined under the CCPA/CPRA. To exercise your
-rights, contact winnerspinapp@gmail.com.
+### Limited record retained after deletion
 
-## Data Deletion
+For no longer than five years after it is archived, we retain a restricted
+record of your acknowledgement of the 18+ and no-real-money disclaimer. This
+record may contain your former Firebase user identifier, email address,
+disclaimer version, acknowledgement timestamp, app version, and archive
+timestamp.
 
-You can delete your account directly in the Application using **My Profile >
-Delete Account**. For your security, you will be asked to sign in again before
-the deletion runs. Deleting your account removes your Firebase Authentication
-account, your Winner Spin cloud records, and the Winner Spin files stored on
-your device for that account, including your local game history.
+We retain this record only to establish, exercise, or defend legal claims. It is
+not used for advertising or marketing, is not accessible through the app, and
+is not used to recreate your account. A recurring manual administrative review,
+performed at least once every three months, identifies and deletes records
+before they reach five years after archive; this is not an automatic feature.
+You may request earlier deletion by email; verified requests may be fulfilled
+manually.
 
-You may also request deletion by contacting winnerspinapp@gmail.com. Such
-requests are handled manually and may require confirmation that the request
-comes from the account holder.
+## 7. Data Retention
 
-**One record is kept after deletion.** When you first open the game you are
-asked to accept a disclaimer confirming, among other things, that you are 18 or
-older and that the game offers no real-money gambling. Before your account is
-removed, a copy of that acceptance is kept: your email address, the version of
-the text you accepted, when you accepted it, and the app version you used. It is
-kept to establish and defend legal claims concerning the period you used the
-Application, on the basis of the Service Provider's legitimate interests. It is
-not used to contact you, is never shared for marketing, and cannot be read or
-changed from within the app. This record is not removed automatically; you can
-ask for it to be deleted by writing to winnerspinapp@gmail.com.
+- **Account, profile, and gameplay information:** retained while your account is
+  active and deleted when your account is deleted.
+- **Password-reset request metadata:** retained with your account and deleted
+  with the account.
+- **Disclaimer acknowledgement record:** retained for no longer than five years
+  after archive. A recurring manual administrative review performed at least
+  once every three months removes records before that limit; verified
+  earlier-deletion requests may be handled manually.
+- **Account-linked local information:** retained until the in-app deletion flow
+  completes, you clear the app's data, or you uninstall the app.
+- **Device-level preferences:** retained until you clear the app's data or
+  uninstall the app.
+- **Provider security logs and backups:** may remain for limited periods under
+  Google's retention and security practices.
 
-## Data Retention
+## 8. Security
 
-* **Account and gameplay data:** kept while your account remains active, and
-  removed when you delete your account, except as stated above.
-* **Disclaimer acceptance record:** kept after account deletion as described in
-  the Data Deletion section.
-* **Technical and security data, such as IP addresses in authentication logs:**
-  kept by Google for a limited period under its own retention practices,
-  described by Google as a few weeks for authentication logs.
-* **Locally stored data:** remains on your device until you delete your account,
-  clear the app's data, or uninstall the Application.
+We use reasonable safeguards appropriate to the information processed. These
+include authenticated access, restricted database rules, app-integrity checks,
+and encryption in transit. Google Firebase also applies security controls to
+data stored in its services.
 
-Limited records may remain temporarily in provider backups or logs where needed
-for security, fraud prevention, legal compliance, or technical recovery.
+Access to production data is limited to people who need it to operate and
+secure Winner Spin. No method of transmission or storage is completely secure,
+so absolute security cannot be guaranteed.
 
-## Opt-Out Rights
+## 9. Children and Age Restriction
 
-You can stop further collection of information from your mobile device by
-uninstalling the Application. Uninstalling stops the Application from collecting
-data from your device, but it does not automatically remove information already
-stored in your account. To have that information removed, delete your account in
-the app or write to winnerspinapp@gmail.com.
+Winner Spin is intended only for users aged 18 or older and is not directed to
+children. Users must confirm that they are at least 18 years old before using
+the game.
 
-## Children
+We do not knowingly collect personal information from anyone under 18. If you
+believe a person under 18 has provided personal information, contact
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com), and we will take
+appropriate steps to delete it.
 
-The Application is not intended for children under 18 years of age, or such
-higher age as required by applicable law. On first launch, users must confirm
-that they are 18 or older. The Service Provider does not knowingly solicit data
-from children, does not market the Application to them, and does not knowingly
-collect personally identifiable information from children under 18 in violation
-of applicable law. If the Service Provider becomes aware that a child has
-provided personal information, that information will be deleted. If you are a
-parent or guardian and believe your child has provided personal information,
-please write to winnerspinapp@gmail.com.
+## 10. Your Privacy Rights
 
-## Security
+Depending on your location, you may have rights to request access to,
+correction of, deletion of, or a copy of your personal information, or to object
+to or restrict certain processing.
 
-The Application relies on the technical and organisational measures provided by
-Google Firebase, including encryption of data in transit and at rest,
-server-side security rules, and Firebase App Check attestation. Access to
-production data is limited to the Service Provider.
+To make a request, email
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com). We may need to verify
+your identity before completing the request. We will not discriminate against
+you for exercising an applicable privacy right.
 
-No method of transmission or storage is completely secure, and absolute security
-cannot be guaranteed.
+## 11. International Processing
 
-## Data Breach Notification
+Google may process information in countries other than the country where you
+live. Such processing is governed by Google's applicable data-protection terms
+and safeguards. Data-protection laws may differ between countries.
 
-If the Service Provider becomes aware of a data breach affecting your personal
-data, it will take the steps required of it under applicable law. Depending on
-the nature and severity of the breach, this may include informing the competent
-authority and affected users.
+## 12. Changes to This Policy
 
-## Disclaimer
+We may update this Privacy Policy when Winner Spin's features, service
+providers, or legal requirements change. The latest version will be published
+at
+[https://sites.google.com/view/winner-spin-privacy-policy](https://sites.google.com/view/winner-spin-privacy-policy)
+with an updated date.
 
-The Application is provided for entertainment and portfolio purposes on an "as
-is" and "as available" basis, without warranties of any kind, whether express or
-implied, to the fullest extent permitted by applicable law. There is no warranty
-that the Application will be uninterrupted, error-free, or free of data loss.
+## 13. Contact
 
-Virtual coins, spins, bonuses, and rewards have no monetary value, are not
-property, are not redeemable for money or anything of value, and may be
-adjusted, reset, or removed at any time, including when an account is deleted.
-The Application does not offer gambling services and is not a gambling operator.
+For privacy questions, rights requests, or account-deletion requests, contact:
 
-To the fullest extent permitted by applicable law, the Service Provider is not
-liable for any indirect, incidental, or consequential damages arising from your
-use of the Application. Nothing in this policy excludes or limits liability
-where such exclusion or limitation is not permitted by law, including your
-statutory consumer rights, which remain unaffected.
+- **Data controllers:** Hakan Güneş and Enes Eken
+- **Email:** [winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com)
 
-It is your responsibility to ensure that using the Application is lawful in your
-jurisdiction.
-
-## Changes
-
-This Privacy Policy may be updated from time to time. Updates are published in
-the project's public repository with a new effective date at the top of this
-document. Previous versions remain available in the repository's version
-history.
-
-## Your Consent
-
-Where processing is based on consent, you provide that consent by affirmatively
-opting in to the relevant feature or action. You may withdraw consent at any
-time without affecting processing carried out before withdrawal. Processing
-based on other lawful bases, such as performance of a contract or the Service
-Provider's legitimate interests, is carried out as described above.
-
-## Contact
-
-If you have questions about this privacy policy or about how your data is
-handled, write to winnerspinapp@gmail.com. Please do not include passwords or
-other sensitive information in your message.
+Do not include passwords or other authentication credentials in your message.
