@@ -86,7 +86,7 @@ class SymbolRegistry {
       assetPath: 'lib/images/slot_main_screen/Items/cupCake.png',
       baseWeight: 8,
       tier: SymbolTier.scatter,
-      scatterPayouts: {4: 3.0, 5: 5.0, 6: 100.0},
+      scatterPayouts: {4: 3.0, 5: 5.0, 6: 10.0},
       displayScale: 1.40,
     ),
 

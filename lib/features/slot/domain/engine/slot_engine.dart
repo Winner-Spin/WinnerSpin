@@ -1,3 +1,4 @@
+import '../enums/game_mode.dart';
 import '../models/pool_state.dart';
 import '../models/spin_result.dart';
 import 'ante_config.dart';
@@ -114,11 +115,11 @@ class SlotEngine {
 
     SpinResult? lastForcedFallback;
     for (int attempt = 0; attempt < 50; attempt++) {
-      final initialGrid = GridGenerator.generateWinning(
-        weights,
-        mode,
-        spinMaxMults,
-        forceScatters: triggersFs,
+      final initialGrid = _generateWinningCandidate(
+        weights: weights,
+        mode: mode,
+        spinMaxMults: spinMaxMults,
+        triggersFs: triggersFs,
         isFreeSpins: isFreeSpins,
       );
       final simResult = TumbleSimulator.run(
@@ -141,11 +142,11 @@ class SlotEngine {
 
     int fallbackAttempts = 0;
     while (fallbackAttempts++ < 100) {
-      final fallbackGrid = GridGenerator.generateWinning(
-        weights,
-        mode,
-        spinMaxMults,
-        forceScatters: triggersFs,
+      final fallbackGrid = _generateWinningCandidate(
+        weights: weights,
+        mode: mode,
+        spinMaxMults: spinMaxMults,
+        triggersFs: triggersFs,
         isFreeSpins: isFreeSpins,
       );
       final simResult = TumbleSimulator.run(
@@ -181,6 +182,25 @@ class SlotEngine {
       betAmount,
       safeRefill: true,
       maxMults: spinMaxMults,
+      isFreeSpins: isFreeSpins,
+    );
+  }
+
+  static List<List<String>> _generateWinningCandidate({
+    required List<WeightedSymbol> weights,
+    required GameMode mode,
+    required int spinMaxMults,
+    required bool triggersFs,
+    required bool isFreeSpins,
+  }) {
+    if (triggersFs && !isFreeSpins) {
+      return GridGenerator.generateFreeSpinEntry(weights, spinMaxMults);
+    }
+    return GridGenerator.generateWinning(
+      weights,
+      mode,
+      spinMaxMults,
+      forceScatters: triggersFs,
       isFreeSpins: isFreeSpins,
     );
   }

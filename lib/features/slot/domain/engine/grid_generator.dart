@@ -54,24 +54,7 @@ class GridGenerator {
     if (forceScatters) {
       scatterPath = SymbolRegistry.all.firstWhere((s) => s.isScatter).assetPath;
 
-      final r = engineRng.nextDouble();
-      if (isFreeSpins) {
-        if (r < 0.90) {
-          scatterCount = 3;
-        } else if (r < 0.98) {
-          scatterCount = 4;
-        } else {
-          scatterCount = 5;
-        }
-      } else {
-        if (r < 0.90) {
-          scatterCount = 4;
-        } else if (r < 0.98) {
-          scatterCount = 5;
-        } else {
-          scatterCount = 6;
-        }
-      }
+      scatterCount = _pickScatterCount(isFreeSpins: isFreeSpins);
 
       for (int i = 0; i < scatterCount && posIndex < kEngineTotalSlots; i++) {
         cells[positions[posIndex++]] = scatterPath;
@@ -101,6 +84,49 @@ class GridGenerator {
       return List.generate(
         kEngineRows,
         (row) => cells[col * kEngineRows + row],
+      );
+    });
+  }
+
+  /// Builds the visible 4-6 SCATTER entry into an initial Free Spins round
+  /// without also forcing an unrelated regular-symbol cluster win.
+  static List<List<String>> generateFreeSpinEntry(
+    List<WeightedSymbol> weights,
+    int maxMults,
+  ) {
+    final cells = List<String>.filled(kEngineTotalSlots, '');
+    final positions = List.generate(kEngineTotalSlots, (i) => i)
+      ..shuffle(engineRng);
+    final scatterPath = SymbolRegistry.all
+        .firstWhere((symbol) => symbol.isScatter)
+        .assetPath;
+    final scatterCount = _pickScatterCount(isFreeSpins: false);
+
+    for (var index = 0; index < scatterCount; index++) {
+      cells[positions[index]] = scatterPath;
+    }
+
+    final totalWeight = weights.fold<double>(0, (sum, item) {
+      return sum + item.weight;
+    });
+    final counts = <String, int>{scatterPath: scatterCount};
+
+    for (var index = 0; index < kEngineTotalSlots; index++) {
+      if (cells[index].isNotEmpty) continue;
+      cells[index] = pickSafe(
+        weights,
+        totalWeight,
+        counts,
+        maxRegular: 7,
+        maxScatter: 3,
+        maxMultiplier: maxMults,
+      );
+    }
+
+    return List.generate(kEngineColumns, (column) {
+      return List.generate(
+        kEngineRows,
+        (row) => cells[column * kEngineRows + row],
       );
     });
   }
@@ -202,5 +228,17 @@ class GridGenerator {
     if (r < 0.96) return 10;
     if (r < 0.99) return 11;
     return 12;
+  }
+
+  static int _pickScatterCount({required bool isFreeSpins}) {
+    final roll = engineRng.nextDouble();
+    if (isFreeSpins) {
+      if (roll < 0.90) return 3;
+      if (roll < 0.98) return 4;
+      return 5;
+    }
+    if (roll < 0.90) return 4;
+    if (roll < 0.98) return 5;
+    return 6;
   }
 }
