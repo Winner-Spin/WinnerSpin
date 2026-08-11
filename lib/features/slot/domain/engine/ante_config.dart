@@ -7,5 +7,5 @@ class AnteConfig {
   static const double fsSafetyFactor = 2.5;
 
   /// Calibrates ante Free Spin hit frequency without altering visible payouts.
-  static const double freeSpinHitRateScale = 0.852;
+  static const double freeSpinHitRateScale = 0.862;
 }

@@ -21,11 +21,11 @@ class RtpConfig {
   };
 
   static const Map<GameMode, double> fsHitRateBoost = {
-    GameMode.recovery: 1.22,
-    GameMode.tight: 1.22,
-    GameMode.normal: 1.275,
-    GameMode.generous: 1.325,
-    GameMode.jackpot: 1.375,
+    GameMode.recovery: 1.380,
+    GameMode.tight: 1.208,
+    GameMode.normal: 1.315,
+    GameMode.generous: 1.405,
+    GameMode.jackpot: 1.518,
   };
 
   static const Map<GameMode, double> fsTriggerRate = {
