@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:winner_spin/features/slot/presentation/models/game_presentation_timings.dart';
 import 'package:winner_spin/features/slot/presentation/ui_controllers/free_spin_auto_play_controller.dart';
 
 void main() {
@@ -97,6 +98,25 @@ void main() {
     requestContinuation();
     await tester.pump(const Duration(milliseconds: 10));
 
+    expect(spinCalls, 1);
+    controller.dispose();
+  });
+
+  testWidgets('honors the short post-win transition hold', (tester) async {
+    final controller = FreeSpinAutoPlayController();
+    var spinCalls = 0;
+
+    controller.continueIfReady(
+      canStart: () => true,
+      spin: () => spinCalls++,
+      delay: GamePresentationTimings.freeSpinPostWinHold,
+    );
+    expect(spinCalls, 0);
+
+    await tester.pump(const Duration(milliseconds: 699));
+    expect(spinCalls, 0);
+
+    await tester.pump(const Duration(milliseconds: 1));
     expect(spinCalls, 1);
     controller.dispose();
   });

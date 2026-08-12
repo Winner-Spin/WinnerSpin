@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../../../domain/models/spin_result.dart';
+import '../../../../../models/game_presentation_timings.dart';
 import '../../playfield/multiplier_bomb_animation.dart';
 import 'multiplier_collect_animation.dart';
 import '../../../../../ui_controllers/win_presentation_controller.dart';
@@ -221,7 +222,10 @@ class _WinPresentationState extends State<WinPresentation> {
       cellSize: cellSize * 0.67,
       endSize: 30,
       settleDuration: WinPresentationController.multiplierSettleDuration,
-      flightDuration: WinPresentationController.multiplierFlightDuration,
+      flightDuration: GamePresentationTimings.flightDurationForSpeed(
+        WinPresentationController.multiplierFlightDuration,
+        widget.speedMultiplier,
+      ),
       burstStartSignal: bombFuture,
       onApproaching: () {
         if (!mounted || !identical(widget.spinResult, result)) return;

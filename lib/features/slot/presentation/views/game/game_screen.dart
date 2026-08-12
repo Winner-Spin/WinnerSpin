@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../audio/ui_click_sound.dart';
 import '../../ui_controllers/big_win_presentation_controller.dart';
-import '../../ui_controllers/flying_tumble_overlay_controller.dart';
 import '../../ui_controllers/free_spin_auto_play_controller.dart';
 import '../../ui_controllers/free_spin_award_sequence_controller.dart';
 import '../../ui_controllers/free_spin_overlay_controller.dart';
@@ -51,8 +50,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       BigWinPresentationController();
   final FreeSpinOverlayController _freeSpinOverlayController =
       FreeSpinOverlayController();
-  final FlyingTumbleOverlayController _flyingTumbleOverlayController =
-      FlyingTumbleOverlayController();
   final FreeSpinAutoPlayController _freeSpinAutoPlayController =
       FreeSpinAutoPlayController();
   final FreeSpinAwardSequenceController _freeSpinAwardSequenceController =
@@ -84,7 +81,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final FreeSpinAwardPresentationState _freeSpinAwardPresentation =
       FreeSpinAwardPresentationState();
 
-  bool _isFlyingTumble = false;
+  bool _isTumbleWinPulsing = false;
 
   bool get _isFreeSpinVisualMode =>
       _freeSpinAwardPresentation.isVisualMode(_viewModel.isInFreeSpins);
@@ -389,15 +386,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             result,
           );
           if (!hasSequence) {
-            Future.delayed(
-              GamePresentationTimings.freeSpinNoSequenceWinDelay,
-              () {
-                if (mounted) {
-                  _maybeShowBigWin(lastWin);
-                  _commitPendingFsWin();
-                }
-              },
-            );
+            _maybeShowBigWin(lastWin);
+            _commitPendingFsWin();
           }
         });
       }
@@ -439,7 +429,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void dispose() {
     _bigWinPresentationController.dispose();
     _freeSpinOverlayController.dispose();
-    _flyingTumbleOverlayController.dispose();
     _freeSpinAutoPlayController.dispose();
     _freeSpinAwardSequenceController.dispose();
     _lingeringClusterController.dispose();
@@ -464,12 +453,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         if (_viewModel.isCurrentSpinFromBuy) {
           _releaseCelebrationLock();
         } else {
-          Future.delayed(
-            GamePresentationTimings.freeSpinNoSequenceWinDelay,
-            () {
-              if (mounted) _commitPendingFsWin();
-            },
-          );
+          _commitPendingFsWin();
         }
       } else {
         _releaseCelebrationLock();
@@ -480,59 +464,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _commitPendingFsWin() {
     if (!_freeSpinPresentation.hasPendingSpinWin) return;
-    final amount = _freeSpinPresentation.pendingSpinWin;
 
     if (_bigWinPresentationController.shownThisSpin) {
       setState(_freeSpinPresentation.commitPendingSpinWin);
       return;
     }
 
-    final overlay = _stageOverlayKey.currentState;
-    if (overlay == null) {
-      setState(_freeSpinPresentation.commitPendingSpinWin);
-      _releaseLockAfterFsCountUp();
-      return;
-    }
-
-    final startedFlight = _flyingTumbleOverlayController.showFromAnchors(
-      overlay: overlay,
-      startKey: _tumbleWinAnchorKey,
-      endKey: _kazancAnchorKey,
-      amount: amount,
-      style: _styles.statusBase,
-      duration: GamePresentationTimings.flyingTumbleDuration,
-      onComplete: () {
-        if (!mounted) return;
-        setState(() {
-          _isFlyingTumble = false;
-          _freeSpinPresentation.addToAccumulatedWin(amount);
-        });
-        Future.delayed(GamePresentationTimings.flyingTumbleReleaseDelay, () {
-          if (!mounted) return;
-          _releaseCelebrationLock();
-        });
-      },
-    );
-    if (startedFlight) {
-      setState(() {
-        _isFlyingTumble = true;
-        _freeSpinPresentation.clearPendingSpinWin();
-      });
-      return;
-    }
-
-    setState(_freeSpinPresentation.commitPendingSpinWin);
-    _releaseLockAfterFsCountUp();
-  }
-
-  void _releaseLockAfterFsCountUp() {
-    Future.delayed(GamePresentationTimings.flyingTumbleReleaseDelay, () {
-      if (!mounted) return;
-      _releaseCelebrationLock();
+    setState(() {
+      _freeSpinPresentation.commitPendingSpinWin();
+      _isTumbleWinPulsing = true;
     });
+    Future.delayed(GamePresentationTimings.freeSpinPostWinPulse, () {
+      if (!mounted || !_isTumbleWinPulsing) return;
+      setState(() => _isTumbleWinPulsing = false);
+    });
+    _releaseCelebrationLock(continueFreeSpinAfterWinHold: true);
   }
 
-  void _releaseCelebrationLock() {
+  void _releaseCelebrationLock({bool continueFreeSpinAfterWinHold = false}) {
     _celebrationLockWatchdog?.cancel();
     _celebrationLockWatchdog = null;
     if (_celebrationLocked) {
@@ -548,10 +497,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
     _viewModel.releaseFsRoundHold();
     _showPendingFreeSpinAwardPopup();
-    _continueAutoSpinIfPresentationIdle();
+    _continueAutoSpinIfPresentationIdle(
+      usePostWinHold: continueFreeSpinAfterWinHold,
+    );
   }
 
-  void _continueAutoSpinIfPresentationIdle() {
+  void _continueAutoSpinIfPresentationIdle({bool usePostWinHold = false}) {
     if (!mounted) return;
     if (_viewModel.isLoading) return;
     if (!_isSpinPresentationIdle()) return;
@@ -561,6 +512,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _freeSpinAutoPlayController.continueIfReady(
         canStart: _canStartAutomaticFreeSpin,
         spin: () => unawaited(_viewModel.spin()),
+        delay: usePostWinHold
+            ? GamePresentationTimings.freeSpinPostWinHold
+            : GamePresentationTimings.freeSpinAutoPlayDelay,
       );
       return;
     }
@@ -741,7 +695,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }) {
     return GameTumbleWinSlot(
       listenable: _listenables.tumbleWin,
-      isFlyingTumble: () => _isFlyingTumble,
+      isFlyingTumble: () => false,
+      isPostWinPulsing: () => _isTumbleWinPulsing,
       isBusy: () => _viewModel.isBusy,
       liveTumbleWin: () => _viewModel.liveTumbleWin,
       lastWin: () => _viewModel.lastWin,

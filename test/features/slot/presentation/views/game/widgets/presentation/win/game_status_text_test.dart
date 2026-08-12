@@ -4,6 +4,7 @@ import 'package:winner_spin/core/widgets/money_text.dart';
 import 'package:winner_spin/features/slot/presentation/models/free_spin_presentation_state.dart';
 import 'package:winner_spin/features/slot/presentation/ui_controllers/win_presentation_controller.dart';
 import 'package:winner_spin/features/slot/presentation/views/game/widgets/presentation/win/game_status_text.dart';
+import 'package:winner_spin/features/slot/presentation/views/game/widgets/presentation/win/win_amount_counter.dart';
 
 void main() {
   testWidgets(
@@ -63,6 +64,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('WIN'), findsOneWidget);
+      expect(find.byType(WinAmountCounter), findsNothing);
       expect(tester.widget<MoneyText>(find.byType(MoneyText)).text, '10.00');
       final renderedAmount = tester.widget<RichText>(
         find.descendant(

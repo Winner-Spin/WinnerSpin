@@ -11,6 +11,7 @@ import '../../../../../ui_controllers/win_presentation_controller.dart';
 
 class TumbleWinLine extends StatelessWidget {
   final bool isFlyingTumble;
+  final bool isPostWinPulsing;
   final bool isBusy;
   final double liveTumbleWin;
   final double lastWin;
@@ -24,6 +25,7 @@ class TumbleWinLine extends StatelessWidget {
   const TumbleWinLine({
     super.key,
     required this.isFlyingTumble,
+    this.isPostWinPulsing = false,
     required this.isBusy,
     required this.liveTumbleWin,
     required this.lastWin,
@@ -37,7 +39,7 @@ class TumbleWinLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final line = Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
@@ -47,6 +49,8 @@ class TumbleWinLine extends StatelessWidget {
         _buildValue(),
       ],
     );
+    if (!isPostWinPulsing) return line;
+    return TumbleWinPulse(child: line);
   }
 
   Widget _buildValue() {
@@ -146,5 +150,59 @@ class TumbleWinLine extends StatelessWidget {
       lineLengthScale: 0.94,
       lineTopExtend: lineTopExtend,
     );
+  }
+}
+
+class TumbleWinPulse extends StatefulWidget {
+  const TumbleWinPulse({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<TumbleWinPulse> createState() => _TumbleWinPulseState();
+}
+
+class _TumbleWinPulseState extends State<TumbleWinPulse>
+    with SingleTickerProviderStateMixin {
+  static const double _peakScale = 1.12;
+
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: GamePresentationTimings.freeSpinPostWinPulse,
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1,
+          end: _peakScale,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: _peakScale,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 55,
+      ),
+    ]).animate(_controller);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(scale: _scale, child: widget.child);
   }
 }

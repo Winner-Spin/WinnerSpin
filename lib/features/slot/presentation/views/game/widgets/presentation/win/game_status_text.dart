@@ -70,11 +70,7 @@ class GameStatusText extends StatelessWidget {
     }
 
     if (isFreeSpinVisualMode) {
-      return _winCounterRow(
-        to: freeSpinAccumulatedWin,
-        duration: GamePresentationTimings.statusFreeSpinWinCount,
-        anchorKey: kazancAnchorKey,
-      );
+      return _winMoneyRow(freeSpinAccumulatedWin, anchorKey: kazancAnchorKey);
     }
 
     if (isTumbling && liveTumbleWin > 0) {
@@ -147,7 +143,7 @@ class GameStatusText extends StatelessWidget {
     );
   }
 
-  Widget _winMoneyRow(double amount) {
+  Widget _winMoneyRow(double amount, {Key? anchorKey}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -155,13 +151,16 @@ class GameStatusText extends StatelessWidget {
       children: [
         Text('WIN', style: accentStyle),
         const SizedBox(width: 6),
-        MoneyText(
-          text: formatMoney(amount),
-          style: baseStyle,
-          symbolOffset: const Offset(0, 1.5),
-          lineYOffset: 0.75,
-          lineLengthScale: 0.94,
-          lineTopExtend: 0.9,
+        Container(
+          key: anchorKey,
+          child: MoneyText(
+            text: formatMoney(amount),
+            style: baseStyle,
+            symbolOffset: const Offset(0, 1.5),
+            lineYOffset: 0.75,
+            lineLengthScale: 0.94,
+            lineTopExtend: 0.9,
+          ),
         ),
       ],
     );

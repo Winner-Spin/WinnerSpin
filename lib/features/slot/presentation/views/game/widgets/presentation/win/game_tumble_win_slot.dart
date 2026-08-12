@@ -11,6 +11,7 @@ class GameTumbleWinSlot extends StatelessWidget {
     super.key,
     required this.listenable,
     required this.isFlyingTumble,
+    required this.isPostWinPulsing,
     required this.isBusy,
     required this.liveTumbleWin,
     required this.lastWin,
@@ -32,6 +33,7 @@ class GameTumbleWinSlot extends StatelessWidget {
 
   final Listenable listenable;
   final bool Function() isFlyingTumble;
+  final bool Function() isPostWinPulsing;
   final bool Function() isBusy;
   final double Function() liveTumbleWin;
   final double Function() lastWin;
@@ -68,6 +70,7 @@ class GameTumbleWinSlot extends StatelessWidget {
             Center(
               child: TumbleWinLine(
                 isFlyingTumble: isFlyingTumble(),
+                isPostWinPulsing: isPostWinPulsing(),
                 isBusy: isBusy(),
                 liveTumbleWin: liveTumbleWin(),
                 lastWin: lastWin(),
