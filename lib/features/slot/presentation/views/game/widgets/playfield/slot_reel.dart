@@ -20,6 +20,8 @@ class SlotReel extends StatefulWidget {
 
   final bool spinning;
 
+  final int spinRevision;
+
   final Set<String> fadingPaths;
 
   final Set<int> clearedPositions;
@@ -47,6 +49,7 @@ class SlotReel extends StatefulWidget {
     required this.previousItems,
     required this.targetItems,
     required this.spinning,
+    required this.spinRevision,
     this.fadingPaths = const {},
     this.clearedPositions = const {},
     this.multiplierResiduePositions = const {},
@@ -98,7 +101,10 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       oldWidget.controller?.detach(this);
       widget.controller?.attach(this, _quickStop);
     }
-    if (widget.spinning && !oldWidget.spinning) {
+    final spinStarted =
+        widget.spinning &&
+        (!oldWidget.spinning || widget.spinRevision != oldWidget.spinRevision);
+    if (spinStarted) {
       _quickStopped = false;
       _quickStopDropIn = false;
       _completeNotified = false;

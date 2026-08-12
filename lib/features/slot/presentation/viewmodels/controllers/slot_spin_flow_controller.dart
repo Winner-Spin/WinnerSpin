@@ -79,11 +79,11 @@ class SlotSpinFlowController {
         poolController: poolController,
         roundController: roundController,
       );
-      await prepareRecovery(taskOutput.result);
       lifecycleController.showPendingInitialGrid(
         roundController: roundController,
         gridController: gridController,
       );
+      await prepareRecovery(taskOutput.result);
     } finally {
       roundController.markSpinResultReady();
     }

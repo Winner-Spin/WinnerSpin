@@ -61,10 +61,10 @@ class LocalSpinRecoveryRepository implements SpinRecoveryRepository {
   Future<void> _save(String userId, PendingSpinRecovery recovery) async {
     final file = await _recoveryFile(userId);
     final temporaryFile = File('${file.path}.tmp');
-    await temporaryFile.writeAsString(
-      jsonEncode(recovery.toJson()),
-      flush: true,
-    );
+    // Keep the atomic temp-file rename, but do not force a synchronous fsync
+    // on the gameplay path. An app-process interruption still leaves the OS
+    // buffered write available, while storage stalls cannot hold the reels.
+    await temporaryFile.writeAsString(jsonEncode(recovery.toJson()));
     if (await file.exists()) await file.delete();
     await temporaryFile.rename(file.path);
   }

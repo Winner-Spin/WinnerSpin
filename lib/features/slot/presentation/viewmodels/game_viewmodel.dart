@@ -146,6 +146,8 @@ class GameViewModel extends ChangeNotifier {
 
   bool get isSpinning => _roundCtrl.isSpinning;
 
+  int get spinRevision => _roundCtrl.spinRevision;
+
   bool get isAutoSpinning => _autoSpinCtrl.active;
 
   bool get lastSpinWasFreeSpin => _roundCtrl.lastSpinWasFreeSpin;
@@ -207,6 +209,7 @@ class GameViewModel extends ChangeNotifier {
   );
 
   bool get isCurrentSpinFromBuy => _roundCtrl.currentSpinFromBuy;
+
   /// Account the disclaimer acceptance is recorded against, null while signed
   /// out.
   String? get currentUserId => _persistenceCtrl.currentUserId;
@@ -215,8 +218,7 @@ class GameViewModel extends ChangeNotifier {
 
   /// True when the shown history was recovered from the account backup, which
   /// only keeps the most recent spins. See [GameHistoryController].
-  bool get isGameHistoryRestoredFromBackup =>
-      _historyCtrl.isRestoredFromBackup;
+  bool get isGameHistoryRestoredFromBackup => _historyCtrl.isRestoredFromBackup;
 
   SpinResult? get lastSpinResult => _roundCtrl.lastSpinResult;
   bool get shouldPulseLandingScatters =>

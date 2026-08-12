@@ -6,6 +6,9 @@ class SpinRoundController {
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
 
+  int _spinRevision = 0;
+  int get spinRevision => _spinRevision;
+
   bool _lastSpinWasFreeSpin = false;
   bool get lastSpinWasFreeSpin => _lastSpinWasFreeSpin;
 
@@ -90,6 +93,7 @@ class SpinRoundController {
 
   void _prepareForSpinResult() {
     markSpinResultReady();
+    _spinRevision++;
     _pendingResult = null;
     _pendingRecoveryId = null;
     _spinResultReady = Completer<void>();

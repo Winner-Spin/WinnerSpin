@@ -685,6 +685,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       previousGrid: _viewModel.previousGrid,
       grid: _viewModel.grid,
       isSpinning: _viewModel.isSpinning,
+      spinRevision: _viewModel.spinRevision,
       fadingPaths: _viewModel.fadingPaths,
       clearedPositions: _viewModel.clearedPositions,
       multiplierResiduePositions: _viewModel.multiplierResiduePositions,

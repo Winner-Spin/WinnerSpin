@@ -9,6 +9,7 @@ class SlotGridView extends StatelessWidget {
   final List<List<String>> previousGrid;
   final List<List<String>> grid;
   final bool isSpinning;
+  final int spinRevision;
   final Set<String> fadingPaths;
   final Set<int> clearedPositions;
   final Set<int> multiplierResiduePositions;
@@ -26,6 +27,7 @@ class SlotGridView extends StatelessWidget {
     required this.previousGrid,
     required this.grid,
     required this.isSpinning,
+    required this.spinRevision,
     required this.fadingPaths,
     required this.clearedPositions,
     required this.multiplierResiduePositions,
@@ -51,6 +53,7 @@ class SlotGridView extends StatelessWidget {
                 previousItems: previousGrid[col],
                 targetItems: grid[col],
                 spinning: isSpinning,
+                spinRevision: spinRevision,
                 fadingPaths: fadingPaths,
                 clearedPositions: clearedPositions,
                 multiplierResiduePositions: multiplierResiduePositions,

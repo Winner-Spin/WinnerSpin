@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:winner_spin/features/slot/domain/engine/slot_engine.dart';
 import 'package:winner_spin/features/slot/domain/engine/spin_task.dart';
@@ -43,6 +45,35 @@ void main() {
 
     fixture.dispose();
   });
+
+  test(
+    'publishes the target grid before recovery persistence completes',
+    () async {
+      final fixture = _SpinFlowFixture();
+      final recoveryGate = Completer<void>();
+      final targetGrid = _gridFilledWith('target');
+      fixture.executionController.result = _resultWithGrid(targetGrid);
+
+      var spinCompleted = false;
+      final spin = fixture
+          .spin(
+            isInFreeSpins: false,
+            prepareRecovery: (_) => recoveryGate.future,
+          )
+          .then((_) => spinCompleted = true);
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fixture.gridController.grid, same(targetGrid));
+      expect(spinCompleted, isFalse);
+
+      recoveryGate.complete();
+      await spin;
+
+      expect(spinCompleted, isTrue);
+      fixture.dispose();
+    },
+  );
 }
 
 class _SpinFlowFixture {
@@ -60,7 +91,10 @@ class _SpinFlowFixture {
   final tumbleController = TumbleSequenceController();
   final gridController = GridController(_emptyGrid());
 
-  Future<void> spin({required bool isInFreeSpins}) {
+  Future<void> spin({
+    required bool isInFreeSpins,
+    Future<void> Function(SpinResult result)? prepareRecovery,
+  }) {
     return flowController.spin(
       startController: startController,
       lifecycleController: lifecycleController,
@@ -78,7 +112,7 @@ class _SpinFlowFixture {
       isInFreeSpins: isInFreeSpins,
       betAmount: balanceController.betAmount,
       vibrationEnabled: false,
-      prepareRecovery: (_) async {},
+      prepareRecovery: prepareRecovery ?? (_) async {},
       commitPendingFreeSpinConsume: freeSpinsController.commitPendingConsume,
       notifyListeners: () {},
     );
@@ -94,6 +128,7 @@ class _SpinFlowFixture {
 
 class _FakeSpinExecutionController extends SpinExecutionController {
   bool? lastSpinWasFree;
+  SpinResult result = _resultWithGrid(_emptyGrid());
 
   @override
   Future<SpinTaskOutput> run({
@@ -105,24 +140,29 @@ class _FakeSpinExecutionController extends SpinExecutionController {
     bool forceFsTrigger = false,
   }) async {
     lastSpinWasFree = isFreeSpins;
-    return SpinTaskOutput(
-      pool: pool,
-      result: SpinResult(
-        initialGrid: _emptyGrid(),
-        tumbles: const [],
-        totalWin: 0,
-        tumbleCount: 0,
-        freeSpinsTriggered: false,
-        scatterCount: 0,
-        scatterPayout: 0,
-      ),
-    );
+    return SpinTaskOutput(pool: pool, result: result);
   }
 }
 
 List<List<String>> _emptyGrid() {
+  return _gridFilledWith('H1');
+}
+
+List<List<String>> _gridFilledWith(String value) {
   return List.generate(
     SlotEngine.columns,
-    (_) => List.filled(SlotEngine.rows, 'H1'),
+    (_) => List.filled(SlotEngine.rows, value),
+  );
+}
+
+SpinResult _resultWithGrid(List<List<String>> grid) {
+  return SpinResult(
+    initialGrid: grid,
+    tumbles: const [],
+    totalWin: 0,
+    tumbleCount: 0,
+    freeSpinsTriggered: false,
+    scatterCount: 0,
+    scatterPayout: 0,
   );
 }
