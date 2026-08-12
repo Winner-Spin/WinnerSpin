@@ -1,12 +1,10 @@
-import 'package:flutter/foundation.dart';
-
 class SlotReelController {
   Object? _owner;
-  VoidCallback? _quickStop;
+  void Function(int spinRevision)? _quickStop;
 
-  void quickStop() => _quickStop?.call();
+  void quickStop(int spinRevision) => _quickStop?.call(spinRevision);
 
-  void attach(Object owner, VoidCallback quickStop) {
+  void attach(Object owner, void Function(int spinRevision) quickStop) {
     _owner = owner;
     _quickStop = quickStop;
   }

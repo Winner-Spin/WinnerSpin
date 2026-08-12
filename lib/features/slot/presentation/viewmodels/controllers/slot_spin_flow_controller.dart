@@ -85,6 +85,12 @@ class SlotSpinFlowController {
       );
       await prepareRecovery(taskOutput.result);
     } finally {
+      if (!roundController.isSpinTargetReady) {
+        lifecycleController.showFallbackSpinTarget(
+          roundController: roundController,
+          gridController: gridController,
+        );
+      }
       roundController.markSpinResultReady();
     }
 
@@ -152,6 +158,12 @@ class SlotSpinFlowController {
         gridController: gridController,
       );
     } finally {
+      if (!roundController.isSpinTargetReady) {
+        lifecycleController.showFallbackSpinTarget(
+          roundController: roundController,
+          gridController: gridController,
+        );
+      }
       roundController.markSpinResultReady();
     }
   }

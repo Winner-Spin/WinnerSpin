@@ -62,9 +62,16 @@ void main() {
           )
           .then((_) => spinCompleted = true);
 
+      expect(fixture.roundController.isSpinTargetReady, isFalse);
+
       await Future<void>.delayed(Duration.zero);
 
       expect(fixture.gridController.grid, same(targetGrid));
+      expect(fixture.roundController.isSpinTargetReady, isTrue);
+      expect(
+        fixture.roundController.targetReadyRevision,
+        fixture.roundController.spinRevision,
+      );
       expect(spinCompleted, isFalse);
 
       recoveryGate.complete();
@@ -74,6 +81,23 @@ void main() {
       fixture.dispose();
     },
   );
+
+  test('publishes a fallback target when spin execution fails', () async {
+    final fixture = _SpinFlowFixture();
+    fixture.executionController.error = StateError('engine failed');
+
+    await expectLater(
+      fixture.spin(isInFreeSpins: false),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(fixture.roundController.isSpinTargetReady, isTrue);
+    expect(
+      fixture.roundController.targetReadyRevision,
+      fixture.roundController.spinRevision,
+    );
+    fixture.dispose();
+  });
 }
 
 class _SpinFlowFixture {
@@ -129,6 +153,7 @@ class _SpinFlowFixture {
 class _FakeSpinExecutionController extends SpinExecutionController {
   bool? lastSpinWasFree;
   SpinResult result = _resultWithGrid(_emptyGrid());
+  Object? error;
 
   @override
   Future<SpinTaskOutput> run({
@@ -139,6 +164,8 @@ class _FakeSpinExecutionController extends SpinExecutionController {
     required bool buyFs,
     bool forceFsTrigger = false,
   }) async {
+    final executionError = error;
+    if (executionError != null) throw executionError;
     lastSpinWasFree = isFreeSpins;
     return SpinTaskOutput(pool: pool, result: result);
   }

@@ -148,6 +148,8 @@ class GameViewModel extends ChangeNotifier {
 
   int get spinRevision => _roundCtrl.spinRevision;
 
+  int get targetReadyRevision => _roundCtrl.targetReadyRevision;
+
   bool get isAutoSpinning => _autoSpinCtrl.active;
 
   bool get lastSpinWasFreeSpin => _roundCtrl.lastSpinWasFreeSpin;

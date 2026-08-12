@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,8 @@ class SlotReel extends StatefulWidget {
   final bool spinning;
 
   final int spinRevision;
+
+  final int targetReadyRevision;
 
   final Set<String> fadingPaths;
 
@@ -50,6 +53,7 @@ class SlotReel extends StatefulWidget {
     required this.targetItems,
     required this.spinning,
     required this.spinRevision,
+    required this.targetReadyRevision,
     this.fadingPaths = const {},
     this.clearedPositions = const {},
     this.multiplierResiduePositions = const {},
@@ -88,9 +92,17 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
   bool _hasCompleted = false;
 
+  int _activeSpinRevision = 0;
+  int _runToken = 0;
+  int? _queuedQuickStopRevision;
+  Completer<void>? _targetReady;
+  List<String>? _targetSnapshot;
+  int? _targetSnapshotRevision;
+
   @override
   void initState() {
     super.initState();
+    _activeSpinRevision = widget.spinRevision;
     widget.controller?.attach(this, _quickStop);
   }
 
@@ -101,20 +113,104 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       oldWidget.controller?.detach(this);
       widget.controller?.attach(this, _quickStop);
     }
+    if (!widget.spinning &&
+        _hasCompleted &&
+        !identical(oldWidget.targetItems, widget.targetItems)) {
+      _targetSnapshot = null;
+      _targetSnapshotRevision = null;
+    }
     final spinStarted =
         widget.spinning &&
         (!oldWidget.spinning || widget.spinRevision != oldWidget.spinRevision);
     if (spinStarted) {
-      _quickStopped = false;
-      _quickStopDropIn = false;
-      _completeNotified = false;
-      _hasCompleted = false;
-      _startSpin();
+      _beginSpin();
+      return;
     }
+    _captureTargetIfReady(widget.spinRevision);
+    _flushQueuedQuickStop();
   }
 
-  Future<void> _startSpin() async {
-    if (!mounted) return;
+  void _beginSpin() {
+    final revision = widget.spinRevision;
+    _runToken++;
+    _disposeCurrentController();
+    final previousTargetReady = _targetReady;
+    if (previousTargetReady != null && !previousTargetReady.isCompleted) {
+      previousTargetReady.complete();
+    }
+
+    _activeSpinRevision = revision;
+    _quickStopped = false;
+    _quickStopDropIn = false;
+    _completeNotified = false;
+    _hasCompleted = false;
+    _targetSnapshot = null;
+    _targetSnapshotRevision = null;
+    _targetReady = Completer<void>();
+    if (_queuedQuickStopRevision != revision) {
+      _queuedQuickStopRevision = null;
+    }
+
+    _captureTargetIfReady(revision);
+    final token = _runToken;
+    unawaited(_startSpin(revision: revision, token: token));
+    _flushQueuedQuickStop();
+  }
+
+  bool _captureTargetIfReady(int revision) {
+    if (widget.spinRevision != revision ||
+        widget.targetReadyRevision != revision) {
+      return false;
+    }
+    if (_targetSnapshotRevision != revision) {
+      _targetSnapshot = List<String>.unmodifiable(widget.targetItems);
+      _targetSnapshotRevision = revision;
+    }
+    final targetReady = _targetReady;
+    if (targetReady != null && !targetReady.isCompleted) {
+      targetReady.complete();
+    }
+    return true;
+  }
+
+  bool _isActiveRun({required int revision, required int token}) {
+    return mounted &&
+        revision == _activeSpinRevision &&
+        token == _runToken &&
+        !_completeNotified;
+  }
+
+  void _replaceController(AnimationController controller) {
+    final previous = _controller;
+    _controller = controller;
+    if (previous == null) return;
+    previous.stop();
+    previous.dispose();
+  }
+
+  void _disposeCurrentController() {
+    final current = _controller;
+    _controller = null;
+    if (current == null) return;
+    current.stop();
+    current.dispose();
+  }
+
+  Future<bool> _forwardController(
+    AnimationController controller, {
+    required int revision,
+    required int token,
+  }) async {
+    try {
+      await controller.forward().orCancel;
+    } on TickerCanceled {
+      return false;
+    }
+    return _isActiveRun(revision: revision, token: token);
+  }
+
+  Future<void> _startSpin({required int revision, required int token}) async {
+    if (!_isActiveRun(revision: revision, token: token)) return;
 
     int speedMult = widget.speedMultiplier;
     final speedFactor = _effectiveSpeedFactor(speedMult);
@@ -124,20 +220,25 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
     if (dropOutDelayMs > 0) {
       await Future.delayed(Duration(milliseconds: dropOutDelayMs));
-      if (!mounted || _quickStopped) return;
+      if (!_isActiveRun(revision: revision, token: token)) return;
     }
 
-    _controller?.dispose();
-    _controller = AnimationController(
+    final dropOutController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: dropOutDurationMs),
     );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
+    _replaceController(dropOutController);
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(dropOutController);
 
     setState(() => _state = ReelState.droppingOut);
 
-    await _controller!.forward();
-    if (!mounted || _quickStopped) return;
+    if (!await _forwardController(
+      dropOutController,
+      revision: revision,
+      token: token,
+    )) {
+      return;
+    }
 
     setState(() => _state = ReelState.empty);
 
@@ -151,56 +252,112 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final int totalEmptyWaitMs = waitToGlobalEmptyMs + 300 + dropInStaggerMs;
 
     await Future.delayed(Duration(milliseconds: totalEmptyWaitMs));
-    if (!mounted || _quickStopped) return;
+    if (!_isActiveRun(revision: revision, token: token)) return;
+
+    final targetReady = _targetReady;
+    if (targetReady == null) return;
+    await targetReady.future;
+    if (!_isActiveRun(revision: revision, token: token)) return;
+    if (!_captureTargetIfReady(revision)) return;
 
     int dropInDurationMs = (900 / speedFactor).round();
 
-    _controller?.dispose();
-    _controller = AnimationController(
+    final dropInController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: dropInDurationMs),
     );
+    _replaceController(dropInController);
 
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(dropInController);
 
     widget.onDropInStart?.call();
     setState(() => _state = ReelState.droppingIn);
 
-    await _controller!.forward();
+    if (!await _forwardController(
+      dropInController,
+      revision: revision,
+      token: token,
+    )) {
+      return;
+    }
     if (widget.pulseScattersOnLanding && !_quickStopped) {
       await Future.delayed(_scatterPulseSettleDuration);
+      if (!_isActiveRun(revision: revision, token: token)) return;
     }
-    _completeSpin();
+    _completeSpin(revision: revision, token: token);
   }
 
-  Future<void> _quickStop() async {
-    if (_state == ReelState.static && _hasCompleted) return;
+  void _quickStop(int spinRevision) {
+    if (spinRevision < _activeSpinRevision) return;
+    if (spinRevision != _activeSpinRevision ||
+        widget.spinRevision != spinRevision) {
+      _queuedQuickStopRevision = spinRevision;
+      return;
+    }
+    if (_completeNotified || (_state == ReelState.static && _hasCompleted)) {
+      return;
+    }
     if (_quickStopped) return;
-    _quickStopped = true;
+    _queuedQuickStopRevision = spinRevision;
+    _flushQueuedQuickStop();
+  }
 
-    _controller?.stop();
-    _controller?.dispose();
-    _controller = AnimationController(
+  void _flushQueuedQuickStop() {
+    final revision = _queuedQuickStopRevision;
+    if (revision == null ||
+        revision != _activeSpinRevision ||
+        widget.spinRevision != revision ||
+        _quickStopped ||
+        _completeNotified ||
+        !_captureTargetIfReady(revision)) {
+      return;
+    }
+    _queuedQuickStopRevision = null;
+    unawaited(_startQuickStop(revision));
+  }
+
+  Future<void> _startQuickStop(int revision) async {
+    if (!mounted ||
+        revision != _activeSpinRevision ||
+        _quickStopped ||
+        _completeNotified ||
+        !_captureTargetIfReady(revision)) {
+      return;
+    }
+    _quickStopped = true;
+    final token = ++_runToken;
+
+    final quickStopController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 260),
     );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
+    _replaceController(quickStopController);
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(quickStopController);
 
-    if (!mounted) return;
     _quickStopDropIn = true;
     setState(() => _state = ReelState.droppingIn);
 
-    await _controller!.forward();
+    if (!await _forwardController(
+      quickStopController,
+      revision: revision,
+      token: token,
+    )) {
+      return;
+    }
     _quickStopDropIn = false;
-    _completeSpin();
+    _completeSpin(revision: revision, token: token);
   }
 
-  void _completeSpin() {
-    if (!mounted || _completeNotified) return;
+  void _completeSpin({required int revision, required int token}) {
+    if (!_isActiveRun(revision: revision, token: token)) return;
     _completeNotified = true;
     setState(() {
       _state = ReelState.static;
       _hasCompleted = true;
+      _quickStopDropIn = false;
     });
     widget.onComplete?.call();
   }
@@ -215,6 +372,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
   Widget _buildReelSymbol({
     required String assetPath,
+    required int rowIndex,
     required double itemH,
     required bool isDropOut,
     required bool cleared,
@@ -234,6 +392,8 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
     final Widget symbolChild;
     if (!isDropOut && isScatter && widget.pulseScattersOnLanding) {
       symbolChild = ScatterPulse(
+        animation: animation,
+        landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
         child: Image.asset(
           assetPath,
           fit: BoxFit.contain,
@@ -241,8 +401,6 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
           gaplessPlayback: true,
           cacheWidth: 256,
         ),
-        animation: animation,
-        landThreshold: math.max(landThreshold, _scatterPulseTriggerProgress),
       );
     } else if (isMultiplier) {
       symbolChild = MultiplierBombSymbol(
@@ -252,10 +410,14 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       );
     } else {
       symbolChild = Image.asset(
+        key: ValueKey(
+          'reel-symbol-${widget.columnIndex}-$rowIndex-'
+          '$_activeSpinRevision-$assetPath-$isDropOut',
+        ),
         assetPath,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.low,
-        gaplessPlayback: true,
+        gaplessPlayback: false,
         cacheWidth: 256,
       );
     }
@@ -346,6 +508,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
         child: Center(
           child: _buildReelSymbol(
             assetPath: assetPath,
+            rowIndex: index,
             itemH: itemH,
             isDropOut: isDropOut,
             cleared: cleared,
@@ -386,7 +549,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
         if (_state == ReelState.static) {
           final items = _hasCompleted
-              ? widget.targetItems
+              ? (_targetSnapshot ?? widget.targetItems)
               : widget.previousItems;
           return SizedBox(
             width: viewportW,
@@ -427,7 +590,7 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
 
         final List<String> currentList = (_state == ReelState.droppingOut)
             ? widget.previousItems
-            : widget.targetItems;
+            : (_targetSnapshot ?? widget.targetItems);
         final bool isOut = (_state == ReelState.droppingOut);
 
         return SizedBox(
@@ -474,15 +637,20 @@ class _SlotReelState extends State<SlotReel> with TickerProviderStateMixin {
       key: ValueKey(
         'manual-scatter-pulse-${widget.columnIndex}-$row-${widget.scatterPulseTrigger}',
       ),
-      child: cell,
       autoStart: true,
+      child: cell,
     );
   }
 
   @override
   void dispose() {
+    _runToken++;
+    final targetReady = _targetReady;
+    if (targetReady != null && !targetReady.isCompleted) {
+      targetReady.complete();
+    }
     widget.controller?.detach(this);
-    _controller?.dispose();
+    _disposeCurrentController();
     super.dispose();
   }
 }

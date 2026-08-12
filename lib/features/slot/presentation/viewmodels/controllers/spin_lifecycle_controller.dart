@@ -38,7 +38,16 @@ class SpinLifecycleController {
   }) {
     final pendingResult = roundController.pendingResult;
     if (pendingResult == null) return;
+    roundController.markSpinTargetReady();
     gridController.setGrid(pendingResult.initialGrid);
+  }
+
+  void showFallbackSpinTarget({
+    required SpinRoundController roundController,
+    required GridController gridController,
+  }) {
+    roundController.markSpinTargetReady();
+    gridController.setGrid(gridController.grid);
   }
 
   void clearMultiplierResidues({required GridController gridController}) {

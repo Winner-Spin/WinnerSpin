@@ -199,7 +199,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _quickStopReels() {
     if (!_viewModel.isSpinning || _viewModel.isTumbling) return;
     for (final controller in _reelControllers) {
-      controller.quickStop();
+      controller.quickStop(_viewModel.spinRevision);
     }
   }
 
@@ -686,6 +686,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       grid: _viewModel.grid,
       isSpinning: _viewModel.isSpinning,
       spinRevision: _viewModel.spinRevision,
+      targetReadyRevision: _viewModel.targetReadyRevision,
       fadingPaths: _viewModel.fadingPaths,
       clearedPositions: _viewModel.clearedPositions,
       multiplierResiduePositions: _viewModel.multiplierResiduePositions,

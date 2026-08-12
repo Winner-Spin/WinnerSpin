@@ -9,6 +9,10 @@ class SpinRoundController {
   int _spinRevision = 0;
   int get spinRevision => _spinRevision;
 
+  int _targetReadyRevision = 0;
+  int get targetReadyRevision => _targetReadyRevision;
+  bool get isSpinTargetReady => _targetReadyRevision == _spinRevision;
+
   bool _lastSpinWasFreeSpin = false;
   bool get lastSpinWasFreeSpin => _lastSpinWasFreeSpin;
 
@@ -63,6 +67,10 @@ class SpinRoundController {
 
   void applyPendingResult(SpinResult result) {
     _pendingResult = result;
+  }
+
+  void markSpinTargetReady() {
+    _targetReadyRevision = _spinRevision;
   }
 
   void attachRecovery(String spinId) {
