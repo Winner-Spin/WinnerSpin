@@ -112,7 +112,11 @@ class WinPresentationController extends ChangeNotifier {
 
     _runningSum += _multipliers[landedIndex];
     notifyListeners();
+  }
 
+  void onMultiplierPresentationComplete(int landedIndex) {
+    if (_phase != WinPresentationPhase.multiplierCollecting) return;
+    if (landedIndex < 0 || landedIndex >= _multipliers.length) return;
     final isLast = landedIndex == _multipliers.length - 1;
     if (isLast) {
       _phaseTimer?.cancel();

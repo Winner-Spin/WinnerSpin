@@ -231,6 +231,10 @@ class _WinPresentationState extends State<WinPresentation> {
         if (!mounted || !identical(widget.spinResult, result)) return;
         _controller.onMultiplierLanded(landedIdx);
       },
+      onFlightComplete: () {
+        if (!mounted || !identical(widget.spinResult, result)) return;
+        _controller.onMultiplierPresentationComplete(landedIdx);
+      },
     );
   }
 

@@ -36,16 +36,15 @@ class BigWinPresentationController {
     required void Function(double amount) showBigWin,
   }) {
     if (isInFreeSpins) return;
-    final currentResult = result();
-    if (currentResult == null) {
-      // A persisted lastWin is restored during session hydration. It belongs
-      // to an earlier session and must not be presented as a fresh BIG WIN.
-      _lastSeenLastWinNormal = lastWin;
-      return;
-    }
     if (lastWin > 0 && _lastSeenLastWinNormal == 0) {
       Future.microtask(() {
         if (!isMounted()) return;
+        // Balance listeners run before the completed result is published.
+        // Resolve it in the microtask so this decision belongs to the current
+        // spin rather than the previously settled one. A null result is a
+        // persisted win restored during session hydration, not a fresh win.
+        final currentResult = result();
+        if (currentResult == null) return;
         final hasSequence = SpinResultPresentationRules.hasMultiplierSequence(
           currentResult,
         );

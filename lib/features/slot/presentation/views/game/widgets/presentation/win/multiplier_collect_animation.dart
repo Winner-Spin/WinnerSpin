@@ -19,6 +19,7 @@ class MultiplierCollectAnimation {
     Duration burstDuration = const Duration(milliseconds: 850),
     Future<void>? burstStartSignal,
     VoidCallback? onApproaching,
+    VoidCallback? onFlightComplete,
     VoidCallback? onSettleComplete,
   }) async {
     final overlay = Overlay.of(context);
@@ -37,6 +38,7 @@ class MultiplierCollectAnimation {
         burstDuration: burstDuration,
         burstStartSignal: burstStartSignal,
         onApproaching: onApproaching,
+        onFlightComplete: onFlightComplete,
         onSettleComplete: onSettleComplete,
         onArrived: () {
           if (entry.mounted) entry.remove();

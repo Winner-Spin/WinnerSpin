@@ -26,6 +26,7 @@ class FloatingCollectText extends StatefulWidget {
   final double approachThreshold;
   final VoidCallback? onApproaching;
   final VoidCallback? onArrived;
+  final VoidCallback? onFlightComplete;
 
   final VoidCallback? onSettleComplete;
 
@@ -44,6 +45,7 @@ class FloatingCollectText extends StatefulWidget {
     this.approachThreshold = 0.70,
     this.onApproaching,
     this.onArrived,
+    this.onFlightComplete,
     this.onSettleComplete,
   });
 
@@ -133,6 +135,7 @@ class _FloatingCollectTextState extends State<FloatingCollectText>
       _flight.forward().then((_) {
         if (!mounted) return;
         _flightCompleted = true;
+        widget.onFlightComplete?.call();
         _completeIfReady();
       });
     });
