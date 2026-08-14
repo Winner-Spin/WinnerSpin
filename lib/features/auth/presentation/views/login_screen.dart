@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../../../core/typography/app_fonts.dart';
@@ -8,6 +7,8 @@ import '../viewmodels/login_viewmodel.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
 import '../widgets/account_deleted_dialog.dart';
+import '../widgets/auth_field_scroll_coordinator.dart';
+import '../widgets/manual_keyboard_scroll_physics.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_dialog.dart';
 import 'post_login_gate.dart';
@@ -34,17 +35,19 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   static const _backgroundAsset = 'lib/images/login_screen/background_1.png';
 
-  /// Fields are placed as a fraction of the screen height, so the same
-  /// constants drive both the layout and the keyboard avoidance math.
+  /// Fields are placed as a fraction of the screen height.
   static const double _emailFieldTopFactor = 0.48;
   static const double _passwordFieldTopFactor = 0.58;
   static const double _fieldHeight = 60;
-  static const double _keyboardGap = 24;
 
   late final LoginViewModel _viewModel;
 
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
+  final AuthFieldScrollCoordinator _scrollCoordinator =
+      AuthFieldScrollCoordinator();
+  final GlobalKey _emailFieldKey = GlobalKey();
+  final GlobalKey _passwordFieldKey = GlobalKey();
 
   late final AnimationController _errorPulseCtrl;
   late final Animation<double> _errorPulseScale;
@@ -70,8 +73,6 @@ class _LoginScreenState extends State<LoginScreen>
     // synchronously notify it. With music disabled, initMusic reaches
     // notifyListeners without awaiting the audio service.
     _viewModel.addListener(_onViewModelChange);
-    _emailFocus.addListener(_onFocusChange);
-    _passwordFocus.addListener(_onFocusChange);
     unawaited(_viewModel.initMusic());
     _scheduleAccountDeletedNotice();
   }
@@ -107,31 +108,13 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _onFocusChange() {
-    if (mounted) setState(() {});
-  }
-
-  /// How far the content must slide up so the focused field stays above the
-  /// on-screen keyboard.
-  double _keyboardShift(double screenH, double bottomInset) {
-    if (bottomInset <= 0) return 0;
-    final double? topFactor = _passwordFocus.hasFocus
-        ? _passwordFieldTopFactor
-        : _emailFocus.hasFocus
-        ? _emailFieldTopFactor
-        : null;
-    if (topFactor == null) return 0;
-    final double fieldBottom =
-        screenH * topFactor + _fieldHeight + _keyboardGap;
-    return math.max(0.0, fieldBottom - (screenH - bottomInset));
-  }
-
   @override
   void dispose() {
     _errorClearTimer?.cancel();
     _errorPulseCtrl.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
+    _scrollCoordinator.dispose();
     _viewModel.removeListener(_onViewModelChange);
     unawaited(const AssetImage(_backgroundAsset).evict());
     super.dispose();
@@ -139,42 +122,56 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final double bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // Read this above Scaffold. Scaffold removes the bottom view inset from
+    // the MediaQuery exposed to its resized body.
+    final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
           return LayoutBuilder(
             builder: (context, constraints) {
-              final double screenH = constraints.maxHeight;
+              final double screenH = constraints.maxHeight + keyboardInset;
               final double screenW = constraints.maxWidth;
-              final double shift = _keyboardShift(screenH, bottomInset);
 
               return GestureDetector(
                 behavior: HitTestBehavior.deferToChild,
                 onTap: () => FocusScope.of(context).unfocus(),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Image.asset(
-                        _backgroundAsset,
-                        fit: BoxFit.cover,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    ),
-
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      left: 0,
-                      right: 0,
-                      top: -shift,
+                child: RawScrollbar(
+                  key: const ValueKey('login-screen-scrollbar'),
+                  controller: _scrollCoordinator.controller,
+                  thumbVisibility: keyboardInset > 0,
+                  trackVisibility: false,
+                  interactive: true,
+                  scrollbarOrientation: ScrollbarOrientation.right,
+                  thickness: 4,
+                  radius: const Radius.circular(2),
+                  thumbColor: const Color(0xCC9E9E9E),
+                  mainAxisMargin: 40,
+                  crossAxisMargin: 6,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('login-screen-scroll'),
+                    controller: _scrollCoordinator.controller,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.manual,
+                    physics: const ManualKeyboardScrollPhysics(),
+                    child: SizedBox(
+                      key: const ValueKey('login-screen-canvas'),
+                      width: screenW,
                       height: screenH,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              _backgroundAsset,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+
                           Positioned(
                             top: screenH * 0.125,
                             right: screenW * 0.07,
@@ -193,6 +190,7 @@ class _LoginScreenState extends State<LoginScreen>
                             left: screenW * 0.15,
                             right: screenW * 0.15,
                             child: _buildCustomTextField(
+                              fieldKey: _emailFieldKey,
                               context: context,
                               controller: _viewModel.emailController,
                               focusNode: _emailFocus,
@@ -201,7 +199,15 @@ class _LoginScreenState extends State<LoginScreen>
                               backgroundImage: AuthImageAssets.emailField,
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => _passwordFocus.requestFocus(),
+                              onTap: () => _scrollCoordinator.centerField(
+                                _emailFieldKey,
+                              ),
+                              onSubmitted: (_) {
+                                _passwordFocus.requestFocus();
+                                _scrollCoordinator.centerField(
+                                  _passwordFieldKey,
+                                );
+                              },
                             ),
                           ),
 
@@ -210,6 +216,7 @@ class _LoginScreenState extends State<LoginScreen>
                             left: screenW * 0.15,
                             right: screenW * 0.15,
                             child: _buildCustomTextField(
+                              fieldKey: _passwordFieldKey,
                               context: context,
                               controller: _viewModel.passwordController,
                               focusNode: _passwordFocus,
@@ -218,6 +225,9 @@ class _LoginScreenState extends State<LoginScreen>
                               obscureText: true,
                               backgroundImage: AuthImageAssets.passwordField,
                               textInputAction: TextInputAction.done,
+                              onTap: () => _scrollCoordinator.centerField(
+                                _passwordFieldKey,
+                              ),
                               onSubmitted: (_) {
                                 FocusScope.of(context).unfocus();
                                 _viewModel.login();
@@ -307,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -437,6 +447,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildCustomTextField({
+    required GlobalKey fieldKey,
     required BuildContext context,
     required TextEditingController controller,
     required IconData icon,
@@ -446,9 +457,11 @@ class _LoginScreenState extends State<LoginScreen>
     bool obscureText = false,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
+    VoidCallback? onTap,
     ValueChanged<String>? onSubmitted,
   }) {
     return Container(
+      key: fieldKey,
       height: _fieldHeight,
       padding: const EdgeInsets.only(bottom: 8.0),
       decoration: BoxDecoration(
@@ -467,6 +480,7 @@ class _LoginScreenState extends State<LoginScreen>
               obscureText: obscureText,
               keyboardType: keyboardType,
               textInputAction: textInputAction,
+              onTap: onTap,
               onSubmitted: onSubmitted,
               style: AppFonts.nunito(
                 color: Colors.white.withValues(alpha: 0.95),

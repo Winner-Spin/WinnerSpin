@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../../../core/typography/app_fonts.dart';
@@ -7,10 +6,14 @@ import '../../../../core/typography/app_fonts.dart';
 import '../../../../core/widgets/animated_image_button.dart';
 import '../models/auth_image_assets.dart';
 import '../viewmodels/register_viewmodel.dart';
+import '../widgets/auth_field_scroll_coordinator.dart';
+import '../widgets/manual_keyboard_scroll_physics.dart';
 import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.viewModel});
+
+  final RegisterViewModel? viewModel;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -20,21 +23,26 @@ class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   static const _backgroundAsset = 'lib/images/register_screen/register.png';
 
-  /// Fields are placed as a fraction of the screen height, so the same
-  /// constants drive both the layout and the keyboard avoidance math.
+  /// Fields are placed as a fraction of the screen height.
   static const double _nameFieldTopFactor = 0.34;
   static const double _emailFieldTopFactor = 0.43;
   static const double _passwordFieldTopFactor = 0.52;
   static const double _confirmFieldTopFactor = 0.61;
   static const double _fieldHeight = 60;
-  static const double _keyboardGap = 24;
 
-  final RegisterViewModel _viewModel = RegisterViewModel();
+  late final RegisterViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   final FocusNode _nameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
   final FocusNode _confirmFocus = FocusNode();
+  final AuthFieldScrollCoordinator _scrollCoordinator =
+      AuthFieldScrollCoordinator();
+  final GlobalKey _nameFieldKey = GlobalKey();
+  final GlobalKey _emailFieldKey = GlobalKey();
+  final GlobalKey _passwordFieldKey = GlobalKey();
+  final GlobalKey _confirmFieldKey = GlobalKey();
 
   late final AnimationController _errorPulseCtrl;
   late final Animation<double> _errorPulseScale;
@@ -45,11 +53,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   @override
   void initState() {
     super.initState();
-    _viewModel.addListener(_onViewModelChange);
-    for (final node in _focusNodes) {
-      node.addListener(_onFocusChange);
-    }
-    unawaited(_viewModel.initMusic());
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel = widget.viewModel ?? RegisterViewModel();
     _errorPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -57,6 +62,8 @@ class _RegisterScreenState extends State<RegisterScreen>
     _errorPulseScale = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _errorPulseCtrl, curve: Curves.easeOutBack),
     );
+    _viewModel.addListener(_onViewModelChange);
+    unawaited(_viewModel.initMusic());
   }
 
   void _onViewModelChange() {
@@ -77,30 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     _confirmFocus,
   ];
 
-  void _onFocusChange() {
-    if (mounted) setState(() {});
-  }
-
-  /// How far the content must slide up so the focused field stays above the
-  /// on-screen keyboard.
-  double _keyboardShift(double screenH, double bottomInset) {
-    if (bottomInset <= 0) return 0;
-    double? topFactor;
-    if (_confirmFocus.hasFocus) {
-      topFactor = _confirmFieldTopFactor;
-    } else if (_passwordFocus.hasFocus) {
-      topFactor = _passwordFieldTopFactor;
-    } else if (_emailFocus.hasFocus) {
-      topFactor = _emailFieldTopFactor;
-    } else if (_nameFocus.hasFocus) {
-      topFactor = _nameFieldTopFactor;
-    }
-    if (topFactor == null) return 0;
-    final double fieldBottom =
-        screenH * topFactor + _fieldHeight + _keyboardGap;
-    return math.max(0.0, fieldBottom - (screenH - bottomInset));
-  }
-
   @override
   void dispose() {
     _errorClearTimer?.cancel();
@@ -108,8 +91,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     for (final node in _focusNodes) {
       node.dispose();
     }
+    _scrollCoordinator.dispose();
     _viewModel.removeListener(_onViewModelChange);
-    _viewModel.dispose();
+    if (_ownsViewModel) _viewModel.dispose();
     unawaited(const AssetImage(_backgroundAsset).evict());
     super.dispose();
   }
@@ -132,42 +116,56 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   Widget build(BuildContext context) {
-    final double bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // Read this above Scaffold. Scaffold removes the bottom view inset from
+    // the MediaQuery exposed to its resized body.
+    final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, child) {
           return LayoutBuilder(
             builder: (context, constraints) {
-              final double screenH = constraints.maxHeight;
+              final double screenH = constraints.maxHeight + keyboardInset;
               final double screenW = constraints.maxWidth;
-              final double shift = _keyboardShift(screenH, bottomInset);
 
               return GestureDetector(
                 behavior: HitTestBehavior.deferToChild,
                 onTap: () => FocusScope.of(context).unfocus(),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Image.asset(
-                        _backgroundAsset,
-                        fit: BoxFit.fill,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    ),
-
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      left: 0,
-                      right: 0,
-                      top: -shift,
+                child: RawScrollbar(
+                  key: const ValueKey('register-screen-scrollbar'),
+                  controller: _scrollCoordinator.controller,
+                  thumbVisibility: keyboardInset > 0,
+                  trackVisibility: false,
+                  interactive: true,
+                  scrollbarOrientation: ScrollbarOrientation.right,
+                  thickness: 4,
+                  radius: const Radius.circular(2),
+                  thumbColor: const Color(0xCC9E9E9E),
+                  mainAxisMargin: 40,
+                  crossAxisMargin: 6,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('register-screen-scroll'),
+                    controller: _scrollCoordinator.controller,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.manual,
+                    physics: const ManualKeyboardScrollPhysics(),
+                    child: SizedBox(
+                      key: const ValueKey('register-screen-canvas'),
+                      width: screenW,
                       height: screenH,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              _backgroundAsset,
+                              fit: BoxFit.fill,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+
                           Positioned(
                             top: screenH * 0.07,
                             right: screenW * 0.07,
@@ -184,6 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             left: screenW * 0.13,
                             right: screenW * 0.13,
                             child: _buildCustomTextField(
+                              fieldKey: _nameFieldKey,
                               context: context,
                               controller: _viewModel.nameController,
                               focusNode: _nameFocus,
@@ -195,7 +194,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                               contentPadding: const EdgeInsets.only(top: 4),
                               backgroundScaleY: 1.58,
                               textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => _emailFocus.requestFocus(),
+                              onTap: () =>
+                                  _scrollCoordinator.centerField(_nameFieldKey),
+                              onSubmitted: (_) {
+                                _emailFocus.requestFocus();
+                                _scrollCoordinator.centerField(_emailFieldKey);
+                              },
                             ),
                           ),
 
@@ -204,6 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             left: screenW * 0.13,
                             right: screenW * 0.13,
                             child: _buildCustomTextField(
+                              fieldKey: _emailFieldKey,
                               context: context,
                               controller: _viewModel.emailController,
                               focusNode: _emailFocus,
@@ -212,7 +217,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                               backgroundImage: AuthImageAssets.emailField,
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => _passwordFocus.requestFocus(),
+                              onTap: () => _scrollCoordinator.centerField(
+                                _emailFieldKey,
+                              ),
+                              onSubmitted: (_) {
+                                _passwordFocus.requestFocus();
+                                _scrollCoordinator.centerField(
+                                  _passwordFieldKey,
+                                );
+                              },
                             ),
                           ),
 
@@ -221,6 +234,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             left: screenW * 0.13,
                             right: screenW * 0.13,
                             child: _buildCustomTextField(
+                              fieldKey: _passwordFieldKey,
                               context: context,
                               controller: _viewModel.passwordController,
                               focusNode: _passwordFocus,
@@ -229,7 +243,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                               obscureText: true,
                               backgroundImage: AuthImageAssets.passwordField,
                               textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => _confirmFocus.requestFocus(),
+                              onTap: () => _scrollCoordinator.centerField(
+                                _passwordFieldKey,
+                              ),
+                              onSubmitted: (_) {
+                                _confirmFocus.requestFocus();
+                                _scrollCoordinator.centerField(
+                                  _confirmFieldKey,
+                                );
+                              },
                             ),
                           ),
 
@@ -238,6 +260,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             left: screenW * 0.13,
                             right: screenW * 0.13,
                             child: _buildCustomTextField(
+                              fieldKey: _confirmFieldKey,
                               context: context,
                               controller: _viewModel.passwordConfirmController,
                               focusNode: _confirmFocus,
@@ -246,6 +269,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                               obscureText: true,
                               backgroundImage: AuthImageAssets.passwordField,
                               textInputAction: TextInputAction.done,
+                              onTap: () => _scrollCoordinator.centerField(
+                                _confirmFieldKey,
+                              ),
                               onSubmitted: (_) {
                                 FocusScope.of(context).unfocus();
                                 _viewModel.register();
@@ -259,7 +285,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                             right: screenW * 0.15,
                             child: Center(
                               child: AnimatedImageButton(
-                                imagePath: 'lib/images/register_screen/image.png',
+                                imagePath:
+                                    'lib/images/register_screen/image.png',
                                 width: 540,
                                 height: 90,
                                 onTap: () => Navigator.pop(context),
@@ -322,7 +349,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -370,6 +397,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   Widget _buildCustomTextField({
+    required GlobalKey fieldKey,
     required BuildContext context,
     required TextEditingController controller,
     required IconData icon,
@@ -382,6 +410,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     double backgroundScaleY = 1,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
+    VoidCallback? onTap,
     ValueChanged<String>? onSubmitted,
   }) {
     final fieldContent = Padding(
@@ -396,6 +425,7 @@ class _RegisterScreenState extends State<RegisterScreen>
               obscureText: obscureText,
               keyboardType: keyboardType,
               textInputAction: textInputAction,
+              onTap: onTap,
               onSubmitted: onSubmitted,
               style: AppFonts.nunito(
                 color: Colors.white.withValues(alpha: 0.95),
@@ -429,6 +459,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     if (backgroundScaleY == 1) {
       return Container(
+        key: fieldKey,
         height: _fieldHeight,
         decoration: BoxDecoration(
           image: DecorationImage(
@@ -441,6 +472,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
 
     return SizedBox(
+      key: fieldKey,
       height: _fieldHeight,
       child: ClipRect(
         child: Stack(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// App typography backed by **bundled** font assets.
 class AppFonts {
@@ -8,6 +9,44 @@ class AppFonts {
   static const String barlowCondensedFamily = 'BarlowCondensed';
   static const String nunitoFamily = 'Nunito';
   static const String outfitFamily = 'Outfit';
+
+  static const Map<String, List<String>> _bundledAssets = {
+    antonFamily: ['assets/fonts/Anton-Regular.ttf'],
+    barlowCondensedFamily: [
+      'assets/fonts/BarlowCondensed-Medium.ttf',
+      'assets/fonts/BarlowCondensed-SemiBold.ttf',
+      'assets/fonts/BarlowCondensed-Bold.ttf',
+      'assets/fonts/BarlowCondensed-ExtraBold.ttf',
+      'assets/fonts/BarlowCondensed-Black.ttf',
+    ],
+    nunitoFamily: [
+      'assets/fonts/Nunito-SemiBold.ttf',
+      'assets/fonts/Nunito-ExtraBold.ttf',
+    ],
+    outfitFamily: ['assets/fonts/Outfit-Black.ttf'],
+  };
+
+  static Future<void>? _preloadFuture;
+
+  /// Registers every bundled font before the first application frame.
+  ///
+  /// Asset fonts are otherwise prepared lazily. On a cold start that can let
+  /// Flutter paint one frame with the platform fallback before relayout occurs.
+  static Future<void> preload() {
+    return _preloadFuture ??= _preloadBundledFonts();
+  }
+
+  static Future<void> _preloadBundledFonts() async {
+    await Future.wait(
+      _bundledAssets.entries.map((entry) async {
+        final loader = FontLoader(entry.key);
+        for (final asset in entry.value) {
+          loader.addFont(rootBundle.load(asset));
+        }
+        await loader.load();
+      }),
+    );
+  }
 
   static TextStyle anton({
     TextStyle? textStyle,

@@ -9,11 +9,15 @@ import 'app/app.dart';
 import 'core/audio/ambient_music_preference.dart';
 import 'core/audio/app_audio_context.dart';
 import 'core/firebase/app_check_initializer.dart';
+import 'core/typography/app_fonts.dart';
 import 'features/slot/presentation/views/game/widgets/playfield/multiplier_bomb_animation.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Keep the native launch screen visible until custom fonts are registered,
+  // so the first Flutter frame never falls back to the platform typeface.
+  await AppFonts.preload();
   await AmbientMusicPreference.initialize();
   await AppAudioContext.configure();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

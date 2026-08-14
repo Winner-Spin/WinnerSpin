@@ -34,6 +34,7 @@ void main() {
     final persistence = AmbientMusicPreference.setEnabled(false);
 
     expect(AmbientMusicPreference.enabled, isFalse);
+    await Future<void>.delayed(Duration.zero);
     expect(store.writeCalls, 1);
     store.writeGate!.complete();
     await persistence;
@@ -60,6 +61,7 @@ void main() {
     final enable = AmbientMusicPreference.setEnabled(true);
 
     expect(AmbientMusicPreference.enabled, isTrue);
+    await Future<void>.delayed(Duration.zero);
     expect(store.writeCalls, 1);
     store.writeGate!.complete();
     await Future.wait([disable, enable]);
