@@ -25,6 +25,7 @@ import 'controllers/game_history_controller.dart';
 import 'controllers/grid_controller.dart';
 import 'controllers/insufficient_funds_hint_controller.dart';
 import 'controllers/player_session_controller.dart';
+import 'controllers/remote_spin_sync_cadence_controller.dart';
 import 'controllers/slot_auto_spin_flow_controller.dart';
 import 'controllers/slot_player_controls_controller.dart';
 import 'controllers/slot_persistence_controller.dart';
@@ -98,12 +99,14 @@ class GameViewModel extends ChangeNotifier {
   final SlotSpinStartController _spinStartCtrl = SlotSpinStartController();
   final SlotSpinCompletionController _spinCompletionCtrl =
       SlotSpinCompletionController();
+  final RemoteSpinSyncCadenceController _remoteSpinSyncCadenceCtrl =
+      RemoteSpinSyncCadenceController();
   late final GridController _gridCtrl;
   final Map<String, ({String userId, PendingSpinRecovery recovery})>
   _preparedSpinRecoveries = {};
   Future<void> _recoveryPersistenceTail = Future<void>.value();
   final Set<String> _acknowledgedRecoveryAwards = {};
-  final Set<String> _failedRecoveryFinalizations = {};
+  final Set<String> _syncedRecoveryIds = {};
   ({String userId, String spinId})? _pendingAwardRecovery;
   PendingFreeSpinAward? _recoveredPendingFreeSpinAward;
   double? _expectedRemoteUserBalance;
@@ -459,31 +462,46 @@ class GameViewModel extends ChangeNotifier {
     if (prepared == null) return;
 
     _recoveryPersistenceTail = _recoveryPersistenceTail.then((_) async {
+      final recovery = prepared.recovery;
+      final isFreeSpin = recovery.isFreeSpin;
+      _remoteSpinSyncCadenceCtrl.recordCompleted(isFreeSpin: isFreeSpin);
       try {
-        await Future.wait([
-          _persistenceCtrl.persistSpinRecoveryPlayer(
+        await _historyCtrl.recordOnce(
+          userId: prepared.userId,
+          id: recovery.spinId,
+          playedAt: recovery.playedAt,
+          newBalance: recovery.userBalance,
+          bet: recovery.historyBet,
+          winAmount: recovery.winAmount,
+        );
+
+        final syncDue = _remoteSpinSyncCadenceCtrl.isSyncDue(
+          isFreeSpin: isFreeSpin,
+        );
+        if (syncDue) {
+          await _persistenceCtrl.persistRecoveredSpin(
             userId: prepared.userId,
-            recovery: prepared.recovery,
-          ),
-          _historyCtrl.recordOnce(
-            userId: prepared.userId,
-            id: prepared.recovery.spinId,
-            playedAt: prepared.recovery.playedAt,
-            newBalance: prepared.recovery.userBalance,
-            bet: prepared.recovery.historyBet,
-            winAmount: prepared.recovery.winAmount,
-          ),
-        ]);
-        _failedRecoveryFinalizations.remove(spinId);
+            recovery: recovery,
+          );
+          _remoteSpinSyncCadenceCtrl.markSynced(isFreeSpin: isFreeSpin);
+          _syncedRecoveryIds.add(spinId);
+        }
+
         final awardAcknowledged = _acknowledgedRecoveryAwards.remove(spinId);
-        if (prepared.recovery.pendingFreeSpinAward == 0 || awardAcknowledged) {
+        if (syncDue &&
+            (recovery.pendingFreeSpinAward == 0 || awardAcknowledged)) {
           await _persistenceCtrl.clearSpinRecovery(
+            spinId,
+            userId: prepared.userId,
+          );
+          _syncedRecoveryIds.remove(spinId);
+        } else if (awardAcknowledged) {
+          await _persistenceCtrl.acknowledgeSpinRecoveryAward(
             spinId,
             userId: prepared.userId,
           );
         }
       } catch (error) {
-        _failedRecoveryFinalizations.add(spinId);
         debugPrint('Spin recovery finalization error: $error');
       }
     });
@@ -498,17 +516,25 @@ class GameViewModel extends ChangeNotifier {
       _acknowledgedRecoveryAwards.add(pending.spinId);
       return;
     }
-    _enqueueRecoveryClear(pending);
+    _enqueueRecoveryAcknowledgement(pending);
   }
 
-  void _enqueueRecoveryClear(({String userId, String spinId}) pending) {
+  void _enqueueRecoveryAcknowledgement(
+    ({String userId, String spinId}) pending,
+  ) {
     _recoveryPersistenceTail = _recoveryPersistenceTail.then((_) async {
-      if (_failedRecoveryFinalizations.contains(pending.spinId)) return;
       try {
-        await _persistenceCtrl.clearSpinRecovery(
-          pending.spinId,
-          userId: pending.userId,
-        );
+        if (_syncedRecoveryIds.remove(pending.spinId)) {
+          await _persistenceCtrl.clearSpinRecovery(
+            pending.spinId,
+            userId: pending.userId,
+          );
+        } else {
+          await _persistenceCtrl.acknowledgeSpinRecoveryAward(
+            pending.spinId,
+            userId: pending.userId,
+          );
+        }
       } catch (error) {
         debugPrint('Spin recovery acknowledgement error: $error');
       }
@@ -526,6 +552,7 @@ class GameViewModel extends ChangeNotifier {
     _expectedRemoteUserBalance = recovery.userBalance;
     await _persistRecoveredSpin(userId: userId, recovery: recovery);
     if (recovery.pendingFreeSpinAward > 0) {
+      _syncedRecoveryIds.add(recovery.spinId);
       _pendingAwardRecovery = (userId: userId, spinId: recovery.spinId);
       _recoveredPendingFreeSpinAward = PendingFreeSpinAward(
         value: recovery.pendingFreeSpinAward,
@@ -628,16 +655,12 @@ class GameViewModel extends ChangeNotifier {
     if (!_fsCtrl.releaseRoundHold()) return;
     if (!_fsCtrl.isActive) {
       _fsCtrl.finishRound();
-      _sessionLifecycleCtrl.savePlayerStateSilently(
-        persistenceController: _persistenceCtrl,
-        balanceController: _balanceCtrl,
-        freeSpinsController: _fsCtrl,
-      );
     }
     notifyListeners();
   }
 
   Future<void> signOut() async {
+    final finalizedRecovery = await _finalizedRecoveryForForcedSync();
     await _sessionLifecycleCtrl.signOut(
       sessionController: _sessionCtrl,
       poolController: _poolCtrl,
@@ -646,6 +669,7 @@ class GameViewModel extends ChangeNotifier {
       freeSpinsController: _fsCtrl,
       historyController: _historyCtrl,
     );
+    await _completeForcedSync(finalizedRecovery);
     notifyListeners();
   }
 
@@ -691,6 +715,7 @@ class GameViewModel extends ChangeNotifier {
   }
 
   Future<void> onAppLifecycleEvent() async {
+    final finalizedRecovery = await _finalizedRecoveryForForcedSync();
     await _sessionLifecycleCtrl.onAppLifecycleEvent(
       poolController: _poolCtrl,
       persistenceController: _persistenceCtrl,
@@ -698,6 +723,38 @@ class GameViewModel extends ChangeNotifier {
       freeSpinsController: _fsCtrl,
       historyController: _historyCtrl,
     );
+    await _completeForcedSync(finalizedRecovery);
+  }
+
+  Future<({String userId, PendingSpinRecovery recovery})?>
+  _finalizedRecoveryForForcedSync() async {
+    await _recoveryPersistenceTail;
+    final userId = _persistenceCtrl.currentUserId;
+    if (userId == null) return null;
+    final recovery = await _persistenceCtrl.loadSpinRecovery();
+    if (recovery == null ||
+        _preparedSpinRecoveries.containsKey(recovery.spinId)) {
+      return null;
+    }
+    return (userId: userId, recovery: recovery);
+  }
+
+  Future<void> _completeForcedSync(
+    ({String userId, PendingSpinRecovery recovery})? finalizedRecovery,
+  ) async {
+    _remoteSpinSyncCadenceCtrl.reset();
+    if (finalizedRecovery == null) return;
+
+    final recovery = finalizedRecovery.recovery;
+    if (recovery.pendingFreeSpinAward > 0) {
+      _syncedRecoveryIds.add(recovery.spinId);
+      return;
+    }
+    await _persistenceCtrl.clearSpinRecovery(
+      recovery.spinId,
+      userId: finalizedRecovery.userId,
+    );
+    _syncedRecoveryIds.remove(recovery.spinId);
   }
 
   Future<bool> validateSessionOnResume() async {

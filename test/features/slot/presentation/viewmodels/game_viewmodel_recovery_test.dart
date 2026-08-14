@@ -39,7 +39,8 @@ void main() {
       await viewModel.onSpinComplete();
       expect(viewModel.userBalance, 950);
       await _flushAsyncWork();
-      expect(recoveryRepository.recovery, isNull);
+      expect(recoveryRepository.recovery, isNotNull);
+      expect(authRepository.playerStateSaveCount, 0);
 
       viewModel.dispose();
       await authRepository.close();
@@ -78,6 +79,30 @@ void main() {
     },
   );
 
+  test('acknowledging a live award keeps its unsynced journal', () async {
+    final authRepository = _MemoryAuthRepository(initialBalance: 5000);
+    final recoveryRepository = _MemorySpinRecoveryRepository();
+    final viewModel = _viewModel(
+      authRepository: authRepository,
+      recoveryRepository: recoveryRepository,
+      result: _result(totalWin: 50, freeSpinsTriggered: true),
+    );
+    await viewModel.fetchUserData();
+    viewModel.setVibration(false);
+
+    await viewModel.spin();
+    await viewModel.onSpinComplete();
+    viewModel.acknowledgePendingFreeSpinAward();
+    await _flushAsyncWork();
+
+    expect(authRepository.playerStateSaveCount, 0);
+    expect(recoveryRepository.recovery, isNotNull);
+    expect(recoveryRepository.recovery?.pendingFreeSpinAward, 0);
+
+    viewModel.dispose();
+    await authRepository.close();
+  });
+
   test('pool failure keeps the cold recovery journal intact', () async {
     final authRepository = _MemoryAuthRepository(initialBalance: 900);
     final recoveryRepository = _MemorySpinRecoveryRepository(
@@ -100,8 +125,8 @@ void main() {
     await authRepository.close();
   });
 
-  test('slow recovery persistence does not block spin completion', () async {
-    final authRepository = _MemoryAuthRepository();
+  test('slow tenth-spin checkpoint does not block spin completion', () async {
+    final authRepository = _MemoryAuthRepository(initialBalance: 5000);
     final recoveryRepository = _MemorySpinRecoveryRepository();
     final viewModel = _viewModel(
       authRepository: authRepository,
@@ -110,6 +135,14 @@ void main() {
     );
     await viewModel.fetchUserData();
     viewModel.setVibration(false);
+
+    for (var spin = 0; spin < 9; spin++) {
+      await viewModel.spin();
+      await viewModel.onSpinComplete();
+    }
+    await _flushAsyncWork();
+    expect(authRepository.playerStateSaveCount, 0);
+
     await viewModel.spin();
     authRepository.blockSaves();
 
@@ -120,11 +153,114 @@ void main() {
     await completion;
 
     expect(completionReturned, isTrue);
-    expect(viewModel.userBalance, 950);
+    expect(viewModel.userBalance, 4500);
     expect(recoveryRepository.recovery, isNotNull);
 
     authRepository.releaseSaves();
     await _flushAsyncWork();
+    expect(recoveryRepository.recovery, isNull);
+
+    viewModel.dispose();
+    await authRepository.close();
+  });
+
+  test('normal spins checkpoint player and pool only on spin ten', () async {
+    final authRepository = _MemoryAuthRepository(initialBalance: 5000);
+    final poolRepository = _MemoryPoolRepository();
+    final recoveryRepository = _MemorySpinRecoveryRepository();
+    final viewModel = _viewModel(
+      authRepository: authRepository,
+      recoveryRepository: recoveryRepository,
+      poolRepository: poolRepository,
+      result: _result(totalWin: 0),
+    );
+    await viewModel.fetchUserData();
+    viewModel.setVibration(false);
+
+    for (var spin = 0; spin < 9; spin++) {
+      await viewModel.spin();
+      await viewModel.onSpinComplete();
+    }
+    await _flushAsyncWork();
+
+    expect(authRepository.playerStateSaveCount, 0);
+    expect(poolRepository.saveCount, 0);
+    expect(recoveryRepository.recovery, isNotNull);
+
+    await viewModel.spin();
+    await viewModel.onSpinComplete();
+    await _flushAsyncWork();
+
+    expect(authRepository.playerStateSaveCount, 1);
+    expect(poolRepository.saveCount, 1);
+    expect(recoveryRepository.recovery, isNull);
+
+    viewModel.dispose();
+    await authRepository.close();
+  });
+
+  test('Free Spins use their own ten-spin remote checkpoint', () async {
+    final authRepository = _MemoryAuthRepository(
+      initialBalance: 5000,
+      freeSpinsRemaining: 10,
+    );
+    final poolRepository = _MemoryPoolRepository();
+    final recoveryRepository = _MemorySpinRecoveryRepository();
+    final viewModel = _viewModel(
+      authRepository: authRepository,
+      recoveryRepository: recoveryRepository,
+      poolRepository: poolRepository,
+      result: _result(totalWin: 0),
+    );
+    await viewModel.fetchUserData();
+    viewModel.setVibration(false);
+
+    for (var spin = 0; spin < 9; spin++) {
+      await viewModel.spin();
+      await viewModel.onSpinComplete();
+      viewModel.releaseFsRoundHold();
+    }
+    await _flushAsyncWork();
+
+    expect(authRepository.playerStateSaveCount, 0);
+    expect(poolRepository.saveCount, 0);
+    expect(recoveryRepository.recovery, isNotNull);
+
+    await viewModel.spin();
+    await viewModel.onSpinComplete();
+    viewModel.releaseFsRoundHold();
+    await _flushAsyncWork();
+
+    expect(authRepository.playerStateSaveCount, 1);
+    expect(poolRepository.saveCount, 1);
+    expect(recoveryRepository.recovery, isNull);
+
+    viewModel.dispose();
+    await authRepository.close();
+  });
+
+  test('backgrounding force-saves and clears a finalized journal', () async {
+    final authRepository = _MemoryAuthRepository(initialBalance: 5000);
+    final poolRepository = _MemoryPoolRepository();
+    final recoveryRepository = _MemorySpinRecoveryRepository();
+    final viewModel = _viewModel(
+      authRepository: authRepository,
+      recoveryRepository: recoveryRepository,
+      poolRepository: poolRepository,
+      result: _result(totalWin: 0),
+    );
+    await viewModel.fetchUserData();
+    viewModel.setVibration(false);
+
+    await viewModel.spin();
+    await viewModel.onSpinComplete();
+    await _flushAsyncWork();
+    expect(recoveryRepository.recovery, isNotNull);
+
+    await viewModel.onAppLifecycleEvent();
+
+    expect(authRepository.playerStateSaveCount, 1);
+    expect(poolRepository.saveCount, 1);
     expect(recoveryRepository.recovery, isNull);
 
     viewModel.dispose();
@@ -213,21 +349,24 @@ Future<void> _flushAsyncWork() async {
 }
 
 class _MemoryAuthRepository implements AuthRepository {
-  _MemoryAuthRepository({double initialBalance = 1000})
-    : _data = {
-        'username': 'Player',
-        'email': 'player@example.com',
-        'userBalance': initialBalance,
-        'lastWin': 0.0,
-        'freeSpinsRemaining': 0,
-        'freeSpinAccumulatedWin': 0.0,
-        'freeSpinsAwardedThisRound': 0,
-      };
+  _MemoryAuthRepository({
+    double initialBalance = 1000,
+    int freeSpinsRemaining = 0,
+  }) : _data = {
+         'username': 'Player',
+         'email': 'player@example.com',
+         'userBalance': initialBalance,
+         'lastWin': 0.0,
+         'freeSpinsRemaining': freeSpinsRemaining,
+         'freeSpinAccumulatedWin': 0.0,
+         'freeSpinsAwardedThisRound': freeSpinsRemaining,
+       };
 
   final Map<String, dynamic> _data;
   final StreamController<Map<String, dynamic>?> _userData =
       StreamController<Map<String, dynamic>?>.broadcast();
   Completer<void>? _saveGate;
+  int playerStateSaveCount = 0;
 
   @override
   String? get currentUserId => 'user-1';
@@ -269,6 +408,7 @@ class _MemoryAuthRepository implements AuthRepository {
     double? freeSpinAccumulatedWin,
     int? freeSpinsAwardedThisRound,
   }) async {
+    playerStateSaveCount++;
     final gate = _saveGate;
     if (gate != null) await gate.future;
     if (userBalance != null) _data['userBalance'] = userBalance;
@@ -333,12 +473,14 @@ class _MemoryPoolRepository implements PoolRepository {
 
   final bool failSave;
   PoolState state = PoolState();
+  int saveCount = 0;
 
   @override
   Future<PoolState> load(String uid) async => PoolState.fromMap(state.toMap());
 
   @override
   Future<void> save(String uid, PoolState state) async {
+    saveCount++;
     if (failSave) throw StateError('pool unavailable');
     this.state = PoolState.fromMap(state.toMap());
   }

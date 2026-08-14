@@ -100,6 +100,20 @@ class SlotPersistenceController {
     return _recoveryRepository.clear(recoveryUserId, spinId);
   }
 
+  Future<void> acknowledgeSpinRecoveryAward(
+    String spinId, {
+    String? userId,
+  }) async {
+    final recoveryUserId = userId ?? currentUserId;
+    if (recoveryUserId == null) return;
+    final recovery = await _recoveryRepository.load(recoveryUserId);
+    if (recovery == null || recovery.spinId != spinId) return;
+    await _recoveryRepository.save(
+      recoveryUserId,
+      recovery.acknowledgeFreeSpinAward(),
+    );
+  }
+
   Future<void> persistSpinRecoveryPlayer({
     required String userId,
     required PendingSpinRecovery recovery,

@@ -35,6 +35,27 @@ class PendingSpinRecovery {
   final double poolTotalPaidOut;
   final int poolTotalSpins;
 
+  PendingSpinRecovery acknowledgeFreeSpinAward() {
+    if (pendingFreeSpinAward == 0) return this;
+    return PendingSpinRecovery(
+      spinId: spinId,
+      playedAt: playedAt,
+      isFreeSpin: isFreeSpin,
+      historyBet: historyBet,
+      winAmount: winAmount,
+      userBalance: userBalance,
+      freeSpinsRemaining: freeSpinsRemaining,
+      freeSpinAccumulatedWin: freeSpinAccumulatedWin,
+      freeSpinsAwardedThisRound: freeSpinsAwardedThisRound,
+      pendingFreeSpinAward: 0,
+      roundFromAnte: roundFromAnte,
+      roundFromBuy: roundFromBuy,
+      poolTotalBetsPlaced: poolTotalBetsPlaced,
+      poolTotalPaidOut: poolTotalPaidOut,
+      poolTotalSpins: poolTotalSpins,
+    );
+  }
+
   factory PendingSpinRecovery.fromJson(Map<String, dynamic> json) {
     final version = (json['schemaVersion'] as num?)?.toInt();
     if (version != 1 && version != schemaVersion) {

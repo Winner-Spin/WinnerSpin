@@ -89,9 +89,13 @@ class SlotSpinCompletionController {
     );
 
     poolController.recordPayout(result.totalWin);
-    savePoolIfNeeded();
     if (recoveryId != null) {
       finalizeRecovery(recoveryId);
+    } else {
+      // Bought-feature triggers do not use the spin recovery journal, so keep
+      // their existing persistence boundary. Journal-backed spins are synced
+      // by GameViewModel's shared normal/Free Spin cadence instead.
+      savePoolIfNeeded();
     }
 
     roundController.clearPendingResult();
