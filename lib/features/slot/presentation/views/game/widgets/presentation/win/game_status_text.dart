@@ -76,7 +76,7 @@ class GameStatusText extends StatelessWidget {
     if (isTumbling && liveTumbleWin > 0) {
       return _winCounterRow(
         to: liveTumbleWin,
-        duration: GamePresentationTimings.statusTumbleWinCount,
+        duration: GamePresentationTimings.tumbleLineLiveCount,
       );
     }
 

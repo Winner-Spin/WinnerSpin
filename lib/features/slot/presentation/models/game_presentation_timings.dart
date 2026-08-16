@@ -28,6 +28,7 @@ class GamePresentationTimings {
   static const freeSpinAutoPlayDelay = Duration(milliseconds: 600);
   static const freeSpinPostWinPulse = Duration(milliseconds: 500);
   static const freeSpinPostWinHold = Duration(milliseconds: 700);
+  static const normalFarmPostWinHold = Duration(milliseconds: 100);
   static const lingeringClusterHold = Duration(seconds: 1);
   static const flyingTumbleDuration = Duration(milliseconds: 700);
   static const flyingTumbleReleaseDelay = Duration(milliseconds: 700);
@@ -36,6 +37,5 @@ class GamePresentationTimings {
   static const freeSpinPopupShowDuration = Duration(milliseconds: 520);
   static const freeSpinPopupDismissDuration = Duration(milliseconds: 220);
   static const statusFreeSpinWinCount = Duration(milliseconds: 700);
-  static const statusTumbleWinCount = Duration(milliseconds: 900);
   static const tumbleLineLiveCount = Duration(milliseconds: 350);
 }

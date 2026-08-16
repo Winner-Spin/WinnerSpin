@@ -61,7 +61,6 @@ class WinSequenceBar extends StatelessWidget {
             );
 
           case WinPresentationPhase.finalCounting:
-          case WinPresentationPhase.done:
             return _kazancRow(
               accentStyle: accentStyle,
               valueWidget: WinAmountCounter(
@@ -70,6 +69,19 @@ class WinSequenceBar extends StatelessWidget {
                 style: baseStyle,
                 duration: WinPresentationController.finalCountUpDuration,
                 vibrationEnabled: vibrationEnabled,
+              ),
+            );
+
+          case WinPresentationPhase.done:
+            return _kazancRow(
+              accentStyle: accentStyle,
+              valueWidget: MoneyText(
+                text: formatMoney(controller.totalWin),
+                style: baseStyle,
+                symbolOffset: const Offset(0, 1.5),
+                lineYOffset: 0.75,
+                lineLengthScale: 0.94,
+                lineTopExtend: 0.9,
               ),
             );
         }
@@ -130,18 +142,6 @@ class WinSequenceBar extends StatelessWidget {
                       ),
                     ),
             ),
-            if (sum > 0) ...[
-              const SizedBox(width: 8),
-              Text('=', style: baseStyle),
-              const SizedBox(width: 6),
-              WinAmountCounter(
-                from: base,
-                to: base * sum,
-                style: accentStyle,
-                duration: const Duration(milliseconds: 350),
-                vibrationEnabled: vibrationEnabled,
-              ),
-            ],
           ],
         ],
       ),

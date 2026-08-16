@@ -1,6 +1,22 @@
 # Winner Spin Privacy Policy
 
-Last updated: August 9, 2026
+Last updated: August 14, 2026
+
+## Delete Your Winner Spin Account
+
+You can permanently delete your Winner Spin account inside the application by
+opening **My Profile** and selecting **Delete Account**.
+
+If you cannot access the application, send an account-deletion request to
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com?subject=Winner%20Spin%20Account%20Deletion%20Request)
+with the subject **Winner Spin Account Deletion Request**.
+
+Deleting your account removes your Firebase Authentication account, Winner Spin
+profile, synchronized gameplay state, cloud game history, virtual balance, and
+account-linked rewards.
+
+Complete information about deleted data, limited retained records, and
+retention periods is provided in **Section 6: Account and Data Deletion** below.
 
 ## 1. Scope and Who We Are
 
@@ -64,10 +80,11 @@ including:
 
 ### Technical and security information
 
-Google Firebase and Google Play Integrity may automatically process limited
-technical information needed to authenticate users, protect the service, and
-prevent abuse. This may include your IP address, user-agent information,
-request timestamps, and device or app-integrity signals.
+Google Firebase, Firebase App Check, and Google Play Integrity may automatically
+process limited technical information needed to authenticate users, protect the
+service, and prevent abuse. This may include your IP address, user-agent
+information, request timestamps, device or app-integrity signals, App Check
+tokens, and attestation results.
 
 Winner Spin also performs basic connectivity checks. These checks do not
 include your Winner Spin account content, although the network service may

@@ -82,6 +82,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       FreeSpinAwardPresentationState();
 
   bool _isTumbleWinPulsing = false;
+  bool _farmPostWinHoldScheduledThisSpin = false;
+  int _tumbleWinPulseRevision = 0;
 
   bool get _isFreeSpinVisualMode =>
       _freeSpinAwardPresentation.isVisualMode(_viewModel.isInFreeSpins);
@@ -300,6 +302,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _trackSpinTransitions() {
     final isBusy = _viewModel.isBusy;
     if (isBusy && !_wasBusy) {
+      _resetTumbleWinPulseForNewSpin();
       _commitPendingFsWin();
       _winCtrl.reset();
       _bigWinPresentationController.resetForNewSpin();
@@ -470,25 +473,68 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return;
     }
 
-    setState(() {
-      _freeSpinPresentation.commitPendingSpinWin();
-      _isTumbleWinPulsing = true;
-    });
-    Future.delayed(GamePresentationTimings.freeSpinPostWinPulse, () {
-      if (!mounted || !_isTumbleWinPulsing) return;
-      setState(() => _isTumbleWinPulsing = false);
-    });
+    setState(_freeSpinPresentation.commitPendingSpinWin);
+    _startTumbleWinPulse();
     _releaseCelebrationLock(continueFreeSpinAfterWinHold: true);
   }
 
+  void _resetTumbleWinPulseForNewSpin() {
+    _farmPostWinHoldScheduledThisSpin = false;
+    _tumbleWinPulseRevision++;
+    if (_isTumbleWinPulsing) {
+      setState(() => _isTumbleWinPulsing = false);
+    }
+  }
+
+  bool _scheduleCompletedFarmWinHold() {
+    final shouldHold = GamePresentationGuards.shouldHoldCompletedFarmWin(
+      isInFreeSpins: _viewModel.isInFreeSpins,
+      lastSpinWasFreeSpin: _viewModel.lastSpinWasFreeSpin,
+      isBusy: _viewModel.isBusy,
+      hasResult: _viewModel.lastSpinResult != null,
+      lastWin: _viewModel.lastWin,
+      holdScheduledThisSpin: _farmPostWinHoldScheduledThisSpin,
+    );
+    if (!shouldHold) return false;
+
+    _farmPostWinHoldScheduledThisSpin = true;
+    return true;
+  }
+
+  void _startTumbleWinPulse() {
+    if (!mounted) return;
+    final revision = ++_tumbleWinPulseRevision;
+    setState(() => _isTumbleWinPulsing = true);
+    Future.delayed(GamePresentationTimings.freeSpinPostWinPulse, () {
+      if (!mounted ||
+          revision != _tumbleWinPulseRevision ||
+          !_isTumbleWinPulsing) {
+        return;
+      }
+      setState(() => _isTumbleWinPulsing = false);
+    });
+  }
+
   void _releaseCelebrationLock({bool continueFreeSpinAfterWinHold = false}) {
+    if (_bigWinPresentationController.hasActiveOverlay) {
+      return;
+    }
+    if (_scheduleCompletedFarmWinHold()) {
+      _celebrationLockWatchdog?.cancel();
+      _celebrationLockWatchdog = Timer(
+        GamePresentationTimings.normalFarmPostWinHold,
+        () {
+          if (!mounted) return;
+          _releaseCelebrationLock();
+        },
+      );
+      return;
+    }
+
     _celebrationLockWatchdog?.cancel();
     _celebrationLockWatchdog = null;
     if (_celebrationLocked) {
       setState(() => _celebrationLocked = false);
-    }
-    if (_bigWinPresentationController.hasActiveOverlay) {
-      return;
     }
     _viewModel.commitPendingFsConsume();
     if (_viewModel.isInFreeSpins && _viewModel.freeSpinsRemaining == 0) {

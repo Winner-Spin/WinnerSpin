@@ -49,8 +49,7 @@ class TumbleWinLine extends StatelessWidget {
         _buildValue(),
       ],
     );
-    if (!isPostWinPulsing) return line;
-    return TumbleWinPulse(child: line);
+    return TumbleWinPulse(active: isPostWinPulsing, child: line);
   }
 
   Widget _buildValue() {
@@ -154,8 +153,9 @@ class TumbleWinLine extends StatelessWidget {
 }
 
 class TumbleWinPulse extends StatefulWidget {
-  const TumbleWinPulse({super.key, required this.child});
+  const TumbleWinPulse({super.key, required this.active, required this.child});
 
+  final bool active;
   final Widget child;
 
   @override
@@ -192,7 +192,21 @@ class _TumbleWinPulseState extends State<TumbleWinPulse>
         weight: 55,
       ),
     ]).animate(_controller);
-    _controller.forward();
+    if (widget.active) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant TumbleWinPulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      _controller.forward(from: 0);
+    } else if (oldWidget.active && !widget.active && _controller.isAnimating) {
+      _controller
+        ..stop()
+        ..value = 0;
+    }
   }
 
   @override

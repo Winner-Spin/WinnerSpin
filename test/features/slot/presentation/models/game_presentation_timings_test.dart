@@ -10,6 +10,13 @@ void main() {
     );
   });
 
+  test('holds a completed farm win for 100 ms', () {
+    expect(
+      GamePresentationTimings.normalFarmPostWinHold,
+      const Duration(milliseconds: 100),
+    );
+  });
+
   test('uses the selected speed only for flight durations', () {
     const base = Duration(milliseconds: 900);
 

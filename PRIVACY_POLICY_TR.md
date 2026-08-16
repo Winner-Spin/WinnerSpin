@@ -1,6 +1,23 @@
 # Winner Spin Gizlilik Politikası
 
-Son güncelleme: 9 Ağustos 2026
+Son güncelleme: 14 Ağustos 2026
+
+## Winner Spin Hesabınızı Silme
+
+Winner Spin hesabınızı uygulama içinden kalıcı olarak silmek için
+**Profilim** bölümünü açıp **Hesabı Sil** seçeneğini kullanabilirsiniz.
+
+Uygulamaya erişemiyorsanız
+[winnerspinapp@gmail.com](mailto:winnerspinapp@gmail.com?subject=Winner%20Spin%20Account%20Deletion%20Request)
+adresine **Winner Spin Account Deletion Request** konulu bir hesap silme talebi
+gönderin.
+
+Hesabınızı silmek; Firebase Authentication hesabınızı, Winner Spin profilinizi,
+senkronize oyun durumunuzu, buluttaki oyun geçmişinizi, sanal bakiyenizi ve
+hesabınıza bağlı ödülleri kaldırır.
+
+Silinen veriler, sınırlı olarak saklanan kayıtlar ve saklama süreleriyle ilgili
+tüm bilgiler aşağıdaki **6. Hesap ve Verilerin Silinmesi** bölümünde yer alır.
 
 ## 1. Kapsam ve Biz Kimiz
 
@@ -65,11 +82,11 @@ işleriz. Bunlar şunları içerir:
 
 ### Teknik ve güvenlik bilgileri
 
-Google Firebase ve Google Play Integrity; kullanıcıların kimliğini doğrulamak,
-hizmeti korumak ve kötüye kullanımı önlemek için gereken sınırlı teknik
-bilgileri otomatik olarak işleyebilir. Bunlar IP adresinizi, user-agent
-bilgilerini, talep zaman damgalarını ve cihaz veya uygulama bütünlüğü sinyallerini
-içerebilir.
+Google Firebase, Firebase App Check ve Google Play Integrity; kullanıcıların
+kimliğini doğrulamak, hizmeti korumak ve kötüye kullanımı önlemek için gereken
+sınırlı teknik bilgileri otomatik olarak işleyebilir. Bunlar IP adresinizi,
+user-agent bilgilerini, talep zaman damgalarını, cihaz veya uygulama bütünlüğü
+sinyallerini, App Check jetonlarını ve doğrulama sonuçlarını içerebilir.
 
 Winner Spin ayrıca temel bağlantı kontrolleri gerçekleştirir. Ağ hizmeti IP
 adresiniz ve talep zaman damgası gibi standart bağlantı bilgilerini alabilse de

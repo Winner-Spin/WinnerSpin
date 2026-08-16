@@ -40,4 +40,20 @@ class GamePresentationGuards {
         !showFreeSpinTransition &&
         !fsSummaryPopupVisible;
   }
+
+  static bool shouldHoldCompletedFarmWin({
+    required bool isInFreeSpins,
+    required bool lastSpinWasFreeSpin,
+    required bool isBusy,
+    required bool hasResult,
+    required double lastWin,
+    required bool holdScheduledThisSpin,
+  }) {
+    return !isInFreeSpins &&
+        !lastSpinWasFreeSpin &&
+        !isBusy &&
+        hasResult &&
+        lastWin > 0 &&
+        !holdScheduledThisSpin;
+  }
 }

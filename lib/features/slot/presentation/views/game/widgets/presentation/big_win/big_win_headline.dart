@@ -35,24 +35,54 @@ class BigWinStarsRow extends StatelessWidget {
       children: List.generate(4, (i) {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Icon(
-            Icons.star_rounded,
-            size: 52,
-            color: const Color(0xFFFFD700),
-            shadows: [
-              Shadow(
-                color: const Color(0xFFFFA500).withValues(alpha: 0.7),
-                blurRadius: 14,
-              ),
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
-          ),
+          child: BigWinStar(index: i),
         );
       }),
+    );
+  }
+}
+
+class BigWinStar extends StatelessWidget {
+  const BigWinStar({super.key, required this.index});
+
+  static const color = Color(0xFFFFD700);
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: SizedBox.square(
+        dimension: 52,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.star_rounded,
+              size: 52,
+              color: Colors.transparent,
+              shadows: [
+                Shadow(
+                  color: const Color(0xFFFFA500).withValues(alpha: 0.7),
+                  blurRadius: 14,
+                ),
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  offset: const Offset(0, 2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            Icon(
+              Icons.star_rounded,
+              key: ValueKey('big-win-star-foreground-$index'),
+              size: 52,
+              color: color,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
